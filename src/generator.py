@@ -1,0 +1,448 @@
+import os
+import json
+import random
+import requests
+import numpy as np
+from io import BytesIO
+import ollama
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
+
+from moviepy.editor import AudioFileClip, ImageClip, VideoFileClip, CompositeVideoClip, CompositeAudioClip, concatenate_videoclips, vfx
+from moviepy.config import change_settings
+from pathlib import Path
+from pydub import AudioSegment
+import pyttsx3
+
+# --- Configuration ---
+ASSETS_PATH = Path("assets")
+FONT_FILE = ASSETS_PATH / "fonts/arial.ttf"
+BACKGROUND_MUSIC_PATH = ASSETS_PATH / "music/bg_music.mp3"
+BACKGROUNDS_PATH = ASSETS_PATH / "backgrounds"
+GAMEPLAY_PATH = ASSETS_PATH / "gameplay"
+FALLBACK_THUMBNAIL_FONT = ImageFont.load_default()
+YOUR_NAME = "Chaitanya"
+PEXELS_API_KEY = "jsVc9Hd2JnpHjPeY5347XU9UHDkz75QLtFkGKmxMS4o44GlG4mHo1jAz"
+PEXELS_CACHE_DIR = ASSETS_PATH / "pexels"
+PEXELS_CACHE_DIR.mkdir(exist_ok=True, parents=True)
+GAMEPLAY_PATH.mkdir(exist_ok=True, parents=True)
+
+if os.name == 'posix':
+    change_settings({"IMAGEMAGICK_BINARY": "/opt/homebrew/bin/convert"})
+
+def get_local_background(lesson_title: str, video_type: str) -> Image.Image:
+    """Fixed for modern Pillow (no more ANTIALIAS error)."""
+    if not BACKGROUNDS_PATH.exists() or len(list(BACKGROUNDS_PATH.glob("*.*"))) < 1:
+        print("⚠️ Backgrounds folder is low/empty")
+        w, h = (1920, 1080) if video_type == 'long' else (1080, 1920)
+        return Image.new('RGBA', (w, h), color=(12, 17, 29))
+    
+    images = list(BACKGROUNDS_PATH.glob("*.jpg")) + list(BACKGROUNDS_PATH.glob("*.png")) + list(BACKGROUNDS_PATH.glob("*.jpeg"))
+    if not images:
+        w, h = (1920, 1080) if video_type == 'long' else (1080, 1920)
+        return Image.new('RGBA', (w, h), color=(12, 17, 29))
+    
+    keywords = ["ai", "neural", "tech", "code", "abstract", "future", "data", "brain", "learning"]
+    title_lower = lesson_title.lower()
+    scored = [(sum(1 for kw in keywords if kw in title_lower or kw in img.name.lower()), img) for img in images]
+    scored.sort(reverse=True, key=lambda x: x[0])
+    chosen = scored[0][1] if scored[0][0] > 0 else random.choice(images)
+    
+    print(f"🎨 Using local background: {chosen.name}")
+    img = Image.open(chosen).convert("RGBA")
+    
+    # Modern Pillow resizing (no ANTIALIAS)
+    width, height = (1920, 1080) if video_type == 'long' else (1080, 1920)
+    img = img.resize((width, height), Image.Resampling.LANCZOS)
+    return img
+
+def get_local_gameplay(video_type: str) -> str:
+    clips = list(GAMEPLAY_PATH.glob("*.mp4"))
+    if clips:
+        return str(random.choice(clips))
+    return None
+
+def get_relevant_pexels_video(query: str, video_type: str) -> str:
+    # clean query
+    query = query.split()[0]
+    headers = {"Authorization": PEXELS_API_KEY}
+    orientation = "landscape" if video_type == 'long' else "portrait"
+    url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation={orientation}"
+    try:
+        res = requests.get(url, headers=headers, timeout=15)
+        data = res.json()
+        if data.get("videos"):
+            video_url = None
+            for v in data["videos"]:
+                for f in v.get("video_files", []):
+                    if f.get("quality") == "hd":
+                        video_url = f["link"]
+                        break
+                if video_url:
+                    video_id = v["id"]
+                    break
+            
+            if not video_url:
+                video_url = data["videos"][0]["video_files"][0]["link"]
+                video_id = data["videos"][0]["id"]
+            
+            video_path = PEXELS_CACHE_DIR / f"{video_id}.mp4"
+            if not video_path.exists():
+                print(f"⬇️ Downloading Pexels video for '{query}'...")
+                r = requests.get(video_url, stream=True, timeout=30)
+                with open(video_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=1024*1024):
+                        if chunk: f.write(chunk)
+            return str(video_path)
+    except Exception as e:
+        print(f"⚠️ Pexels error: {e}")
+    return None
+
+def ollama_generate(prompt: str, json_mode: bool = True) -> dict:
+    model = "qwen2.5-coder:3b"
+    full_prompt = prompt
+    if json_mode:
+        full_prompt += "\n\nRespond with ONLY valid JSON. No explanations, no markdown, no extra text."
+    response = ollama.chat(
+        model=model,
+        messages=[{'role': 'user', 'content': full_prompt}],
+        options={
+            'temperature': 0.6,
+            'num_ctx': 4096,
+            'num_gpu': 1,
+            'num_thread': 8,
+            'repeat_penalty': 1.1
+        }
+    )
+    text = response['message']['content'].strip()
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0]
+    elif "```" in text:
+        text = text.split("```")[1]
+    try:
+        return json.loads(text)
+    except:
+        import re
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        return json.loads(match.group(0)) if match else {}
+
+def text_to_speech(text: str, output_path: Path) -> Path:
+    """Better local TTS using Piper (natural neural voice) with pyttsx3 fallback."""
+    print(f"🗣️ Converting script to speech with Piper...")
+    wav_path = output_path.with_suffix('.wav')
+    try:
+        import subprocess
+        # Piper command - adjust voice path to your downloaded voice
+        voice_path = Path.home() / ".local/share/piper-tts/voices/en-us-lessac-medium.onnx"
+        if voice_path.exists():
+            cmd = [
+                "piper",
+                "--model", str(voice_path),
+                "--output_file", str(wav_path),
+                "--length_scale", "1.0",
+                "--sentence_silence", "0.3"
+            ]
+            result = subprocess.run(cmd, input=text.encode(), capture_output=True, check=True)
+            print(f"✅ Piper TTS saved → {wav_path.name}")
+            return wav_path
+        else:
+            raise FileNotFoundError("Piper voice not found")
+    except Exception as e:
+        print(f"⚠️ Piper failed ({e}), falling back to pyttsx3...")
+        mp3_path = output_path.with_suffix('.mp3')
+        engine = pyttsx3.init()
+        engine.setProperty('rate', 170)
+        engine.setProperty('volume', 1.0)
+        engine.save_to_file(text, str(mp3_path))
+        engine.runAndWait()
+        audio = AudioSegment.from_mp3(str(mp3_path))
+        audio.export(str(wav_path), format="wav", codec="pcm_s16le")
+        if mp3_path.exists():
+            mp3_path.unlink()
+        print(f"✅ Fallback TTS saved → {wav_path.name}")
+        return wav_path
+
+def generate_curriculum(previous_titles=None):
+    print("📋 Generating new curriculum with local Ollama...")
+    try:
+        history = ""
+        if previous_titles:
+            formatted = "\n".join([f"{i+1}. {t}" for i, t in enumerate(previous_titles)])
+            history = f"The following lessons have already been created:\n{formatted}\n\nPlease continue from where this series left off.\n"
+        prompt = f"""
+        You are an expert AI educator. Generate a curriculum for a YouTube series called 'AI for Developers by {YOUR_NAME}'.
+        {history}
+        The style must be: 'Assume the viewer is a beginner or non-technical person starting their journey into AI as a developer.
+        Use simple real-world analogies, relatable examples, and then connect to technical concepts.'
+
+        Make sure to include TRENDING and LATEST topics in AI (like multi-agent systems, local LLMs, deepseek, qwen, etc.).
+
+        The curriculum must guide a developer from absolute beginner to advanced AI, covering foundations like Generative AI, LLMs, Vector Databases, and Agentic AI.
+        Then continue into deep AI topics like Reinforcement Learning, Transformers internals, multi-agent systems, tool use, LangGraph, AI architecture, and more.
+
+        Respond with ONLY a valid JSON object. The object must contain a key "lessons" which is a list of 20 lesson objects.
+        Each lesson object must have these keys: "chapter", "part", "title", "status" (defaulted to "pending"), and "youtube_id" (defaulted to null).
+        """
+        return ollama_generate(prompt, json_mode=True)
+    except Exception as e:
+        print(f"❌ Curriculum generation failed: {e}")
+        raise
+
+def generate_lesson_content(lesson_title):
+    print(f"📝 Generating content for lesson: '{lesson_title}'...")
+    try:
+        prompt = f"""
+        You are creating a lesson for the 'AI for Developers by {YOUR_NAME}' series. The topic is '{lesson_title}'.
+        The style is: Assume the viewer is a beginner developer or non-tech person who wants to learn AI from scratch.
+        Use analogies and clear, simple language. Each concept must be explained from a developer's perspective, assuming no prior AI or ML knowledge.
+
+        Generate a JSON response with three keys:
+        1. "long_form_slides": A list of 7 to 8 slide objects for a longer, more detailed main video. Each object needs a "title" and "content" key.
+        2. "short_form_highlight": A single, punchy, 1-2 sentence summary for a YouTube Short.
+        3. "hashtags": A string of 5-7 relevant, space-separated hashtags for this lesson (e.g., "#GenerativeAI #LLM #Developer","#NeuralNetworks #BeginnerAI #AIforDevelopers").
+
+        Return only valid JSON.
+        """
+        return ollama_generate(prompt, json_mode=True)
+    except Exception as e:
+        print(f"❌ Lesson content failed: {e}")
+        raise
+
+def draw_wrapped_text(draw, text, font, content_box, fill="white", center=True, dry_run=False):
+    """Render word-wrapped text within a bounding box. Returns False if text doesn't fit."""
+    box_left, box_top, box_right, box_bottom = content_box
+    pad = 20
+    max_width = (box_right - box_left) - (pad * 2)
+    available_height = (box_bottom - box_top) - (pad * 2)
+    line_spacing = int(font.size * 1.4)
+
+    # Word wrap with character-level fallback for long words
+    lines = []
+    for paragraph in text.split('\n'):
+        words = paragraph.split()
+        if not words:
+            lines.append("")
+            continue
+        line = ""
+        for word in words:
+            test_line = (line + " " + word).strip()
+            if draw.textlength(test_line, font=font) <= max_width:
+                line = test_line
+            else:
+                if line:
+                    lines.append(line)
+                # Check if single word exceeds max_width — break with hyphen
+                if draw.textlength(word, font=font) > max_width:
+                    chunk = ""
+                    for ch in word:
+                        if draw.textlength(chunk + ch + "-", font=font) > max_width:
+                            lines.append(chunk + "-")
+                            chunk = ch
+                        else:
+                            chunk += ch
+                    line = chunk
+                else:
+                    line = word
+        if line:
+            lines.append(line)
+
+    total_height = len(lines) * line_spacing
+    if total_height > available_height:
+        return False
+
+    if dry_run:
+        return True
+
+    y = box_top + pad
+    for line_text in lines:
+        if center:
+            tw = draw.textlength(line_text, font=font)
+            x = box_left + (box_right - box_left - tw) / 2
+        else:
+            x = box_left + pad
+        draw.text((x, y), line_text, fill=fill, font=font)
+        y += line_spacing
+    return True
+
+
+def auto_scale_text(draw, text, font_path, initial_size, content_box, fill="white", min_size=20):
+    """Progressively shrink font until text fits the content_box. Returns font size used."""
+    size = initial_size
+    while size >= min_size:
+        try:
+            font = ImageFont.truetype(font_path, size)
+        except IOError:
+            font = FALLBACK_THUMBNAIL_FONT
+        if draw_wrapped_text(draw, text, font, content_box, fill=fill, dry_run=True):
+            draw_wrapped_text(draw, text, font, content_box, fill=fill)
+            return size
+        size -= 3
+
+    # At min_size, render with truncation
+    font = ImageFont.truetype(font_path, min_size) if FONT_FILE.exists() else FALLBACK_THUMBNAIL_FONT
+    box_left, box_top, box_right, box_bottom = content_box
+    max_width = (box_right - box_left) - 40
+    available_height = (box_bottom - box_top) - 40
+    line_spacing = int(min_size * 1.4)
+    max_lines = max(1, int(available_height / line_spacing))
+
+    lines = []
+    for paragraph in text.split('\n'):
+        words = paragraph.split()
+        if not words:
+            lines.append("")
+            continue
+        line = ""
+        for word in words:
+            test_line = (line + " " + word).strip()
+            if draw.textlength(test_line, font=font) <= max_width:
+                line = test_line
+            else:
+                if line:
+                    lines.append(line)
+                line = word
+            if len(lines) >= max_lines:
+                break
+        if line and len(lines) < max_lines:
+            lines.append(line)
+        if len(lines) >= max_lines:
+            break
+
+    if len(lines) == max_lines:
+        lines[-1] = lines[-1][:max(0, len(lines[-1]) - 3)] + "..."
+
+    y = box_top + 20
+    for line_text in lines:
+        tw = draw.textlength(line_text, font=font)
+        x = box_left + ((box_right - box_left) - tw) / 2
+        draw.text((x, y), line_text, fill=fill, font=font)
+        y += line_spacing
+    return min_size
+
+def generate_visuals(output_dir, video_type, slide_content=None, thumbnail_title=None, slide_number=0, total_slides=0):
+    output_dir.mkdir(exist_ok=True, parents=True)
+    is_thumbnail = thumbnail_title is not None
+    width, height = (1920, 1080) if video_type == 'long' else (1080, 1920)
+    title = thumbnail_title if is_thumbnail else slide_content.get("title", "")
+    
+    if is_thumbnail:
+        bg_image = get_local_background(title, video_type)
+        bg_image = bg_image.resize((width, height)).filter(ImageFilter.GaussianBlur(5))
+        darken_layer = Image.new('RGBA', bg_image.size, (0, 0, 0, 150))
+        final_bg = Image.alpha_composite(bg_image, darken_layer).convert("RGB")
+        if video_type == 'long':
+            w, h = final_bg.size
+            if h > w:
+                print("Detected vertical thumbnail for long video. Rotating...")
+                final_bg = final_bg.transpose(Image.ROTATE_270).resize((1920, 1080))
+    else:
+        final_bg = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+
+    draw = ImageDraw.Draw(final_bg)
+    try:
+        title_font = ImageFont.truetype(str(FONT_FILE), 80 if video_type == 'long' else 90)
+        content_font = ImageFont.truetype(str(FONT_FILE), 45 if video_type == 'long' else 55)
+        footer_font = ImageFont.truetype(str(FONT_FILE), 25 if video_type == 'long' else 35)
+    except IOError:
+        title_font = content_font = footer_font = FALLBACK_THUMBNAIL_FONT
+        
+    if not is_thumbnail:
+        header_height = int(height * 0.18)
+        draw.rectangle([0, 0, width, header_height], fill=(25, 40, 65, 200))
+        draw.text((width//2, header_height//2), title, fill="white", font=title_font, anchor="mm")
+        content_y = header_height + 80
+        draw.rectangle([20, content_y - 40, width - 20, height - 120], fill=(0, 0, 0, 150))
+        content_text = slide_content.get("content", "")
+        content_box = (40, content_y, width - 40, height - 130)
+        auto_scale_text(draw, content_text, str(FONT_FILE), 45 if video_type == 'long' else 55, content_box)
+        footer_y = height - 80
+        footer_text = f"AI for Developers by {YOUR_NAME} • Slide {slide_number}/{total_slides}"
+        draw.text((width//2, footer_y), footer_text, fill="white", font=footer_font, anchor="mm")
+    else:
+        draw.text((width//2, height//2 - 100), title, fill="white", font=title_font, anchor="mm")
+        
+    file_prefix = "thumbnail" if is_thumbnail else f"slide_{slide_number:02d}"
+    path = output_dir / f"{file_prefix}.png"
+    final_bg.save(path)
+    return str(path)
+
+def create_video(slide_paths, audio_paths, output_path, video_type, lesson_title):
+    """OPTIMIZED dynamic video – background loaded ONCE, ultrafast encoding."""
+    print(f"🎥 Creating dynamic {video_type} video for: {lesson_title} (OPTIMIZED MODE)")
+    
+    STATIC_MODE = False  # Set to True only for super-fast testing
+    
+    try:
+        if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
+            raise ValueError("Slide/audio mismatch")
+
+        # Load background ONCE
+        pexels_path = get_relevant_pexels_video(lesson_title, video_type)
+        if not pexels_path:
+            pexels_path = get_local_gameplay(video_type)
+
+        total_duration = sum(AudioFileClip(str(a)).duration for a in audio_paths) + 0.5 * len(audio_paths)
+
+        if pexels_path and not STATIC_MODE:
+            print(f"🎮 Using background: {Path(pexels_path).name} (loaded once)")
+            bg_clip = VideoFileClip(pexels_path)
+            if bg_clip.duration < total_duration:
+                bg_clip = bg_clip.fx(vfx.loop, duration=total_duration)
+            else:
+                bg_clip = bg_clip.subclip(0, total_duration)
+            bg_clip = bg_clip.fx(vfx.colorx, 0.78)
+            w, h = bg_clip.size
+            zoom = 1.06
+            bg_clip = bg_clip.resize(zoom).set_position(lambda t: (0 + (t * 2), 0 + (t * 1.2)))
+        else:
+            bg_clip = None
+
+        # Build slides
+        image_clips = []
+        for i, (img_path, audio_path) in enumerate(zip(slide_paths, audio_paths)):
+            audio_clip = AudioFileClip(str(audio_path))
+            duration = audio_clip.duration + 0.5
+            img_clip = ImageClip(str(img_path)).set_duration(duration).fadein(0.5).fadeout(0.5)
+            
+            if bg_clip and not STATIC_MODE:
+                final_clip = CompositeVideoClip([
+                    bg_clip.set_duration(duration),
+                    img_clip.set_opacity(0.93).set_position('center')
+                ])
+            else:
+                final_clip = img_clip
+            
+            final_clip = final_clip.set_audio(audio_clip)
+            image_clips.append(final_clip)
+
+        final_video = concatenate_videoclips(image_clips, method="compose")
+
+        if BACKGROUND_MUSIC_PATH.exists():
+            print("🎵 Adding background music...")
+            bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.15)
+            if bg_music.duration < final_video.duration:
+                bg_music = bg_music.fx(vfx.loop, duration=final_video.duration)
+            else:
+                bg_music = bg_music.subclip(0, final_video.duration)
+            composite = CompositeAudioClip([final_video.audio.volumex(1.2), bg_music])
+            final_video = final_video.set_audio(composite)
+
+        # Ultra-fast write settings for M1 8GB
+        final_video.write_videofile(
+            str(output_path),
+            fps=24,
+            codec="libx264",
+            audio_codec="aac",
+            audio_bitrate="192k",
+            preset="ultrafast",      # ← This is the main speed boost
+            threads=3,
+            logger=None
+        )
+        print(f"✅ Dynamic video saved: {output_path.name} (optimized)")
+        
+    except Exception as e:
+        print(f"❌ Video creation error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise

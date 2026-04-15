@@ -1,0 +1,23 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Output / generated media
+output/
+
+# Secrets
+credentials.json
+client_secrets.json
+.env
+
+# Assets cache (large files)
+assets/pexels/
+
+# macOS
+.DS_Store

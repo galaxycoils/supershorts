@@ -1,0 +1,137 @@
+{
+  "lessons": [
+    {
+      "chapter": 1,
+      "part": 1,
+      "title": "Introduction to AI for Developers",
+      "status": "complete",
+      "youtube_id": "MOCK_VIDEO_ID"
+    },
+    {
+      "chapter": 1,
+      "part": 2,
+      "title": "What is Artificial Intelligence?",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 1,
+      "part": 3,
+      "title": "Real-World Examples of AI",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 2,
+      "part": 1,
+      "title": "Foundations of AI: Generative AI",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 2,
+      "part": 2,
+      "title": "Understanding Large Language Models (LLMs)",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 2,
+      "part": 3,
+      "title": "Vector Databases: How They Work",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 3,
+      "part": 1,
+      "title": "Advanced AI: Agentic AI",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 3,
+      "part": 2,
+      "title": "AI in the Real World: Case Studies",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 4,
+      "part": 1,
+      "title": "Deep AI: Reinforcement Learning",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 4,
+      "part": 2,
+      "title": "Reinforcement Learning Basics",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 5,
+      "part": 1,
+      "title": "Transformers Internals: How They Work",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 5,
+      "part": 2,
+      "title": "Understanding Transformers: A Simple Explanation",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 6,
+      "part": 1,
+      "title": "Multi-Agent Systems: How They Work",
+      "status": "complete",
+      "youtube_id": "BROWSER_UPLOAD_SUCCESS"
+    },
+    {
+      "chapter": 6,
+      "part": 2,
+      "title": "Introducing Multi-Agent Systems",
+      "status": "pending"
+    },
+    {
+      "chapter": 7,
+      "part": 1,
+      "title": "Tool Use in AI: How It Works",
+      "status": "pending"
+    },
+    {
+      "chapter": 7,
+      "part": 2,
+      "title": "Understanding Tool Use in AI",
+      "status": "pending"
+    },
+    {
+      "chapter": 8,
+      "part": 1,
+      "title": "LangGraph: The Future of AI",
+      "status": "pending"
+    },
+    {
+      "chapter": 8,
+      "part": 2,
+      "title": "What is LangGraph and Why It Matters",
+      "status": "pending"
+    },
+    {
+      "chapter": 9,
+      "part": 1,
+      "title": "AI Architecture: How AI Systems Are Structured",
+      "status": "pending"
+    },
+    {
+      "chapter": 9,
+      "part": 2,
+      "title": "Understanding AI Architectures",
+      "status": "pending"
+    }
+  ]
+}
