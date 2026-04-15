@@ -64,8 +64,11 @@ def get_local_gameplay(video_type: str) -> str:
     return None
 
 def get_relevant_pexels_video(query: str, video_type: str) -> str:
-    # clean query
-    query = query.split()[0]
+    # clean query — guard empty string
+    parts = query.split()
+    if not parts:
+        return None
+    query = parts[0]
     headers = {"Authorization": PEXELS_API_KEY}
     orientation = "landscape" if video_type == 'long' else "portrait"
     url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation={orientation}"
@@ -122,7 +125,7 @@ def ollama_generate(prompt: str, json_mode: bool = True) -> dict:
         text = text.split("```")[1]
     try:
         return json.loads(text)
-    except:
+    except Exception:
         import re
         match = re.search(r'\{.*\}', text, re.DOTALL)
         return json.loads(match.group(0)) if match else {}
