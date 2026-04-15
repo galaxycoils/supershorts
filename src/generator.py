@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import random
 import requests
@@ -13,6 +14,7 @@ from moviepy.editor import AudioFileClip, ImageClip, VideoFileClip, CompositeVid
 from moviepy.config import change_settings
 from pathlib import Path
 from pydub import AudioSegment
+from tqdm import tqdm
 import pyttsx3
 
 # --- Configuration ---
@@ -130,9 +132,31 @@ def ollama_generate(prompt: str, json_mode: bool = True) -> dict:
         match = re.search(r'\{.*\}', text, re.DOTALL)
         return json.loads(match.group(0)) if match else {}
 
+_EMOJI_RE = re.compile(
+    "[\U0001F600-\U0001F64F"   # emoticons
+    "\U0001F300-\U0001F5FF"   # symbols & pictographs
+    "\U0001F680-\U0001F6FF"   # transport & map
+    "\U0001F1E0-\U0001F1FF"   # flags
+    "\U00002702-\U000027B0"   # dingbats
+    "\U000024C2-\U0001F251"   # enclosed chars
+    "\U0001F900-\U0001F9FF"   # supplemental symbols
+    "\U0001FA00-\U0001FA6F"   # chess symbols
+    "\U0001FA70-\U0001FAFF"   # symbols extended-A
+    "\U00002300-\U000023FF"   # misc technical
+    "]+",
+    flags=re.UNICODE,
+)
+
+def strip_emojis(text: str) -> str:
+    """Remove emoji and non-ASCII decorative chars before TTS."""
+    text = _EMOJI_RE.sub('', text)
+    return re.sub(r' {2,}', ' ', text).strip()
+
+
 def text_to_speech(text: str, output_path: Path) -> Path:
     """Better local TTS using Piper (natural neural voice) with pyttsx3 fallback."""
-    print(f"🗣️ Converting script to speech with Piper...")
+    text = strip_emojis(text)
+    print(f"🗣️ TTS → {Path(output_path).stem} ({len(text)} chars)...")
     wav_path = output_path.with_suffix('.wav')
     try:
         import subprocess
@@ -403,11 +427,13 @@ def create_video(slide_paths, audio_paths, output_path, video_type, lesson_title
 
         # Build slides
         image_clips = []
-        for i, (img_path, audio_path) in enumerate(zip(slide_paths, audio_paths)):
+        for i, (img_path, audio_path) in enumerate(tqdm(list(zip(slide_paths, audio_paths)),
+                                                         desc="  Building slides", unit="slide",
+                                                         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
             audio_clip = AudioFileClip(str(audio_path))
             duration = audio_clip.duration + 0.5
             img_clip = ImageClip(str(img_path)).set_duration(duration).fadein(0.5).fadeout(0.5)
-            
+
             if bg_clip and not STATIC_MODE:
                 final_clip = CompositeVideoClip([
                     bg_clip.set_duration(duration),
@@ -415,7 +441,7 @@ def create_video(slide_paths, audio_paths, output_path, video_type, lesson_title
                 ])
             else:
                 final_clip = img_clip
-            
+
             final_clip = final_clip.set_audio(audio_clip)
             image_clips.append(final_clip)
 
@@ -432,17 +458,18 @@ def create_video(slide_paths, audio_paths, output_path, video_type, lesson_title
             final_video = final_video.set_audio(composite)
 
         # Ultra-fast write settings for M1 8GB
+        print(f"🎬 Encoding video → {Path(output_path).name}")
         final_video.write_videofile(
             str(output_path),
             fps=24,
             codec="libx264",
             audio_codec="aac",
             audio_bitrate="192k",
-            preset="ultrafast",      # ← This is the main speed boost
+            preset="ultrafast",      # ← main speed boost
             threads=3,
-            logger=None
+            logger='bar',
         )
-        print(f"✅ Dynamic video saved: {output_path.name} (optimized)")
+        print(f"✅ Video saved: {Path(output_path).name}")
         
     except Exception as e:
         print(f"❌ Video creation error: {e}")

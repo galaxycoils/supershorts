@@ -9,10 +9,12 @@ from moviepy.editor import (
     CompositeVideoClip, CompositeAudioClip,
     concatenate_videoclips, vfx
 )
+from tqdm import tqdm
 
 from src.generator import (
     ollama_generate,
     text_to_speech,
+    strip_emojis,
     get_local_gameplay,
     get_relevant_pexels_video,
     get_local_background,
@@ -276,9 +278,11 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title):
             bg_clip = None
 
         clips = []
-        for i, (img_path, audio_path) in enumerate(zip(slide_paths, audio_paths)):
+        pairs = list(zip(slide_paths, audio_paths))
+        for i, (img_path, audio_path) in enumerate(tqdm(pairs, desc="  Building clips", unit="clip", leave=False,
+                                                         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
             audio_clip = AudioFileClip(str(audio_path))
-            duration = audio_clip.duration + 0.3  # shorter gap vs 0.5
+            duration = audio_clip.duration + 0.3
             img_clip = ImageClip(str(img_path)).set_duration(duration).fadein(0.2).fadeout(0.2)
 
             if bg_clip:
@@ -304,6 +308,7 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title):
             composite_audio = CompositeAudioClip([final.audio.volumex(1.2), bg_music])
             final = final.set_audio(composite_audio)
 
+        print(f"🎬 Encoding → {Path(output_path).name}")
         final.write_videofile(
             str(output_path),
             fps=24,
@@ -312,7 +317,7 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title):
             audio_bitrate="192k",
             preset="ultrafast",
             threads=3,
-            logger=None
+            logger='bar',
         )
         print(f"✅ Brain rot video saved: {Path(output_path).name}")
 
@@ -349,8 +354,10 @@ def run_brainrot_pipeline():
 
     from src.browser_uploader import upload_to_youtube_browser
 
+    batch = pending[:SHORTS_PER_RUN]
     processed = 0
-    for topic in pending[:SHORTS_PER_RUN]:
+    for topic in tqdm(batch, desc="Brain Rot Shorts", unit="short",
+                      bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} shorts [{elapsed}<{remaining}]"):
         try:
             print(f"\n▶️  Topic: '{topic['title']}'")
             script = generate_brainrot_script(topic)
@@ -360,18 +367,16 @@ def run_brainrot_pipeline():
             palette = random.choice(BRAINROT_PALETTES)
             slides_data = script.get("slides", [])
 
-            # TTS full script as one audio, split across slides proportionally
-            full_script = script.get("full_script", " ".join(s["text"] for s in slides_data))
-            audio_path = OUTPUT_DIR / f"brainrot_audio_{unique_id}.mp3"
-            tts_path = text_to_speech(full_script, audio_path)
+            full_script = strip_emojis(script.get("full_script", " ".join(s["text"] for s in slides_data)))
 
-            # Per-slide TTS for better sync
+            # Per-slide TTS + visuals with progress
             slide_audio_paths = []
             slide_image_paths = []
             total_slides = len(slides_data)
 
-            for idx, slide in enumerate(slides_data):
-                slide_text = slide.get("text", "")
+            for idx, slide in enumerate(tqdm(slides_data, desc="  Slides", unit="slide", leave=False,
+                                              bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
+                slide_text = strip_emojis(slide.get("text", ""))
                 s_audio_path = OUTPUT_DIR / f"brainrot_s{idx+1}_{unique_id}.mp3"
                 s_tts = text_to_speech(slide_text, s_audio_path)
                 slide_audio_paths.append(s_tts)

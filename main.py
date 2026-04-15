@@ -4,6 +4,7 @@ import datetime
 import time
 import traceback
 from pathlib import Path
+from tqdm import tqdm
 from src.generator import (
     generate_curriculum,
     generate_lesson_content,
@@ -58,14 +59,16 @@ def produce_lesson_videos(lesson):
         "Thanks for watching! If you found this helpful, make sure to subscribe to our channel and hit the like button."
     ]
     slide_audio_paths = []
-    for i, script in enumerate(slide_scripts):
+    for i, script in enumerate(tqdm(slide_scripts, desc="  TTS (long)", unit="slide",
+                                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
         audio_path = OUTPUT_DIR / f"audio_slide_{i+1}_{unique_id}.mp3"
         wav_path = text_to_speech(script, audio_path)
         slide_audio_paths.append(wav_path)
-    print(f"🎧 Total slide audios: {len(slide_audio_paths)}")
+
     slide_dir = OUTPUT_DIR / f"slides_long_{unique_id}"
     slide_paths = []
-    for i, slide in enumerate(all_slides):
+    for i, slide in enumerate(tqdm(all_slides, desc="  Slides (long)", unit="slide",
+                                   bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
         path = generate_visuals(
             output_dir=slide_dir,
             video_type='long',
