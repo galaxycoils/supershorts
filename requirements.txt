@@ -2,7 +2,7 @@ ollama
 pyttsx3
 pydub
 moviepy==1.0.3
-Pillow==9.5.0
+Pillow==12.2.0
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
