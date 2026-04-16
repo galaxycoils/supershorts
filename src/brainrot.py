@@ -256,8 +256,9 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title):
         if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
             raise ValueError("Slide/audio count mismatch")
 
-        # Prefer gameplay, then Pexels with satisfying/gaming queries
-        bg_path = get_local_gameplay('short')
+        # Prefer viral gameplay, then normal gameplay, then Pexels
+        from src.generator import get_local_viral_gameplay
+        bg_path = get_local_viral_gameplay() or get_local_gameplay('short')
         if not bg_path:
             for query in ["satisfying", "gaming", "coding", "technology"]:
                 bg_path = get_relevant_pexels_video(query, 'short')
@@ -397,6 +398,9 @@ def run_brainrot_pipeline():
 
             print(f"\n📤 Uploading: {title}")
             video_id = upload_to_youtube_browser(video_path, title, desc, tags)
+            if video_id:
+                from src.learning import log_upload
+                log_upload(title, video_id, "brainrot")
 
             # Mark complete
             for t in plan["topics"]:

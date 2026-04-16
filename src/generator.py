@@ -1,3 +1,4 @@
+# src/generator.py - FULLY UPDATED FOR NEW FEATURES
 import os
 import re
 import json
@@ -16,6 +17,8 @@ from pathlib import Path
 from pydub import AudioSegment
 from tqdm import tqdm
 import pyttsx3
+import time
+import datetime
 
 # --- Configuration ---
 ASSETS_PATH = Path("assets")
@@ -23,12 +26,16 @@ FONT_FILE = ASSETS_PATH / "fonts/arial.ttf"
 BACKGROUND_MUSIC_PATH = ASSETS_PATH / "music/bg_music.mp3"
 BACKGROUNDS_PATH = ASSETS_PATH / "backgrounds"
 GAMEPLAY_PATH = ASSETS_PATH / "gameplay"
+VIRAL_GAMEPLAY_PATH = ASSETS_PATH / "viral_gameplay"   # ← NEW FOLDER: Subway Surfers etc.
 FALLBACK_THUMBNAIL_FONT = ImageFont.load_default()
 YOUR_NAME = "Chaitanya"
 PEXELS_API_KEY = "jsVc9Hd2JnpHjPeY5347XU9UHDkz75QLtFkGKmxMS4o44GlG4mHo1jAz"
 PEXELS_CACHE_DIR = ASSETS_PATH / "pexels"
+OUTPUT_DIR = Path("output")
 PEXELS_CACHE_DIR.mkdir(exist_ok=True, parents=True)
+OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 GAMEPLAY_PATH.mkdir(exist_ok=True, parents=True)
+VIRAL_GAMEPLAY_PATH.mkdir(exist_ok=True, parents=True)
 
 if os.name == 'posix':
     change_settings({"IMAGEMAGICK_BINARY": "/opt/homebrew/bin/convert"})
@@ -64,6 +71,17 @@ def get_local_gameplay(video_type: str) -> str:
     if clips:
         return str(random.choice(clips))
     return None
+
+def get_local_viral_gameplay() -> str | None:
+    """NEW: Picks high-motion Subway Surfers / Minecraft style clips"""
+    if not VIRAL_GAMEPLAY_PATH.exists():
+        return None
+    clips = list(VIRAL_GAMEPLAY_PATH.glob("*.mp4"))
+    if not clips:
+        return None
+    chosen = random.choice(clips)
+    print(f"🔥 Viral Gameplay background: {chosen.name}")
+    return str(chosen)
 
 def get_relevant_pexels_video(query: str, video_type: str) -> str:
     # clean query — guard empty string
@@ -216,14 +234,25 @@ def generate_curriculum(previous_titles=None):
         print(f"❌ Curriculum generation failed: {e}")
         raise
 
+def get_learning_context() -> str:
+    """Retrieves passive learning suggestions if available."""
+    suggestions_path = ASSETS_PATH / "learning_suggestions.txt"
+    if suggestions_path.exists():
+        try:
+            return f"\n\nPAST LEARNING IMPROVEMENTS (Implement these!):\n{suggestions_path.read_text()}\n"
+        except:
+            return ""
+    return ""
+
 def generate_lesson_content(lesson_title):
     print(f"📝 Generating content for lesson: '{lesson_title}'...")
     try:
+        learning_context = get_learning_context()
         prompt = f"""
         You are creating a lesson for the 'AI for Developers by {YOUR_NAME}' series. The topic is '{lesson_title}'.
         The style is: Assume the viewer is a beginner developer or non-tech person who wants to learn AI from scratch.
         Use analogies and clear, simple language. Each concept must be explained from a developer's perspective, assuming no prior AI or ML knowledge.
-
+        {learning_context}
         Generate a JSON response with three keys:
         1. "long_form_slides": A list of 7 to 8 slide objects for a longer, more detailed main video. Each object needs a "title" and "content" key.
         2. "short_form_highlight": A single, punchy, 1-2 sentence summary for a YouTube Short.
@@ -394,26 +423,30 @@ def generate_visuals(output_dir, video_type, slide_content=None, thumbnail_title
     final_bg.save(path)
     return str(path)
 
-def create_video(slide_paths, audio_paths, output_path, video_type, lesson_title):
+def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_title, is_tutorial=False, force_viral_bg=False):
     """OPTIMIZED dynamic video – background loaded ONCE, ultrafast encoding."""
-    print(f"🎥 Creating dynamic {video_type} video for: {lesson_title} (OPTIMIZED MODE)")
-    
+    label = 'Tutorial' if is_tutorial else ('Viral' if force_viral_bg else 'Dynamic')
+    print(f"🎥 Creating {label} {video_type} video for: {lesson_title} (OPTIMIZED MODE)")
+
     STATIC_MODE = False  # Set to True only for super-fast testing
-    
+
     try:
         if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
             raise ValueError("Slide/audio mismatch")
 
-        # Load background ONCE
-        pexels_path = get_relevant_pexels_video(lesson_title, video_type)
-        if not pexels_path:
-            pexels_path = get_local_gameplay(video_type)
+        # Load background ONCE — viral gameplay only when explicitly requested
+        if force_viral_bg:
+            bg_path = get_local_viral_gameplay() or get_relevant_pexels_video(lesson_title, video_type)
+        else:
+            bg_path = get_relevant_pexels_video(lesson_title, video_type)
+        if not bg_path:
+            bg_path = get_local_gameplay(video_type)
 
         total_duration = sum(AudioFileClip(str(a)).duration for a in audio_paths) + 0.5 * len(audio_paths)
 
-        if pexels_path and not STATIC_MODE:
-            print(f"🎮 Using background: {Path(pexels_path).name} (loaded once)")
-            bg_clip = VideoFileClip(pexels_path)
+        if bg_path and not STATIC_MODE:
+            print(f"🎮 Using background: {Path(bg_path).name} (loaded once)")
+            bg_clip = VideoFileClip(bg_path)
             if bg_clip.duration < total_duration:
                 bg_clip = bg_clip.fx(vfx.loop, duration=total_duration)
             else:
@@ -476,3 +509,152 @@ def create_video(slide_paths, audio_paths, output_path, video_type, lesson_title
         import traceback
         traceback.print_exc()
         raise
+
+# NEW: Tutorial Generation
+def generate_tutorial_content(topic: str):
+    print(f"📚 Generating ~10-minute tutorial for: {topic}")
+    prompt = f"""
+    Create a 10-minute tutorial script for topic: {topic}.
+    Break into 15-20 slides. Each slide: title + detailed content (explanation + code/examples + analogies).
+    Also create a 60-second Short highlight script.
+    Return ONLY JSON: {{"long_slides": [...], "short_highlight": "...", "hashtags": "..." }}
+    """
+    return ollama_generate(prompt, json_mode=True)
+
+# NEW: Tutorial Pipeline (long + linked short)
+def start_tutorial_generation():
+    from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
+    from src.learning import log_upload
+    
+    topic = input("Enter tutorial topic: ")
+    content = generate_tutorial_content(topic)
+    
+    # If content is string, try to parse it (fallback for direct ollama calls or inconsistencies)
+    if isinstance(content, str):
+        try:
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0]
+            elif "```" in content:
+                content = content.split("```")[1]
+            content = json.loads(content)
+        except:
+            import re
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            content = json.loads(match.group(0)) if match else {}
+
+    if not content or not isinstance(content, dict):
+        print("❌ Failed to generate tutorial content.")
+        return
+
+    unique_id = f"tutorial_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    print("\n--- Producing Long Tutorial Video ---")
+    long_slides = content.get("long_slides", [])
+    if not long_slides:
+        print("❌ No slides generated.")
+        return
+
+    slide_audio_paths = []
+    for i, slide in enumerate(tqdm(long_slides, desc="  TTS (long)")):
+        txt = f"{slide.get('title', '')}. {slide.get('content', '')}"
+        audio_path = OUTPUT_DIR / f"{unique_id}_long_audio_{i}.mp3"
+        wav_path = text_to_speech(txt, audio_path)
+        slide_audio_paths.append(wav_path)
+
+    slide_dir = OUTPUT_DIR / f"{unique_id}_slides"
+    slide_paths = []
+    for i, slide in enumerate(tqdm(long_slides, desc="  Slides (long)")):
+        path = generate_visuals(slide_dir, 'long', slide, slide_number=i+1, total_slides=len(long_slides))
+        slide_paths.append(path)
+
+    long_video_path = OUTPUT_DIR / f"{unique_id}_long.mp4"
+    compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', topic, is_tutorial=True)
+    
+    long_thumb_path = generate_visuals(OUTPUT_DIR, 'long', thumbnail_title=topic)
+
+    print("\n--- Producing Tutorial Short ---")
+    short_txt = content.get("short_highlight", f"Check out my new tutorial on {topic}!")
+    short_audio_path = text_to_speech(short_txt, OUTPUT_DIR / f"{unique_id}_short_audio.mp3")
+    
+    short_slide_content = {"title": "Tutorial Highlight", "content": short_txt}
+    short_slide_path = generate_visuals(OUTPUT_DIR / f"{unique_id}_short_slides", 'short', short_slide_content, slide_number=1, total_slides=1)
+    
+    short_video_path = OUTPUT_DIR / f"{unique_id}_short.mp4"
+    compose_video([short_slide_path], [short_audio_path], short_video_path, 'short', topic, is_tutorial=True)
+    
+    short_thumb_path = generate_visuals(OUTPUT_DIR, 'short', thumbnail_title=f"Tutorial: {topic}")
+
+    print("\n--- Uploading Tutorial ---")
+    hashtags = content.get("hashtags", "#Tutorial #Learn #Tech")
+    desc = f"New deep dive tutorial: {topic}\n\n{hashtags}\n\nProduced by SuperShorts"
+    
+    long_video_id = upload_to_youtube(long_video_path, topic, desc, "tutorial,ai," + topic.replace(" ", ","), long_thumb_path)
+    
+    if long_video_id:
+        log_upload(topic, long_video_id, "tutorial")
+        print("⏳ Waiting 120 seconds before uploading short...")
+        time.sleep(120)
+        
+        short_title = f"{topic[:80]} #Shorts #Tutorial"
+        short_desc = f"{short_txt}\n\nWatch full tutorial: https://youtube.com/watch?v={long_video_id}\n\n{hashtags}"
+        short_video_id = upload_to_youtube(short_video_path, short_title, short_desc, "shorts,tutorial", short_thumb_path)
+        if short_video_id:
+            log_upload(short_title, short_video_id, "tutorial_short")
+    else:
+        print("⚠️ Long video upload failed or returned no ID. Skipping Short upload.")
+
+
+def start_viral_gameplay_mode():
+    """Educational videos with FORCED viral gameplay backgrounds (Subway Surfers style)."""
+    from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
+    from src.learning import log_upload
+
+    clips = list(VIRAL_GAMEPLAY_PATH.glob("*.mp4"))
+    if not clips:
+        print(f"\n⚠️  No gameplay clips found in {VIRAL_GAMEPLAY_PATH}/")
+        print("   Drop Subway Surfers, Minecraft, or satisfying MP4s there and retry.")
+        print("   Falling back to Pexels backgrounds...\n")
+
+    topic = input("Enter topic for viral gameplay video (or press Enter for random AI topic): ").strip()
+    if not topic:
+        topic = random.choice([
+            "Why AI Will Replace 90% of Jobs by 2030",
+            "This FREE AI Codes Better Than ChatGPT",
+            "Nobody Is Talking About This AI Secret",
+            "How To Build Your Own GPT in 5 Minutes",
+            "The AI Tool That Makes $1000/Day Automatically",
+        ])
+        print(f"  Using: {topic}")
+
+    content = generate_lesson_content(topic)
+    unique_id = f"viral_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # Short-form only (portrait) for viral gameplay
+    slides_data = content.get('long_form_slides', [])[:5]  # Max 5 slides for shorts
+    if not slides_data:
+        print("❌ No content generated.")
+        return
+
+    slide_audio_paths = []
+    for i, slide in enumerate(tqdm(slides_data, desc="  TTS (viral)")):
+        txt = f"{slide.get('title', '')}. {slide.get('content', '')}"
+        audio_path = OUTPUT_DIR / f"{unique_id}_audio_{i}.mp3"
+        slide_audio_paths.append(text_to_speech(txt, audio_path))
+
+    slide_dir = OUTPUT_DIR / f"{unique_id}_slides"
+    slide_paths = []
+    for i, slide in enumerate(tqdm(slides_data, desc="  Slides (viral)")):
+        path = generate_visuals(slide_dir, 'short', slide, slide_number=i+1, total_slides=len(slides_data))
+        slide_paths.append(path)
+
+    video_path = OUTPUT_DIR / f"{unique_id}.mp4"
+    compose_video(slide_paths, slide_audio_paths, video_path, 'short', topic, force_viral_bg=True)
+
+    thumb_path = generate_visuals(OUTPUT_DIR, 'short', thumbnail_title=topic)
+
+    hashtags = content.get("hashtags", "#AI #Shorts #Viral")
+    desc = f"{topic}\n\n{hashtags}\n\nProduced by SuperShorts"
+    video_id = upload_to_youtube(video_path, f"{topic[:80]} #Shorts", desc, "AI,Shorts,Viral", thumb_path)
+    if video_id:
+        log_upload(topic, video_id, "viral_gameplay")
+    print(f"✅ Viral gameplay video done: {topic}")

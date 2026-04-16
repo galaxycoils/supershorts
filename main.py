@@ -1,3 +1,4 @@
+# main.py - SuperShorts v2.0
 import os
 import json
 import datetime
@@ -10,10 +11,16 @@ from src.generator import (
     generate_lesson_content,
     text_to_speech,
     generate_visuals,
-    create_video,
-    YOUR_NAME
+    compose_video,
+    YOUR_NAME,
+    start_viral_gameplay_mode,
+    start_tutorial_generation,
 )
+from src.brainrot import run_brainrot_pipeline as start_brainrot_generation
+from src.learning import start_learning_mode, log_upload
+from src.ideagenerator import start_idea_generator
 from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
+import menu
 
 CONTENT_PLAN_FILE = Path("content_plan.json")
 OUTPUT_DIR = Path("output")
@@ -79,7 +86,7 @@ def produce_lesson_videos(lesson):
         slide_paths.append(path)
     long_video_path = OUTPUT_DIR / f"long_video_{unique_id}.mp4"
     print(f"🎥 Creating long-form video at: {long_video_path}")
-    create_video(slide_paths, slide_audio_paths, long_video_path, 'long', lesson['title'])
+    compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', lesson['title'])
     long_thumb_path = generate_visuals(
         output_dir=OUTPUT_DIR,
         video_type='long',
@@ -104,7 +111,7 @@ def produce_lesson_videos(lesson):
     )
     short_video_path = OUTPUT_DIR / f"short_video_{unique_id}.mp4"
     print(f"🎥 Creating short video at: {short_video_path}")
-    create_video([short_slide_path], [short_audio_path], short_video_path, 'short', lesson['title'])
+    compose_video([short_slide_path], [short_audio_path], short_video_path, 'short', lesson['title'])
     short_thumb_path = generate_visuals(
         output_dir=OUTPUT_DIR,
         video_type='short',
@@ -122,6 +129,7 @@ def produce_lesson_videos(lesson):
         long_thumb_path
     )
     if long_video_id:
+        log_upload(lesson['title'], long_video_id, "educational")
         print("⏳ Waiting 30 seconds before uploading the short...")
         time.sleep(30)
         highlight = (lesson_content.get('short_form_highlight') or '').strip()
@@ -131,17 +139,19 @@ def produce_lesson_videos(lesson):
         short_desc = (f"{lesson_content['short_form_highlight']}\n\n"
                       f"Watch the full lesson with {YOUR_NAME} here: https://www.youtube.com/watch?v={long_video_id}\n\n"
                       f"{hashtags}")
-        upload_to_youtube(
+        short_video_id = upload_to_youtube(
             short_video_path,
             short_title.strip(),
             short_desc,
             "AI,Shorts,TechTip",
             short_thumb_path
         )
+        if short_video_id:
+            log_upload(short_title, short_video_id, "short")
         return long_video_id
     return None
 
-def main():
+def main_flow():
     print("🚀 Starting Money Printer V2 (100% Local Ollama)")
     print(f"📁 Current working dir: {os.getcwd()}")
     print(f"📁 OUTPUT_DIR: {OUTPUT_DIR.resolve()}")
@@ -174,6 +184,34 @@ def main():
         print(f"❌ Critical error: {e}")
         traceback.print_exc()
 
+def main():
+    while True:
+        choice = menu.show_menu()
+        try:
+            if choice == "1":
+                main_flow()
+            elif choice == "2":
+                start_brainrot_generation()
+            elif choice == "3":
+                start_viral_gameplay_mode()
+            elif choice == "4":
+                start_tutorial_generation()
+            elif choice == "5":
+                start_learning_mode()
+            elif choice == "6":
+                start_idea_generator()
+            elif choice == "7":
+                menu.view_content_plan()
+                continue  # skip the "Press Enter" since view_content_plan has its own
+            elif choice == "8":
+                print("\n  Goodbye!")
+                break
+            else:
+                print("  Invalid option.")
+        except Exception as e:
+            print(f"\n  Error: {e}")
+            traceback.print_exc()
+        input("\nPress Enter to return to menu...")
+
 if __name__ == "__main__":
-    from menu import menu_loop
-    menu_loop()
+    main()

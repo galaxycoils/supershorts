@@ -1,0 +1,56 @@
+[
+  {
+    "timestamp": "2026-04-15T00:00:00",
+    "title": "V1",
+    "video_id": "1",
+    "mode": "educational"
+  },
+  {
+    "timestamp": "2026-04-15T00:00:00",
+    "title": "V2",
+    "video_id": "2",
+    "mode": "educational"
+  },
+  {
+    "timestamp": "2026-04-15T00:00:00",
+    "title": "V3",
+    "video_id": "3",
+    "mode": "educational"
+  },
+  {
+    "timestamp": "2026-04-15 19:54:10.411519",
+    "title": "Test Topic",
+    "video_id": "vid123",
+    "mode": "tutorial"
+  },
+  {
+    "timestamp": "2026-04-15 19:56:10.420489",
+    "title": "Test Topic #Shorts #Tutorial",
+    "video_id": "vid123",
+    "mode": "tutorial_short"
+  },
+  {
+    "timestamp": "2026-04-15 20:24:19.900791",
+    "title": "Understanding Tool Use in AI",
+    "video_id": "BROWSER_UPLOAD_SUCCESS",
+    "mode": "educational"
+  },
+  {
+    "timestamp": "2026-04-15 20:25:37.150401",
+    "title": "Discover the essential tools and techniques for building AI applications. From data prepro #Shorts",
+    "video_id": "BROWSER_UPLOAD_SUCCESS",
+    "mode": "short"
+  },
+  {
+    "timestamp": "2026-04-15 20:30:24.215975",
+    "title": "LangGraph: The Future of AI",
+    "video_id": "BROWSER_UPLOAD_SUCCESS",
+    "mode": "educational"
+  },
+  {
+    "timestamp": "2026-04-15 20:31:41.508320",
+    "title": "Discover the future of AI with LangGraph! Learn how this open-source framework makes it ea #Shorts",
+    "video_id": "BROWSER_UPLOAD_SUCCESS",
+    "mode": "short"
+  }
+]
