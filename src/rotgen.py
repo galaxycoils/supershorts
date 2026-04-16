@@ -359,7 +359,8 @@ def build_character_clip(
 
 # ─────────────────────────── subtitles ──────────────────────────────────────
 
-def chunk_script(script: str, words_per_chunk: int = 6) -> list[str]:
+def chunk_script(script: str, words_per_chunk: int = 4) -> list[str]:
+    """Split into small chunks — 4 words keeps each subtitle short enough to fit."""
     words = script.split()
     return [" ".join(words[i:i + words_per_chunk]) for i in range(0, len(words), words_per_chunk)]
 
@@ -378,17 +379,58 @@ def assign_subtitle_timings(chunks: list[str], total_audio_duration: float) -> l
 
 
 def render_subtitle_frame(text: str) -> np.ndarray:
-    """Returns (160, 1080, 3) uint8 numpy array — one subtitle bar."""
+    """Returns (160, 1080, 3) uint8 numpy array — one subtitle bar.
+    Auto-scales font so text always fits; supports 2-line wrap for longer chunks.
+    """
+    MAX_W = 1020   # usable width with margins
     img = Image.new("RGBA", (1080, SUBTITLE_H), (10, 10, 20, 230))
-    d = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype(str(FONT_FILE), 48)
-    except IOError:
-        font = ImageFont.load_default()
-    # Stroke effect: black outline at 8 offsets, then white text
-    for dx, dy in [(-3, -3), (-3, 3), (3, -3), (3, 3), (-3, 0), (3, 0), (0, -3), (0, 3)]:
-        d.text((540 + dx, 80 + dy), text, fill="black", font=font, anchor="mm")
-    d.text((540, 80), text, fill="white", font=font, anchor="mm")
+    d   = ImageDraw.Draw(img)
+
+    # Auto-scale: start at 36, step down until text fits on ONE line (or two)
+    font = ImageFont.load_default()
+    chosen_size  = 36
+    chosen_lines = [text]
+    for size in range(36, 19, -2):
+        try:
+            f = ImageFont.truetype(str(FONT_FILE), size)
+        except IOError:
+            break
+        # Try single line
+        bb = d.textbbox((0, 0), text, font=f)
+        if bb[2] - bb[0] <= MAX_W:
+            font         = f
+            chosen_size  = size
+            chosen_lines = [text]
+            break
+        # Try two lines by splitting at midpoint word
+        words = text.split()
+        mid   = len(words) // 2
+        l1, l2 = " ".join(words[:mid]), " ".join(words[mid:])
+        bb1 = d.textbbox((0, 0), l1, font=f)
+        bb2 = d.textbbox((0, 0), l2, font=f)
+        if max(bb1[2]-bb1[0], bb2[2]-bb2[0]) <= MAX_W:
+            font         = f
+            chosen_size  = size
+            chosen_lines = [l1, l2]
+            break
+    else:
+        # fallback: smallest tried
+        try:
+            font = ImageFont.truetype(str(FONT_FILE), 20)
+        except IOError:
+            pass
+
+    line_h  = chosen_size + 6
+    total_h = len(chosen_lines) * line_h
+    start_y = (SUBTITLE_H - total_h) // 2 + line_h // 2
+
+    stroke_offsets = [(-2,-2),(-2,2),(2,-2),(2,2),(-2,0),(2,0),(0,-2),(0,2)]
+    for li, line in enumerate(chosen_lines):
+        cy = start_y + li * line_h
+        for dx, dy in stroke_offsets:
+            d.text((540 + dx, cy + dy), line, fill=(0,0,0,220), font=font, anchor="mm")
+        d.text((540, cy), line, fill="white", font=font, anchor="mm")
+
     return np.array(img.convert("RGB"))
 
 
