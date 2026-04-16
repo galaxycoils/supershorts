@@ -509,18 +509,40 @@ def run_rotgen_pipeline() -> None:
     print(f"\n  Composing video → {output_path.name}")
     compose_rotgen_video(char_clip, gameplay_clip, sub_clips, audio_clip, output_path)
 
+    # ── Upload ────────────────────────────────────────────────────────────────
+    from src.browser_uploader import upload_to_youtube_browser
+    from src.learning import log_upload
+
+    short_title = f"{title[:80]} #Shorts"
+    desc = (
+        f"{script_text}\n\n"
+        f"{hashtags}\n\n"
+        f"AI for Developers by {YOUR_NAME} — powered by ByteBot"
+    )
+    tags = "AI,Shorts,BrainRot,ByteBot,AIFacts,Tech"
+
+    print(f"\n  Uploading to YouTube...")
+    video_id = upload_to_youtube_browser(output_path, short_title, desc, tags)
+
     # ── Log ───────────────────────────────────────────────────────────────────
     plan = load_rotgen_plan()
     plan["videos"].append({
-        "title":      title,
+        "title":      short_title,
         "topic":      topic,
         "path":       str(output_path),
+        "youtube_id": video_id or None,
         "created_at": datetime.date.today().isoformat(),
-        "status":     "complete",
+        "status":     "complete" if video_id else "upload_failed",
     })
     save_rotgen_plan(plan)
 
-    print(f"\n  ByteBot video complete!")
-    print(f"  Title:    {title}")
+    if video_id:
+        log_upload(short_title, video_id, "rotgen")
+        print(f"\n  ByteBot video live!")
+        print(f"  YouTube: https://youtube.com/watch?v={video_id}")
+    else:
+        print(f"\n  Upload failed or returned no ID — video saved locally.")
+
+    print(f"  Title:    {short_title}")
     print(f"  Hashtags: {hashtags}")
     print(f"  File:     {output_path}")
