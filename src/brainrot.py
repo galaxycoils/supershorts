@@ -16,6 +16,7 @@ from src.generator import (
     ollama_generate,
     text_to_speech,
     strip_emojis,
+    _clamp_words,
     get_local_gameplay,
     get_relevant_pexels_video,
     get_local_background,
@@ -100,7 +101,7 @@ Hook: {topic['hook']}
 Angle: {topic['angle']}
 
 Rules:
-- Total script UNDER 80 words
+- Total script 100-120 words (35-42 seconds at normal speaking pace)
 - First sentence = the HOOK (instant curiosity, shocking)
 - Short punchy sentences. No academic language.
 - Use "you" and "your" to speak directly to viewer
@@ -134,6 +135,9 @@ Return ONLY valid JSON:
             "title": f"{topic['title']} 🤯",
             "hashtags": "#AI #Shorts #Tech #AIFacts",
         }
+    # Enforce 35-45s duration (99-127 words) on the full narration
+    if result.get("full_script"):
+        result["full_script"] = _clamp_words(result["full_script"], min_w=99, max_w=127)
     return result
 
 
@@ -250,8 +254,9 @@ def render_brainrot_slide(output_dir, text, slide_index, total_slides, palette=N
     return str(path)
 
 
-def create_brainrot_video(slide_paths, audio_paths, output_path, title):
-    """Compose brain rot video: fast pacing, dynamic bg, high music vol."""
+def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=None):
+    """Compose brain rot video: fast pacing, dynamic bg, high music vol.
+    If `script` is provided, adds timed word-chunk subtitles in safe zone."""
     print(f"🎥 Creating brain rot video: {title}")
     try:
         if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
@@ -291,7 +296,7 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title):
                 segment = CompositeVideoClip([
                     bg_clip.set_duration(duration),
                     img_clip.set_opacity(0.88).set_position('center')
-                ])
+                ], size=(1080, 1920))
             else:
                 segment = img_clip
 
@@ -299,6 +304,15 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title):
             clips.append(segment)
 
         final = concatenate_videoclips(clips, method="compose")
+
+        # Universal subtitle overlay (timed word chunks in safe zone)
+        if script:
+            try:
+                from src.captions import add_subtitle_overlay
+                print(f"💬 Adding subtitles ({len(script.split())} words)...")
+                final = add_subtitle_overlay(final, script, 'short')
+            except Exception as e:
+                print(f"⚠️ Subtitle overlay failed ({e}) — continuing without captions.")
 
         if BACKGROUND_MUSIC_PATH.exists():
             print("🎵 Adding music...")
@@ -389,7 +403,8 @@ def run_brainrot_pipeline():
                 slide_image_paths.append(img_path)
 
             video_path = OUTPUT_DIR / f"brainrot_video_{unique_id}.mp4"
-            create_brainrot_video(slide_image_paths, slide_audio_paths, video_path, topic["title"])
+            create_brainrot_video(slide_image_paths, slide_audio_paths, video_path, topic["title"],
+                                  script=full_script)
 
             # Upload
             title = script.get("title", topic["title"])[:100]

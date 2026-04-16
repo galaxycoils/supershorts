@@ -210,42 +210,96 @@ def strip_markdown(text: str) -> str:
     return text.strip()
 
 
+_PIPER_VOICES_DIR = Path.home() / ".local/share/piper-tts/voices"
+# Preferred order: highest quality first
+_PIPER_VOICE_NAMES = ("en_US-ryan-high", "en_US-lessac-high", "en-us-lessac-medium")
+
+
 def text_to_speech(text: str, output_path: Path) -> Path:
-    """Better local TTS using Piper (natural neural voice) with pyttsx3 fallback."""
+    """
+    Natural TTS — 3-tier fallback:
+    1. Piper neural (Python API, bypasses missing CLI binary)
+    2. macOS `say` with Alex voice (much better than pyttsx3 Samantha)
+    3. pyttsx3 (last resort)
+    """
     text = strip_markdown(strip_emojis(text))
     print(f"🗣️ TTS → {Path(output_path).stem} ({len(text)} chars)...")
     wav_path = output_path.with_suffix('.wav')
+
+    # 1 — Piper Python API (no CLI needed; piper-tts + onnx installed)
+    try:
+        import wave
+        from piper.voice import PiperVoice
+        for model_name in _PIPER_VOICE_NAMES:
+            model_path = _PIPER_VOICES_DIR / f"{model_name}.onnx"
+            if model_path.exists():
+                voice = PiperVoice.load(str(model_path))
+                with wave.open(str(wav_path), 'wb') as wf:
+                    voice.synthesize_wav(text, wf)
+                print(f"✅ Piper ({model_name}) → {wav_path.name}")
+                return wav_path
+        raise FileNotFoundError(f"No Piper voice in {_PIPER_VOICES_DIR}")
+    except Exception as e:
+        print(f"⚠️ Piper Python API failed ({e}), trying macOS say...")
+
+    # 2 — macOS `say` command (high-quality system voice, far better than pyttsx3)
     try:
         import subprocess
-        # Piper command - adjust voice path to your downloaded voice
-        voice_path = Path.home() / ".local/share/piper-tts/voices/en-us-lessac-medium.onnx"
-        if voice_path.exists():
-            cmd = [
-                "piper",
-                "--model", str(voice_path),
-                "--output_file", str(wav_path),
-                "--length_scale", "1.0",
-                "--sentence_silence", "0.3"
-            ]
-            result = subprocess.run(cmd, input=text.encode(), capture_output=True, check=True)
-            print(f"✅ Piper TTS saved → {wav_path.name}")
-            return wav_path
-        else:
-            raise FileNotFoundError("Piper voice not found")
-    except Exception as e:
-        print(f"⚠️ Piper failed ({e}), falling back to pyttsx3...")
-        mp3_path = output_path.with_suffix('.mp3')
-        engine = pyttsx3.init()
-        engine.setProperty('rate', 170)
-        engine.setProperty('volume', 1.0)
-        engine.save_to_file(text, str(mp3_path))
-        engine.runAndWait()
-        audio = AudioSegment.from_mp3(str(mp3_path))
-        audio.export(str(wav_path), format="wav", codec="pcm_s16le")
-        if mp3_path.exists():
-            mp3_path.unlink()
-        print(f"✅ Fallback TTS saved → {wav_path.name}")
+        aiff_path = output_path.with_suffix('.aiff')
+        subprocess.run(
+            ['say', '-v', 'Alex', '-r', '170', '-o', str(aiff_path), text],
+            check=True, capture_output=True
+        )
+        subprocess.run(
+            ['ffmpeg', '-y', '-loglevel', 'error',
+             '-i', str(aiff_path), '-ar', '22050', '-ac', '1', str(wav_path)],
+            check=True, capture_output=True
+        )
+        if aiff_path.exists():
+            aiff_path.unlink()
+        print(f"✅ macOS say (Alex) → {wav_path.name}")
         return wav_path
+    except Exception as e:
+        print(f"⚠️ macOS say failed ({e}), using pyttsx3...")
+
+    # 3 — pyttsx3 last resort
+    mp3_path = output_path.with_suffix('.mp3')
+    engine = pyttsx3.init()
+    engine.setProperty('rate', 170)
+    engine.setProperty('volume', 1.0)
+    engine.save_to_file(text, str(mp3_path))
+    engine.runAndWait()
+    audio = AudioSegment.from_mp3(str(mp3_path))
+    audio.export(str(wav_path), format="wav", codec="pcm_s16le")
+    if mp3_path.exists():
+        mp3_path.unlink()
+    print(f"✅ pyttsx3 fallback → {wav_path.name}")
+    return wav_path
+
+
+# ── Short-form word-count clamp (shared with ideagenerator, brainrot) ────────
+_SHORT_CONTENT_PAD = (
+    " AI is reshaping every single industry on the planet right now at a speed "
+    "nobody predicted. The developers who master this will win the next decade. "
+    "Those who ignore it will fall behind. This is not science fiction — it is "
+    "happening today. Start using these tools now and stay ahead of the curve."
+)
+
+def _clamp_words(text: str, min_w: int = 99, max_w: int = 127, pad: str = _SHORT_CONTENT_PAD) -> str:
+    """Pad text to at least min_w words, then trim to max_w words at a sentence end."""
+    words = text.split()
+    while len(words) < min_w:
+        words += pad.split()
+    if len(words) > max_w:
+        words = words[:max_w]
+    result = ' '.join(words)
+    # Try to end on sentence boundary in last 30%
+    for sep in ('. ', '! ', '? '):
+        idx = result.rfind(sep)
+        if idx > len(result) * 0.7:
+            result = result[:idx + 1]
+            break
+    return result.strip()
 
 def generate_curriculum(previous_titles=None):
     print("📋 Generating new curriculum with local Ollama...")
@@ -466,8 +520,10 @@ def generate_visuals(output_dir, video_type, slide_content=None, thumbnail_title
     final_bg.save(path)
     return str(path)
 
-def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_title, is_tutorial=False, force_viral_bg=False):
-    """OPTIMIZED dynamic video – background loaded ONCE, ultrafast encoding."""
+def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_title,
+                  is_tutorial=False, force_viral_bg=False, script=None):
+    """OPTIMIZED dynamic video – background loaded ONCE, ultrafast encoding.
+    If `script` is provided, adds timed word-chunk subtitles in the safe zone."""
     label = 'Tutorial' if is_tutorial else ('Viral' if force_viral_bg else 'Dynamic')
     print(f"🎥 Creating {label} {video_type} video for: {lesson_title} (OPTIMIZED MODE)")
 
@@ -510,18 +566,29 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
             duration = audio_clip.duration + 0.5
             img_clip = ImageClip(str(img_path)).set_duration(duration).fadein(0.5).fadeout(0.5)
 
+            # Force exact output dimensions — prevents 1.06x zoom bleed beyond 1080x1920 / 1920x1080
+            target_size = (1920, 1080) if video_type == 'long' else (1080, 1920)
             if bg_clip and not STATIC_MODE:
                 final_clip = CompositeVideoClip([
                     bg_clip.set_duration(duration),
                     img_clip.set_opacity(0.93).set_position('center')
-                ])
+                ], size=target_size)
             else:
-                final_clip = img_clip
+                final_clip = CompositeVideoClip([img_clip], size=target_size)
 
             final_clip = final_clip.set_audio(audio_clip)
             image_clips.append(final_clip)
 
         final_video = concatenate_videoclips(image_clips, method="compose")
+
+        # Universal subtitle overlay — timed word-chunks in safe zone
+        if script:
+            try:
+                from src.captions import add_subtitle_overlay
+                print(f"💬 Adding subtitles ({len(script.split())} words)...")
+                final_video = add_subtitle_overlay(final_video, script, video_type)
+            except Exception as e:
+                print(f"⚠️ Subtitle overlay failed ({e}) — continuing without captions.")
 
         if BACKGROUND_MUSIC_PATH.exists():
             print("🎵 Adding background music...")
@@ -590,14 +657,13 @@ _SCRIPT_PAD = (
     "percent from everyone else."
 )
 
-def _enforce_script_length(script: str, min_words: int = 900) -> str:
-    """Pad script to at least min_words (900 w ≈ 5 min @ 170 wpm)."""
+def _enforce_script_length(script: str, min_words: int = 1360, max_words: int = 1700) -> str:
+    """Pad script to at least min_words (1360 w ≈ 8 min @ 170 wpm), trim at max_words (≈10 min)."""
     while len(script.split()) < min_words:
         script += " " + _SCRIPT_PAD
-    # trim at 1200 words (~7 min) max
     words = script.split()
-    if len(words) > 1200:
-        script = " ".join(words[:1200])
+    if len(words) > max_words:
+        script = " ".join(words[:max_words])
     return script.strip()
 
 
@@ -708,19 +774,27 @@ def start_tutorial_generation():
         slide_paths.append(path)
 
     long_video_path = OUTPUT_DIR / f"{unique_id}_long.mp4"
-    compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', topic, is_tutorial=True)
-    
+    # Build full narration script for subtitle overlay
+    long_script = ' '.join(
+        f"{s.get('title', '')}. {s.get('content', '')}" for s in long_slides
+    )
+    compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', topic,
+                  is_tutorial=True, script=long_script)
+
     long_thumb_path = generate_visuals(OUTPUT_DIR, 'long', thumbnail_title=topic)
 
     print("\n--- Producing Tutorial Short ---")
     short_txt = content.get("short_highlight", f"Check out my new tutorial on {topic}!")
+    # Enforce 35-45s duration (99-127 words)
+    short_txt = _clamp_words(short_txt, min_w=99, max_w=127)
     short_audio_path = text_to_speech(short_txt, OUTPUT_DIR / f"{unique_id}_short_audio.mp3")
-    
+
     short_slide_content = {"title": "Tutorial Highlight", "content": short_txt}
     short_slide_path = generate_visuals(OUTPUT_DIR / f"{unique_id}_short_slides", 'short', short_slide_content, slide_number=1, total_slides=1)
-    
+
     short_video_path = OUTPUT_DIR / f"{unique_id}_short.mp4"
-    compose_video([short_slide_path], [short_audio_path], short_video_path, 'short', topic, is_tutorial=True)
+    compose_video([short_slide_path], [short_audio_path], short_video_path, 'short', topic,
+                  is_tutorial=True, script=short_txt)
     
     short_thumb_path = generate_visuals(OUTPUT_DIR, 'short', thumbnail_title=f"Tutorial: {topic}")
 
@@ -821,8 +895,8 @@ Return ONLY valid JSON:
 
     title      = strip_emojis(result.get("selected_title", topic)[:80])
     script     = strip_emojis(result.get("full_script", ""))
-    # Enforce 5-minute minimum (900 words @ 170 wpm ≈ 5.3 min)
-    script     = _enforce_script_length(script, min_words=900)
+    # Enforce 8-minute minimum (1360 words @ 170 wpm ≈ 8 min), trim at ~10 min
+    script     = _enforce_script_length(script, min_words=1360)
     desc       = result.get("description", "") + "\n\n" + result.get("hashtags", "")
     pexels_kw  = result.get("pexels_keywords", "technology abstract")
 
@@ -851,10 +925,10 @@ Return ONLY valid JSON:
         slide_number=1, total_slides=1,
     )
 
-    # Compose
+    # Compose with subtitle overlay (timed captions on entire script)
     video_path = OUTPUT_DIR / f"{unique_id}_video.mp4"
     print(f"  Composing → {video_path.name}")
-    compose_video([slide_path], [audio_path], video_path, "long", title)
+    compose_video([slide_path], [audio_path], video_path, "long", title, script=script)
 
     # Upload
     tags     = ",".join(dict.fromkeys((pexels_kw + ",YouTube,education").split(",")[:10]))
@@ -912,7 +986,11 @@ def start_viral_gameplay_mode():
         slide_paths.append(path)
 
     video_path = OUTPUT_DIR / f"{unique_id}.mp4"
-    compose_video(slide_paths, slide_audio_paths, video_path, 'short', topic, force_viral_bg=True)
+    viral_script = ' '.join(f"{s.get('title', '')}. {s.get('content', '')}" for s in slides_data)
+    # Enforce 35-45s for viral shorts
+    viral_script = _clamp_words(viral_script, min_w=99, max_w=127)
+    compose_video(slide_paths, slide_audio_paths, video_path, 'short', topic,
+                  force_viral_bg=True, script=viral_script)
 
     thumb_path = generate_visuals(OUTPUT_DIR, 'short', thumbnail_title=topic)
 

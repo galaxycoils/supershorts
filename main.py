@@ -88,15 +88,21 @@ def produce_lesson_videos(lesson):
         slide_paths.append(path)
     long_video_path = OUTPUT_DIR / f"long_video_{unique_id}.mp4"
     print(f"🎥 Creating long-form video at: {long_video_path}")
-    compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', lesson['title'])
+    # Build full script for subtitle overlay
+    long_full_script = '\n'.join(slide_scripts)
+    compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', lesson['title'],
+                  script=long_full_script)
     long_thumb_path = generate_visuals(
         output_dir=OUTPUT_DIR,
         video_type='long',
         thumbnail_title=lesson['title']
     )
     print("\n--- Producing Short Video ---")
-    short_script = (f"{lesson_content['short_form_highlight']}\n\n"
-                    f"Link to the full lesson is in the description below.")
+    from src.generator import _clamp_words
+    raw_short = (f"{lesson_content['short_form_highlight']}\n\n"
+                 f"Link to the full lesson is in the description below.")
+    # Enforce 35-45s duration (99-127 words)
+    short_script = _clamp_words(raw_short, min_w=99, max_w=127)
     short_audio_mp3_path = OUTPUT_DIR / f"short_audio_{unique_id}.mp3"
     short_audio_path = text_to_speech(short_script, short_audio_mp3_path)
     short_slide_dir = OUTPUT_DIR / f"slides_short_{unique_id}"
@@ -113,7 +119,8 @@ def produce_lesson_videos(lesson):
     )
     short_video_path = OUTPUT_DIR / f"short_video_{unique_id}.mp4"
     print(f"🎥 Creating short video at: {short_video_path}")
-    compose_video([short_slide_path], [short_audio_path], short_video_path, 'short', lesson['title'])
+    compose_video([short_slide_path], [short_audio_path], short_video_path, 'short', lesson['title'],
+                  script=short_script)
     short_thumb_path = generate_visuals(
         output_dir=OUTPUT_DIR,
         video_type='short',

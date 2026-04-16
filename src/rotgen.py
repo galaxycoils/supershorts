@@ -101,9 +101,9 @@ def save_rotgen_plan(plan: dict) -> None:
 
 # ─────────────────────────── script gen ─────────────────────────────────────
 
-# TTS runs at 170 wpm → 31–40 s = 88–113 words target
-SCRIPT_MIN_WORDS = 88
-SCRIPT_MAX_WORDS = 113
+# TTS runs at 170 wpm → 35–45 s = 99–127 words target
+SCRIPT_MIN_WORDS = 99
+SCRIPT_MAX_WORDS = 127
 
 
 def _enforce_word_count(text: str) -> str:
@@ -506,7 +506,10 @@ def compose_rotgen_video(
     """Layer order (bottom → top): gameplay | character panel | subtitle clips."""
     game_pos  = gameplay_clip.set_position((0, PANEL_H))            # y=768
     char_pos  = character_clip.set_position((0, 0))                 # y=0
-    sub_clips = [sc.set_position((0, PANEL_H + GAMEPLAY_H))         # y=1760
+    # Safe zone: bar at y=1570 (190px safe margin from 1920 bottom)
+    # Overlays bottom of gameplay panel — standard caption style, no crop risk.
+    SUBTITLE_SAFE_Y = VIDEO_H - SUBTITLE_H - 190                    # = 1570
+    sub_clips = [sc.set_position((0, SUBTITLE_SAFE_Y))
                  for sc in subtitle_clips]
 
     all_clips = [game_pos, char_pos] + sub_clips

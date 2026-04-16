@@ -17,6 +17,7 @@ from src.generator import (
     text_to_speech,
     compose_video,
     strip_emojis,
+    _clamp_words,
     OUTPUT_DIR,
 )
 
@@ -138,13 +139,14 @@ A trending video exists:
 TITLE: {title}
 DESCRIPTION: {desc}
 
-Write a punchy 60-90 second Short script on the same topic — punchier and more hooky.
+Write a punchy 35-45 second Short script on the same topic — punchier and more hooky.
 Rules: hook first 2 seconds, plain spoken language, address viewer as "you", end with CTA.
+IMPORTANT: dialogue MUST be exactly 99-127 words (35-45 seconds at 170 wpm). NO more, NO less.
 Return ONLY JSON:
 {{
   "title": "clickbait title",
   "hook": "first 2-second hook sentence",
-  "dialogue": "full spoken 60-90 second script here",
+  "dialogue": "99-127 word spoken script here",
   "thumbnail_prompt": "visual description for thumbnail"
 }}"""
     try:
@@ -165,6 +167,9 @@ Return ONLY JSON:
             "dialogue":         desc or "This AI technology is changing everything. Here is what you need to know.",
             "thumbnail_prompt": "cinematic neon AI background",
         }
+    # Enforce 35-45s duration (99-127 words)
+    if result.get("dialogue"):
+        result["dialogue"] = _clamp_words(result["dialogue"], min_w=99, max_w=127)
     result["yt_thumbnail_url"] = video_data.get("thumbnail_url", "")
     result["yt_video_id"]      = video_data.get("video_id", "")
     result["yt_link"]          = video_data.get("yt_link", "")
@@ -187,7 +192,7 @@ PAST PERFORMANCE: {past_data}
 Generate {num_ideas} YouTube Short ideas. Each object must have:
 - title (clickbait + searchable, include emoji)
 - hook (first 2-second sentence)
-- dialogue (full 60-90 second spoken script — minimum 150 words)
+- dialogue (35-45 second spoken script — exactly 99-127 words, NO more, NO less)
 - thumbnail_prompt (visual description)
 
 Return ONLY a valid JSON array of {num_ideas} objects."""
@@ -209,6 +214,10 @@ Return ONLY a valid JSON array of {num_ideas} objects."""
             ideas = json.loads(match.group(0)) if match else []
         if not isinstance(ideas, list):
             ideas = ideas.get("ideas", [ideas]) if isinstance(ideas, dict) else []
+        # Enforce 35-45s duration on every idea
+        for idea in ideas:
+            if isinstance(idea, dict) and idea.get("dialogue"):
+                idea["dialogue"] = _clamp_words(idea["dialogue"], min_w=99, max_w=127)
     except Exception as e:
         print(f"  Ollama failed ({e}), using fallback ideas.")
         ideas = [
@@ -256,6 +265,9 @@ def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
         print(f"  [{index+1}/{total}] No dialogue — skipping.")
         return {"status": "skipped", "title": title}
 
+    # Enforce 35-45s duration before TTS
+    dialogue = _clamp_words(dialogue, min_w=99, max_w=127)
+
     print(f"\n  ── Idea {index+1}/{total}: {title[:60]} ──")
 
     uid = f"idea_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{index}"
@@ -277,10 +289,10 @@ def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
     slide_path = generate_visuals(slide_dir, "short", slide_content,
                                   slide_number=1, total_slides=1)
 
-    # Compose Short
+    # Compose Short with subtitle overlay
     video_path = OUTPUT_DIR / f"{uid}.mp4"
     print(f"  Composing → {video_path.name}")
-    compose_video([slide_path], [audio_path], video_path, "short", title)
+    compose_video([slide_path], [audio_path], video_path, "short", title, script=dialogue)
 
     # Upload
     hashtags = "#AI #Shorts #Tech #Viral #AIFacts"
