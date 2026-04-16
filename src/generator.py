@@ -652,6 +652,126 @@ def start_tutorial_generation():
         print("⚠️ Long video upload failed or returned no ID. Skipping Short upload.")
 
 
+# ── YouTube Content Package ──────────────────────────────────────────────────
+
+CONTENT_PACKAGE_TOPICS = [
+    "The Science of Habit Formation",
+    "Why Sleep Deprivation Destroys Productivity",
+    "How Top Performers Structure Their Day",
+    "The Hidden Psychology of Motivation",
+    "Why Most People Never Reach Their Goals",
+    "The Neuroscience of Deep Work",
+    "How to Learn Anything 10x Faster",
+    "The Truth About Multitasking",
+    "Why Your Environment Controls Your Behaviour",
+    "The Simple System That Beats Every To-Do App",
+    "What High Achievers Do in the First Hour of Their Day",
+    "The Real Reason You Procrastinate (And How to Stop)",
+]
+
+
+def generate_youtube_content_package() -> None:
+    """Expert YouTube Content Strategist — auto-picks topic, generates script + video + upload."""
+    from src.browser_uploader import upload_to_youtube_browser
+    from src.learning import log_upload
+
+    print("\n  📦 YouTube Content Strategist Activated\n")
+
+    raw   = input("  Seed category (or Enter to auto-pick): ").strip()
+    topic = raw if raw else random.choice(CONTENT_PACKAGE_TOPICS)
+    if not raw:
+        print(f"  Auto-picked: {topic}")
+
+    prompt = f"""You are an expert YouTube scriptwriter and content strategist.
+Create a complete production package for a 5-minute YouTube video.
+
+Topic: {topic}
+
+Requirements:
+- Write a complete spoken script (600-800 words) for TTS narration
+- Plain flowing prose — no bullet points, no emojis, no markdown
+- Start with a hook sentence that creates curiosity or mild shock
+- End with exactly: "Subscribe for more"
+- Title under 70 characters, SEO-optimised
+
+Return ONLY valid JSON:
+{{
+  "title_options": ["Option A", "Option B", "Option C"],
+  "selected_title": "Best title under 70 chars",
+  "full_script": "Complete 600-800 word spoken narration...",
+  "pexels_keywords": "keyword1 keyword2 keyword3",
+  "description": "2-3 line SEO description with CTA",
+  "hashtags": "#Tag1 #Tag2 #Tag3 #Tag4 #Tag5"
+}}"""
+
+    print("  Calling Ollama for content package...")
+    result = ollama_generate(prompt, json_mode=True)
+
+    if not result or not result.get("full_script"):
+        print("  ⚠️  LLM returned empty — using fallback script.")
+        result = {
+            "selected_title": topic[:70],
+            "full_script": (
+                f"{topic}. Most people never think about this deeply enough. "
+                "The science is clear — those who master this principle outperform everyone around them. "
+                "It starts with one small shift in how you approach each day. "
+                "Researchers at leading universities have studied this for decades and the results are consistent. "
+                "The people at the top of every field do this differently. "
+                "And once you understand why, you cannot unsee it. "
+                "Start today, not tomorrow. Subscribe for more."
+            ),
+            "pexels_keywords": "productivity focus mindset",
+            "description": f"{topic}\n\nScience-backed insights every week. Subscribe now.",
+            "hashtags": "#Productivity #Science #Psychology #Mindset #Learning",
+        }
+
+    title      = strip_emojis(result.get("selected_title", topic)[:80])
+    script     = strip_emojis(result.get("full_script", ""))
+    desc       = result.get("description", "") + "\n\n" + result.get("hashtags", "")
+    pexels_kw  = result.get("pexels_keywords", "technology abstract")
+
+    # Save .md package
+    timestamp    = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    package_path = OUTPUT_DIR / f"content_package_{timestamp}.md"
+    package_path.write_text(
+        f"# YouTube Content Package\n\nGenerated: {datetime.datetime.now():%Y-%m-%d %H:%M}\n\n"
+        + json.dumps(result, indent=2),
+        encoding="utf-8",
+    )
+    print(f"  Package saved → {package_path.name}")
+    print(f"  Title: {title}")
+    print(f"  Script: {len(script.split())} words\n")
+
+    unique_id = f"pkg_{timestamp}"
+
+    # TTS
+    audio_path = text_to_speech(script, OUTPUT_DIR / f"{unique_id}_audio.mp3")
+
+    # Visuals — single long-form slide
+    slide_dir  = OUTPUT_DIR / f"{unique_id}_slides"
+    slide_path = generate_visuals(
+        slide_dir, "long",
+        slide_content={"title": title, "content": script[:600]},
+        slide_number=1, total_slides=1,
+    )
+
+    # Compose
+    video_path = OUTPUT_DIR / f"{unique_id}_video.mp4"
+    print(f"  Composing → {video_path.name}")
+    compose_video([slide_path], [audio_path], video_path, "long", title)
+
+    # Upload
+    tags     = ",".join(dict.fromkeys((pexels_kw + ",YouTube,education").split(",")[:10]))
+    print(f"  Uploading → {title[:60]}...")
+    video_id = upload_to_youtube_browser(video_path, title, desc, tags)
+
+    if video_id:
+        log_upload(title, video_id, "content_package")
+        print(f"  Live: https://youtube.com/watch?v={video_id}")
+    else:
+        print(f"  Upload failed — video saved locally: {video_path.name}")
+
+
 def start_viral_gameplay_mode():
     """Educational videos with FORCED viral gameplay backgrounds (Subway Surfers style)."""
     from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube

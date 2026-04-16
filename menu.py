@@ -45,7 +45,8 @@ MENU_OPTIONS = [
     ("6", "💡", "YouTube Studio Ideas",       "Real YT suggestions, thumbnails & scripts"),
     ("7", "📋", "View Content Plan",          "Browse lessons + brain rot topic tracker"),
     ("8", "🎭", "RotGen Character Mode",       "ByteBot AI character + gameplay + auto-subtitles"),
-    ("9", "🚪", "Exit",                       ""),
+    ("9", "📦", "YouTube Content Package",    "Expert AI: topic → script → 5-min video → upload"),
+    ("10","🚪", "Exit",                       ""),
 ]
 
 

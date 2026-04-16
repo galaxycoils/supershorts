@@ -15,6 +15,7 @@ from src.generator import (
     YOUR_NAME,
     start_viral_gameplay_mode,
     start_tutorial_generation,
+    generate_youtube_content_package,
 )
 from src.brainrot import run_brainrot_pipeline as start_brainrot_generation
 from src.rotgen import run_rotgen_pipeline as start_rotgen_mode
@@ -207,6 +208,8 @@ def main():
             elif choice == "8":
                 start_rotgen_mode()
             elif choice == "9":
+                generate_youtube_content_package()
+            elif choice == "10":
                 print("\n  Goodbye!")
                 break
             else:
