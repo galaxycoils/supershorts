@@ -17,6 +17,7 @@ from src.generator import (
     start_tutorial_generation,
 )
 from src.brainrot import run_brainrot_pipeline as start_brainrot_generation
+from src.rotgen import run_rotgen_pipeline as start_rotgen_mode
 from src.learning import start_learning_mode, log_upload
 from src.ideagenerator import start_idea_generator
 from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
@@ -204,6 +205,8 @@ def main():
                 menu.view_content_plan()
                 continue  # skip the "Press Enter" since view_content_plan has its own
             elif choice == "8":
+                start_rotgen_mode()
+            elif choice == "9":
                 print("\n  Goodbye!")
                 break
             else:
