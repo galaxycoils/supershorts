@@ -101,17 +101,53 @@ def save_rotgen_plan(plan: dict) -> None:
 
 # ─────────────────────────── script gen ─────────────────────────────────────
 
+# TTS runs at 170 wpm → 31–40 s = 88–113 words target
+SCRIPT_MIN_WORDS = 88
+SCRIPT_MAX_WORDS = 113
+
+
+def _enforce_word_count(text: str) -> str:
+    """Trim script to SCRIPT_MAX_WORDS at a sentence boundary. Pad if too short."""
+    words = text.split()
+    if len(words) <= SCRIPT_MAX_WORDS:
+        if len(words) >= SCRIPT_MIN_WORDS:
+            return text  # already in range
+        # Too short — pad until we hit minimum word count
+        pad = (
+            " AI is reshaping every single industry on the planet right now at a speed nobody predicted."
+            " Companies are being built and destroyed overnight because of this technology."
+            " The workers who adapt will thrive. Those who ignore it will fall behind."
+            " This is not science fiction. This is happening today, this week, this year."
+            " Follow for more AI facts."
+        )
+        combined = text.rstrip()
+        while len(combined.split()) < SCRIPT_MIN_WORDS:
+            combined += pad
+        words = combined.split()
+
+    # Trim to max, ending on a sentence boundary where possible
+    trimmed = words[:SCRIPT_MAX_WORDS]
+    result  = " ".join(trimmed)
+    # Try to end at last sentence-ending punctuation
+    for sep in (". ", "! ", "? "):
+        idx = result.rfind(sep)
+        if idx > len(result) * 0.6:   # only trim if we keep >60% of content
+            result = result[:idx + 1]
+            break
+    return result.strip()
+
+
 def generate_rotgen_script(topic: str | None = None) -> dict:
     if not topic:
         topic = random.choice(VIRAL_TOPICS)
     print(f"  Topic: {topic}")
     prompt = f"""
-You are scripting a 30-45 second YouTube Short for a character called ByteBot.
+You are scripting a 31-40 second YouTube Short for a character called ByteBot.
 ByteBot is an enthusiastic AI educator who talks directly to camera.
 Topic: {topic}
 
 Rules:
-- Under 60 words total
+- EXACTLY 90-110 words (this is critical — TTS must hit 31-40 seconds)
 - First-person, conversational, energetic
 - No emojis (TTS will read them aloud)
 - Start with a shocking hook sentence
@@ -119,22 +155,27 @@ Rules:
 
 Return ONLY valid JSON:
 {{
-  "script": "full narration text under 60 words",
+  "script": "full narration text, exactly 90-110 words",
   "title": "YouTube title for this short",
   "hashtags": "#AI #Shorts #Tech"
 }}"""
     try:
         result = ollama_generate(prompt, json_mode=True)
         if result.get("script"):
+            result["script"] = _enforce_word_count(result["script"])
             return result
     except Exception as e:
         print(f"  Ollama failed ({e}), using fallback script.")
+    fallback = (
+        f"{topic}. Most people have absolutely no idea this is already happening right now. "
+        "AI systems are reshaping every single industry on the planet at a speed nobody predicted. "
+        "Companies are being built and destroyed overnight because of this technology. "
+        "The workers who adapt will thrive. Those who ignore it will fall behind. "
+        "This is not science fiction. This is happening today. "
+        "Follow for more AI facts."
+    )
     return {
-        "script": (
-            f"{topic}. Most people have no idea this is already happening. "
-            "AI systems are changing the world faster than any technology in history. "
-            "The question is not if it will affect you, but when. Follow for more AI facts."
-        ),
+        "script":   _enforce_word_count(fallback),
         "title":    f"{topic[:80]} #Shorts",
         "hashtags": "#AI #Shorts #Tech #AIFacts #ByteBot",
     }
@@ -471,7 +512,8 @@ def run_rotgen_pipeline() -> None:
         print("  No script generated.")
         return
 
-    print(f"  Script ({len(script_text.split())} words): {script_text[:80]}...")
+    wc = len(script_text.split())
+    print(f"  Script ({wc} words, ~{wc/170*60:.0f}s at 170wpm): {script_text[:80]}...")
 
     # ── TTS ───────────────────────────────────────────────────────────────────
     unique_id  = datetime.datetime.now().strftime("rotgen_%Y%m%d_%H%M%S")
