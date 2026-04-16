@@ -524,6 +524,54 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
         traceback.print_exc()
         raise
 
+# ── Length enforcers ─────────────────────────────────────────────────────────
+
+_SLIDE_PAD = (
+    " This concept is foundational — understanding it deeply will directly affect "
+    "the quality of your AI projects. Let's break it down further with a real-world "
+    "analogy. Think of it like building a house: you need solid foundations before "
+    "you add walls and a roof. The same applies here. Developers who skip this step "
+    "consistently run into problems later that take hours to debug. Take this seriously "
+    "and implement it in your own work as soon as possible."
+)
+
+def _enforce_slide_content(slides: list, min_words: int = 120) -> list:
+    """Pad each slide's content field to at least min_words so TTS hits ~40 s/slide."""
+    padded = []
+    for s in slides:
+        content = s.get("content", s.get("title", ""))
+        while len(content.split()) < min_words:
+            content += _SLIDE_PAD
+        # hard-trim at 200 words to keep slides scannable on screen
+        words = content.split()
+        if len(words) > 200:
+            content = " ".join(words[:200])
+        padded.append({**s, "content": content.strip()})
+    return padded
+
+
+_SCRIPT_PAD = (
+    " This is something that affects every single person who wants to perform at a "
+    "higher level. The research is consistent and spans multiple decades across different "
+    "countries and demographics. Understanding this gives you an edge that most people "
+    "never bother to develop. The practical application is simpler than you might think, "
+    "and the results show up within days, not months. Start with the smallest possible "
+    "version of this habit and build from there. Small consistent actions compound into "
+    "dramatic changes over time. That is the core insight that separates the top one "
+    "percent from everyone else."
+)
+
+def _enforce_script_length(script: str, min_words: int = 900) -> str:
+    """Pad script to at least min_words (900 w ≈ 5 min @ 170 wpm)."""
+    while len(script.split()) < min_words:
+        script += " " + _SCRIPT_PAD
+    # trim at 1200 words (~7 min) max
+    words = script.split()
+    if len(words) > 1200:
+        script = " ".join(words[:1200])
+    return script.strip()
+
+
 # ── Tutorial topics — auto-picked when user presses Enter ─────────────────────
 TUTORIAL_TOPICS = [
     "Build Your First AI Agent with Python",
@@ -546,23 +594,33 @@ TUTORIAL_TOPICS = [
 # NEW: Tutorial Generation
 def generate_tutorial_content(topic: str):
     print(f"📚 Generating ~10-minute tutorial for: {topic}")
-    prompt = f"""
-    Create a 10-minute tutorial script for topic: {topic}.
-    Break into 12-15 slides (keep it tight — quality over quantity).
-    Each slide needs a short "title" and detailed "content" (clear explanation, real analogy, code hint or example where relevant).
-    Also write a punchy 60-second Short highlight that hooks in the first sentence.
-    Return ONLY valid JSON:
-    {{
-      "long_slides": [{{"title": "...", "content": "..."}}],
-      "short_highlight": "60-second spoken script here",
-      "hashtags": "#Tutorial #AI #Dev"
-    }}
-    """
+    prompt = f"""You are creating a 10-minute YouTube tutorial on: {topic}
+
+Generate exactly 15 slides. CRITICAL: each slide "content" MUST be 3-4 full sentences
+(minimum 60 words each). Short content is unacceptable — pad with explanation and examples.
+
+Each slide must include:
+- A real-world analogy
+- A practical developer tip or code example
+- Why this matters
+
+Also write a 60-second Short highlight script (hook first, "Follow for more" at end).
+
+Return ONLY valid JSON:
+{{
+  "long_slides": [
+    {{"title": "slide title here", "content": "minimum 60 words of detailed explanation here..."}}
+  ],
+  "short_highlight": "60-second spoken script with hook and CTA",
+  "hashtags": "#Tutorial #AI #Dev #LearnToCode"
+}}"""
     result = ollama_generate(prompt, json_mode=True)
-    # Validate structure
     if not result.get("long_slides"):
         print("⚠️  Ollama returned empty long_slides — retrying once...")
         result = ollama_generate(prompt, json_mode=True)
+    # Enforce minimum slide length so TTS hits 40+ seconds per slide
+    if result.get("long_slides"):
+        result["long_slides"] = _enforce_slide_content(result["long_slides"], min_words=120)
     return result
 
 # NEW: Tutorial Pipeline (long + linked short)
@@ -595,12 +653,17 @@ def start_tutorial_generation():
         return
 
     unique_id = f"tutorial_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
+
     print("\n--- Producing Long Tutorial Video ---")
     long_slides = content.get("long_slides", [])
     if not long_slides:
         print("❌ No slides generated.")
         return
+
+    # Enforce 120-word minimum per slide regardless of LLM output
+    long_slides = _enforce_slide_content(long_slides, min_words=120)
+    print(f"  {len(long_slides)} slides enforced to 120w+ each "
+          f"(~{len(long_slides)*120//170//60}:{len(long_slides)*120//170%60:02d} min target)")
 
     slide_audio_paths = []
     for i, slide in enumerate(tqdm(long_slides, desc="  TTS (long)")):
@@ -687,18 +750,20 @@ Create a complete production package for a 5-minute YouTube video.
 
 Topic: {topic}
 
-Requirements:
-- Write a complete spoken script (600-800 words) for TTS narration
-- Plain flowing prose — no bullet points, no emojis, no markdown
-- Start with a hook sentence that creates curiosity or mild shock
+CRITICAL SCRIPT REQUIREMENTS — READ CAREFULLY:
+- The "full_script" field MUST be 500+ words of flowing spoken prose
+- Write in paragraphs, not bullet points — this is narrated speech
+- No emojis, no asterisks, no markdown formatting
+- Start with a single shocking or curiosity hook sentence
+- Use transitions: "But here is the thing...", "What most people miss is...", "Research shows..."
 - End with exactly: "Subscribe for more"
-- Title under 70 characters, SEO-optimised
+- Cover at least 4 distinct sub-points about the topic with explanation and examples
 
 Return ONLY valid JSON:
 {{
   "title_options": ["Option A", "Option B", "Option C"],
-  "selected_title": "Best title under 70 chars",
-  "full_script": "Complete 600-800 word spoken narration...",
+  "selected_title": "Best SEO title under 70 chars",
+  "full_script": "MINIMUM 500 WORDS of flowing narration here. Write multiple paragraphs...",
   "pexels_keywords": "keyword1 keyword2 keyword3",
   "description": "2-3 line SEO description with CTA",
   "hashtags": "#Tag1 #Tag2 #Tag3 #Tag4 #Tag5"
@@ -727,6 +792,8 @@ Return ONLY valid JSON:
 
     title      = strip_emojis(result.get("selected_title", topic)[:80])
     script     = strip_emojis(result.get("full_script", ""))
+    # Enforce 5-minute minimum (900 words @ 170 wpm ≈ 5.3 min)
+    script     = _enforce_script_length(script, min_words=900)
     desc       = result.get("description", "") + "\n\n" + result.get("hashtags", "")
     pexels_kw  = result.get("pexels_keywords", "technology abstract")
 

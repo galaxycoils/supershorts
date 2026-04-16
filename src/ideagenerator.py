@@ -1,12 +1,24 @@
 # src/ideagenerator.py
-# YouTube Studio Idea Generator — real YT suggestions + downloaded thumbnails + Ollama dialogue
+# YouTube Studio Idea Generator — real YT suggestions + thumbnails + Ollama dialogue
+# Auto-produces short-form video + uploads for every idea found. Zero interactive prompts
+# after the first-time API key setup.
+
 import json
 import re
+import time
+import datetime
 import requests
 import ollama
-import datetime
 from pathlib import Path
-from src.generator import generate_visuals  # reuse for Ollama-only thumbnails
+from tqdm import tqdm
+
+from src.generator import (
+    generate_visuals,
+    text_to_speech,
+    compose_video,
+    strip_emojis,
+    OUTPUT_DIR,
+)
 
 LOG_FILE    = Path("performance_log.json")
 IDEAS_FILE  = Path("youtube_studio_ideas.json")
@@ -41,7 +53,7 @@ def get_yt_api_key() -> str | None:
 
     print("\n  YouTube Data API key needed for real Studio suggestions.")
     print("  Get free key: https://console.cloud.google.com/apis/library/youtube.googleapis.com")
-    key = input("  Paste API key (Enter to skip, use Ollama-only mode): ").strip()
+    key = input("  Paste API key (Enter to skip → Ollama-only mode): ").strip()
     if key:
         cfg["youtube_api_key"] = key
         CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
@@ -49,12 +61,19 @@ def get_yt_api_key() -> str | None:
     return key or None
 
 
+def _safe_json_parse(text: str):
+    """Tolerant JSON parse — strips trailing commas and control chars."""
+    text = text.strip().lstrip('\ufeff')
+    text = re.sub(r',\s*([}\]])', r'\1', text)
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    return json.loads(text)
+
+
 # ─────────────────── YouTube Data API v3 ────────────────────────
 
 def fetch_yt_suggestions(query: str = "AI tutorial 2025",
                           max_results: int = 5,
                           api_key: str = None) -> list:
-    """Search YouTube for trending videos. Returns list of dicts with metadata."""
     if not api_key:
         return []
     url = (
@@ -66,15 +85,13 @@ def fetch_yt_suggestions(query: str = "AI tutorial 2025",
         resp = requests.get(url, timeout=10)
         data = resp.json()
         if "error" in data:
-            msg = data["error"].get("message", "unknown error")
-            print(f"  YT API error: {msg}")
+            print(f"  YT API error: {data['error'].get('message','unknown')}")
             return []
         results = []
         for item in data.get("items", []):
             snippet  = item.get("snippet", {})
             video_id = item.get("id", {}).get("videoId", "")
             thumbs   = snippet.get("thumbnails", {})
-            # Prefer highest-res thumbnail available
             thumb_url = (
                 thumbs.get("maxres", thumbs.get("high", thumbs.get("medium", {}))).get("url", "")
             )
@@ -93,7 +110,6 @@ def fetch_yt_suggestions(query: str = "AI tutorial 2025",
 
 
 def download_yt_thumbnail(video_data: dict) -> str | None:
-    """Download actual YouTube thumbnail to output/thumbnails/. Returns local path."""
     url      = video_data.get("thumbnail_url", "")
     video_id = video_data.get("video_id", "unknown")
     if not url:
@@ -102,12 +118,11 @@ def download_yt_thumbnail(video_data: dict) -> str | None:
     out_dir.mkdir(exist_ok=True, parents=True)
     dest = out_dir / f"yt_{video_id}.jpg"
     if dest.exists():
-        print(f"  Thumbnail cached: {dest.name}")
         return str(dest)
     try:
         r = requests.get(url, timeout=10)
         dest.write_bytes(r.content)
-        print(f"  Downloaded thumbnail: {dest.name}")
+        print(f"  Thumbnail: {dest.name}")
         return str(dest)
     except Exception as e:
         print(f"  Thumbnail download failed: {e}")
@@ -115,23 +130,22 @@ def download_yt_thumbnail(video_data: dict) -> str | None:
 
 
 def generate_dialogue_from_yt(video_data: dict) -> dict:
-    """Ollama generates adapted short-form script inspired by a real YT video."""
+    """Ollama generates a 60-90 second Short script from a real YT video."""
     title = video_data.get("title", "")
     desc  = video_data.get("description", "")[:600]
-    prompt = f"""
-You are a YouTube Shorts scriptwriter for SuperShorts channel.
-A trending YouTube video exists with this metadata:
+    prompt = f"""You are a YouTube Shorts scriptwriter for the SuperShorts channel.
+A trending video exists:
 TITLE: {title}
 DESCRIPTION: {desc}
 
-Write a punchier, hook-driven 60-90 second YouTube Short script on the same topic.
-Rules: hook first 2 seconds, plain spoken language, "you" addressing viewer, end with CTA.
+Write a punchy 60-90 second Short script on the same topic — punchier and more hooky.
+Rules: hook first 2 seconds, plain spoken language, address viewer as "you", end with CTA.
 Return ONLY JSON:
 {{
-  "title": "clickbait title with emoji",
-  "hook": "first 2-second sentence",
-  "dialogue": "full spoken script here",
-  "thumbnail_prompt": "visual style description for thumbnail image"
+  "title": "clickbait title",
+  "hook": "first 2-second hook sentence",
+  "dialogue": "full spoken 60-90 second script here",
+  "thumbnail_prompt": "visual description for thumbnail"
 }}"""
     try:
         resp = ollama.chat(
@@ -140,20 +154,17 @@ Return ONLY JSON:
             options={"temperature": 0.75, "num_ctx": 2048},
         )
         text = resp["message"]["content"]
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1]
-        result = json.loads(text)
+        if "```json" in text: text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:   text = text.split("```")[1]
+        result = _safe_json_parse(text)
     except Exception as e:
         print(f"  Dialogue gen failed ({e}), using fallback.")
         result = {
             "title":            title,
-            "hook":             f"Nobody is talking about this AI secret...",
-            "dialogue":         desc or "This AI technology is changing everything. Here is how it works.",
+            "hook":             "Nobody is talking about this AI secret...",
+            "dialogue":         desc or "This AI technology is changing everything. Here is what you need to know.",
             "thumbnail_prompt": "cinematic neon AI background",
         }
-    # Attach source metadata
     result["yt_thumbnail_url"] = video_data.get("thumbnail_url", "")
     result["yt_video_id"]      = video_data.get("video_id", "")
     result["yt_link"]          = video_data.get("yt_link", "")
@@ -161,31 +172,25 @@ Return ONLY JSON:
     return result
 
 
-# ─────────────────── Ollama-only flow (fallback) ─────────────────
-
 def generate_ideas(num_ideas: int = 5) -> list:
     """Pure Ollama idea generation (no YouTube API needed)."""
-    data    = load_performance_data()
+    data     = load_performance_data()
     trending = get_trending_context()
-
-    if not data:
-        past_data = "No past data yet. Generate fresh ideas based on trending topics only."
-    else:
-        lines     = [f"- {e.get('title','Untitled')} (mode: {e.get('mode','?')})" for e in data[-10:]]
-        past_data = "\n".join(lines)
-
-    prompt = f"""
-You are YouTube Studio's AI Idea Generator.
+    past_data = (
+        "\n".join(f"- {e.get('title','Untitled')} ({e.get('mode','?')})" for e in data[-10:])
+        if data else "No past data. Generate fresh ideas."
+    )
+    prompt = f"""You are YouTube Studio's AI Idea Generator.
 TRENDING: {trending}
 PAST PERFORMANCE: {past_data}
 
-Generate {num_ideas} YouTube Short ideas. Each needs:
+Generate {num_ideas} YouTube Short ideas. Each object must have:
 - title (clickbait + searchable, include emoji)
 - hook (first 2-second sentence)
-- dialogue (full 60-90 second script)
-- thumbnail_prompt (describe the image)
+- dialogue (full 60-90 second spoken script — minimum 150 words)
+- thumbnail_prompt (visual description)
 
-Return ONLY a valid JSON array of objects."""
+Return ONLY a valid JSON array of {num_ideas} objects."""
 
     print("  Asking Ollama for ideas...")
     try:
@@ -198,7 +203,7 @@ Return ONLY a valid JSON array of objects."""
         if "```json" in text: text = text.split("```json")[1].split("```")[0]
         elif "```" in text:   text = text.split("```")[1]
         try:
-            ideas = json.loads(text)
+            ideas = _safe_json_parse(text)
         except Exception:
             match = re.search(r'\[.*\]', text, re.DOTALL)
             ideas = json.loads(match.group(0)) if match else []
@@ -207,9 +212,19 @@ Return ONLY a valid JSON array of objects."""
     except Exception as e:
         print(f"  Ollama failed ({e}), using fallback ideas.")
         ideas = [
-            {"title": f"AI Secret #{i+1}", "hook": "Nobody talks about this...",
-             "dialogue": "Here is an AI trick that will change how you work forever.",
-             "thumbnail_prompt": "neon circuits dark background"}
+            {
+                "title":            f"🤖 AI Secret #{i+1} Nobody Talks About",
+                "hook":             "Nobody is talking about this...",
+                "dialogue":         (
+                    "Here is an AI trick that will change how you work forever. "
+                    "Most developers spend hours on tasks that AI can handle in seconds. "
+                    "The key is knowing which tool to use and how to prompt it correctly. "
+                    "This single technique has saved professionals countless hours every week. "
+                    "Start using this today and you will never go back to the old way. "
+                    "Subscribe for more AI productivity tips."
+                ),
+                "thumbnail_prompt": "neon circuits dark background",
+            }
             for i in range(num_ideas)
         ]
     IDEAS_FILE.write_text(json.dumps(ideas, indent=2))
@@ -217,139 +232,130 @@ Return ONLY a valid JSON array of objects."""
 
 
 def create_thumbnail_from_idea(idea: dict) -> str:
-    """Generate thumbnail using existing slide renderer."""
+    """Generate thumbnail PNG for an idea using existing slide renderer."""
     title      = idea.get("title", "New Idea")
     output_dir = Path("output/thumbnails")
     output_dir.mkdir(exist_ok=True, parents=True)
-    return generate_visuals(output_dir=output_dir, video_type='long', thumbnail_title=title)
+    return generate_visuals(output_dir=output_dir, video_type='short', thumbnail_title=title)
 
 
-# ──────────────── sub-flow helpers ───────────────────────────────
+# ──────────────── video production per idea ──────────────────────
 
-def _yt_ideas_flow():
-    """Fetch real YouTube suggestions, download thumbnails, gen dialogue."""
-    api_key = get_yt_api_key()
-    if not api_key:
-        print("  No API key — switching to Ollama-only mode.")
-        _ollama_ideas_flow()
-        return
+def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
+    """
+    Full pipeline for one idea:
+      dialogue → TTS → thumbnail → compose Short → upload
+    Returns result dict with status.
+    """
+    from src.browser_uploader import upload_to_youtube_browser
+    from src.learning import log_upload
 
-    query = input("  Search query (Enter = 'AI tutorial 2025'): ").strip() or "AI tutorial 2025"
-    print(f"\n  Searching YouTube for '{query}'...")
-    yt_videos = fetch_yt_suggestions(query, max_results=5, api_key=api_key)
+    title    = strip_emojis(idea.get("title", f"Idea {index+1}"))[:100]
+    dialogue = strip_emojis(idea.get("dialogue", idea.get("script", "")))
+    if not dialogue.strip():
+        print(f"  [{index+1}/{total}] No dialogue — skipping.")
+        return {"status": "skipped", "title": title}
 
-    if not yt_videos:
-        print("  No results from YouTube — switching to Ollama mode.")
-        _ollama_ideas_flow()
-        return
+    print(f"\n  ── Idea {index+1}/{total}: {title[:60]} ──")
 
-    print(f"\n  Found {len(yt_videos)} trending videos:\n")
-    for i, v in enumerate(yt_videos):
-        print(f"  [{i+1}] {v['title']}")
-        print(f"       Channel: {v['channel']}")
-        print(f"       Link:    {v['yt_link']}")
-        print()
+    uid = f"idea_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{index}"
 
-    sel = input("  Pick one as inspiration (number) or 0 to use all: ").strip()
-    if sel == "0" or not sel.isdigit():
-        targets = yt_videos
+    # TTS
+    audio_path = text_to_speech(dialogue, OUTPUT_DIR / f"{uid}_audio.mp3")
+
+    # Thumbnail — prefer downloaded YT thumb, else generate one
+    local_thumb = idea.get("local_thumbnail_path")
+    if not local_thumb or not Path(str(local_thumb)).exists():
+        local_thumb = create_thumbnail_from_idea(idea)
+
+    # Slide visual (dark card with title + hook)
+    slide_content = {
+        "title":   title,
+        "content": idea.get("hook", dialogue[:200]),
+    }
+    slide_dir  = OUTPUT_DIR / f"{uid}_slides"
+    slide_path = generate_visuals(slide_dir, "short", slide_content,
+                                  slide_number=1, total_slides=1)
+
+    # Compose Short
+    video_path = OUTPUT_DIR / f"{uid}.mp4"
+    print(f"  Composing → {video_path.name}")
+    compose_video([slide_path], [audio_path], video_path, "short", title)
+
+    # Upload
+    hashtags = "#AI #Shorts #Tech #Viral #AIFacts"
+    desc     = f"{dialogue[:500]}\n\n{hashtags}\n\nProduced by SuperShorts"
+    short_title = f"{title[:80]} #Shorts"
+    print(f"  Uploading → {short_title[:60]}...")
+    video_id = upload_to_youtube_browser(video_path, short_title, desc,
+                                         "AI,Shorts,Viral,Tech,AIFacts")
+    if video_id:
+        log_upload(short_title, video_id, "studio_idea")
+        print(f"  Live: https://youtube.com/watch?v={video_id}")
+        return {"status": "complete", "title": short_title, "youtube_id": video_id}
     else:
-        idx     = int(sel) - 1
-        targets = [yt_videos[idx]] if 0 <= idx < len(yt_videos) else yt_videos
-
-    ideas = []
-    for vid in targets:
-        print(f"\n  Downloading thumbnail: {vid['title'][:50]}...")
-        local_thumb      = download_yt_thumbnail(vid)
-        print(f"  Generating adapted dialogue...")
-        idea             = generate_dialogue_from_yt(vid)
-        idea["local_thumbnail_path"] = local_thumb
-        ideas.append(idea)
-
-    IDEAS_FILE.write_text(json.dumps(ideas, indent=2))
-    print(f"\n  Generated {len(ideas)} ideas from YouTube:\n")
-    for i, idea in enumerate(ideas):
-        print(f"  [{i+1}] {idea.get('title','?')}")
-        print(f"       Hook:      {idea.get('hook','?')[:80]}")
-        if idea.get("local_thumbnail_path"):
-            print(f"       Thumbnail: {idea['local_thumbnail_path']}")
-        print()
-
-    use = input("  View full dialogue for one? (number or 0 to skip): ").strip()
-    if use.isdigit() and 1 <= int(use) <= len(ideas):
-        s = ideas[int(use) - 1]
-        print(f"\n  TITLE: {s.get('title')}")
-        print(f"  HOOK:  {s.get('hook')}")
-        print(f"\n  DIALOGUE:\n{s.get('dialogue','N/A')}")
-        if s.get("local_thumbnail_path"):
-            print(f"\n  THUMBNAIL SAVED AT: {s['local_thumbnail_path']}")
-        print(f"\n  ORIGINAL YT VIDEO: {s.get('yt_link','N/A')}")
-
-
-def _ollama_ideas_flow():
-    """Pure Ollama ideas flow."""
-    ideas = generate_ideas(num_ideas=5)
-    if not ideas:
-        print("  No ideas generated.")
-        return
-    print(f"\n  Generated {len(ideas)} ideas:\n")
-    for i, idea in enumerate(ideas):
-        print(f"  [{i+1}] {idea.get('title','?')}")
-        hook = idea.get('hook') or idea.get('description','?')
-        print(f"       Hook: {str(hook)[:80]}")
-    use = input("\n  Use one? (number or 0): ").strip()
-    if use.isdigit() and 1 <= int(use) <= len(ideas):
-        selected   = ideas[int(use) - 1]
-        thumb_path = create_thumbnail_from_idea(selected)
-        print(f"  Thumbnail saved: {thumb_path}")
-        dialogue   = selected.get("dialogue") or selected.get("script","No dialogue")
-        print(f"\n  DIALOGUE:\n{str(dialogue)[:800]}")
-
-
-def _view_saved_ideas_flow():
-    """Browse previously saved ideas."""
-    if not IDEAS_FILE.exists():
-        print("  No saved ideas yet.")
-        return
-    try:
-        ideas = json.loads(IDEAS_FILE.read_text())
-        print(f"\n  Saved ideas ({len(ideas)}):\n")
-        for i, idea in enumerate(ideas):
-            src = " [YT]" if idea.get("yt_video_id") else " [Ollama]"
-            print(f"  [{i+1}]{src} {idea.get('title','?')}")
-        sel = input("\n  View which? (number or 0): ").strip()
-        if sel.isdigit() and 1 <= int(sel) <= len(ideas):
-            s = ideas[int(sel) - 1]
-            print(f"\n  TITLE:    {s.get('title')}")
-            print(f"  HOOK:     {s.get('hook') or s.get('description')}")
-            if s.get("local_thumbnail_path"):
-                print(f"  THUMBNAIL: {s['local_thumbnail_path']}")
-            elif s.get("yt_thumbnail_url"):
-                print(f"  YT THUMB:  {s['yt_thumbnail_url']}")
-            if s.get("yt_link"):
-                print(f"  SOURCE:    {s['yt_link']}")
-            print(f"\n  DIALOGUE:\n{s.get('dialogue') or s.get('script','N/A')}")
-    except Exception as e:
-        print(f"  Error reading ideas file: {e}")
+        print(f"  Upload failed — saved: {video_path.name}")
+        return {"status": "upload_failed", "title": short_title, "path": str(video_path)}
 
 
 # ─────────────────── main entry point ────────────────────────────
 
 def start_idea_generator():
-    print("\n  YouTube Studio Idea Generator\n")
-    print("  [1]  Fetch real YouTube suggestions + download thumbnails + gen dialogue")
-    print("  [2]  Generate Ollama-only ideas (no API key needed)")
-    print("  [3]  Browse saved ideas / scripts")
-    print()
-    choice = input("  Choose (1-3): ").strip()
+    """
+    Option 6 — fully auto-pilot:
+    1. Fetch real YT suggestions (or Ollama-only if no API key)
+    2. Generate adapted dialogue + download thumbnails
+    3. Produce Short video for each idea
+    4. Upload each one with 30 s gap
+    """
+    print("\n  YouTube Studio Idea Generator — Auto-Pilot Mode\n")
 
-    if choice == "1":
-        _yt_ideas_flow()
-    elif choice == "2":
-        _ollama_ideas_flow()
-    elif choice == "3":
-        _view_saved_ideas_flow()
-    else:
-        print("  Invalid choice.")
+    # ── gather ideas ─────────────────────────────────────────────
+    api_key   = get_yt_api_key()
+    ideas     = []
 
-    input("\n  Press Enter to return to menu...")
+    if api_key:
+        print("\n  Searching YouTube for trending AI content...")
+        yt_videos = fetch_yt_suggestions("AI productivity tutorial 2025",
+                                          max_results=5, api_key=api_key)
+        if yt_videos:
+            print(f"  Found {len(yt_videos)} trending videos — generating adapted scripts...")
+            for vid in tqdm(yt_videos, desc="  Adapting", unit="video"):
+                local_thumb = download_yt_thumbnail(vid)
+                idea        = generate_dialogue_from_yt(vid)
+                idea["local_thumbnail_path"] = local_thumb
+                ideas.append(idea)
+        else:
+            print("  No YT results — falling back to Ollama ideas.")
+
+    if not ideas:
+        ideas = generate_ideas(num_ideas=5)
+
+    if not ideas:
+        print("  No ideas generated.")
+        return
+
+    IDEAS_FILE.write_text(json.dumps(ideas, indent=2))
+    print(f"\n  {len(ideas)} ideas ready — producing + uploading all...\n")
+
+    # ── produce + upload ─────────────────────────────────────────
+    results = []
+    for i, idea in enumerate(ideas):
+        try:
+            result = _produce_and_upload_idea(idea, i, len(ideas))
+            results.append(result)
+            # 30 s gap between uploads (skip after last)
+            if i < len(ideas) - 1 and result.get("status") == "complete":
+                print(f"\n  Waiting 30 s before next upload...")
+                time.sleep(30)
+        except Exception as e:
+            import traceback
+            print(f"  Error on idea {i+1}: {e}")
+            traceback.print_exc()
+            results.append({"status": "error", "error": str(e)})
+
+    # ── summary ──────────────────────────────────────────────────
+    done   = sum(1 for r in results if r.get("status") == "complete")
+    failed = len(results) - done
+    print(f"\n  Studio Ideas done — {done}/{len(ideas)} uploaded"
+          + (f", {failed} failed/local" if failed else "") + ".")
