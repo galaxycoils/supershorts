@@ -1,6 +1,10 @@
-# SuperShorts v2.0
+# SuperShorts v2.2
 
-**Automated AI video factory — educational videos, viral Shorts, and RotGen brain rot content. 100% local.**
+**Fully local AI video factory — educational videos, viral Shorts, RotGen brain rot, and expert-crafted YouTube content packages. Zero paid APIs.**
+
+<p align="center">
+  <img src="assets/supershorts_poster.png" alt="SuperShorts" width="340"/>
+</p>
 
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![Ollama](https://img.shields.io/badge/LLM-Ollama%20local-orange)
@@ -11,24 +15,30 @@
 
 ## What It Does
 
-SuperShorts is a fully local video production pipeline. It generates educational YouTube content, brain rot viral Shorts, and — new in v2 — **RotGen Character Mode**: a rotgen.org-style format where an animated AI character (ByteBot) narrates over gameplay footage with live subtitles.
+SuperShorts is a fully local video production pipeline. Drop it on any Mac or Linux box, run `python main.py`, and it writes, narrates, edits, and uploads YouTube videos entirely on-device.
+
+- **Educational series** — 20-lesson AI curriculum, long-form + linked Shorts
+- **Brain rot Shorts** — sensationalized AI hooks with viral gameplay backgrounds
+- **RotGen Character Mode** — animated ByteBot avatar narrates over gameplay (rotgen.org style)
+- **YouTube Content Package** *(new v2.2)* — expert AI strategist picks a trending topic, writes a 600-800 word science-backed script, produces a full 5-minute video, and uploads it automatically
 
 No OpenAI. No Anthropic. No paid APIs of any kind.
 
 ---
 
-## Menu (9 options)
+## Menu (10 options)
 
 ```
-  [1]  📚  Educational Videos       Long-form + linked Short (curriculum-based)
-  [2]  🧠  Brain Rot Viral Shorts   Sensationalized AI shorts, 30–45 s
-  [3]  🎮  Viral Gameplay Mode      Subway Surfers-style background + AI narration
-  [4]  🎓  Tutorial Videos          ~10-min deep-dive + linked Short
-  [5]  📈  Learning Mode            Self-improvement analysis from past uploads
-  [6]  💡  YouTube Studio Ideas     Real YT suggestions, thumbnails & adapted scripts
-  [7]  📋  View Content Plan        Browse lessons + brain rot topic tracker
-  [8]  🎭  RotGen Character Mode    ByteBot AI character + gameplay + auto-subtitles
-  [9]  🚪  Exit
+  [1]  📚  Educational Videos         Long-form + linked Short (curriculum-based)
+  [2]  🧠  Brain Rot Viral Shorts     Sensationalized AI shorts, 30–45 s
+  [3]  🎮  Viral Gameplay Mode        Subway Surfers-style background + AI narration
+  [4]  🎓  Tutorial Videos            ~10-min deep-dive + linked Short
+  [5]  📈  Learning Mode              Self-improvement analysis from past uploads
+  [6]  💡  YouTube Studio Ideas       Real YT suggestions, thumbnails & adapted scripts
+  [7]  📋  View Content Plan          Browse lessons + brain rot topic tracker
+  [8]  🎭  RotGen Character Mode      ByteBot AI character + gameplay + auto-subtitles
+  [9]  📦  YouTube Content Package    Expert AI: topic → script → 5-min video → upload
+  [10] 🚪  Exit
 ```
 
 Live stats bar shows lessons done / brain rot topics done on every menu render.
