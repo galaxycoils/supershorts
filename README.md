@@ -1,46 +1,104 @@
-# SuperShorts
+# SuperShorts v2.0
 
-**Automated AI video factory — creates educational YouTube videos and viral Shorts, 100% locally.**
+**Automated AI video factory — educational videos, viral Shorts, and RotGen brain rot content. 100% local.**
 
-![Python](https://img.shields.io/badge/python-3.12%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![Ollama](https://img.shields.io/badge/LLM-Ollama%20local-orange)
+![MoviePy](https://img.shields.io/badge/video-MoviePy%201.0.3-red)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
 ## What It Does
 
-SuperShorts is a fully local, zero-API-cost video production pipeline. Point it at a topic and it will:
-
-1. Use a local Ollama LLM to generate a structured lesson curriculum.
-2. Convert each lesson into narrated slide-based video (long-form, 1920x1080) and a companion Short (1080x1920).
-3. Generate viral "Brain Rot" Shorts — punchy, high-retention content with bold outlined text and attention-grabbing color palettes.
-4. Upload everything to YouTube via Selenium driving your existing Firefox profile — no OAuth dance, no API keys.
+SuperShorts is a fully local video production pipeline. It generates educational YouTube content, brain rot viral Shorts, and — new in v2 — **RotGen Character Mode**: a rotgen.org-style format where an animated AI character (ByteBot) narrates over gameplay footage with live subtitles.
 
 No OpenAI. No Anthropic. No paid APIs of any kind.
 
 ---
 
+## Menu (9 options)
+
+```
+  [1]  📚  Educational Videos       Long-form + linked Short (curriculum-based)
+  [2]  🧠  Brain Rot Viral Shorts   Sensationalized AI shorts, 30–45 s
+  [3]  🎮  Viral Gameplay Mode      Subway Surfers-style background + AI narration
+  [4]  🎓  Tutorial Videos          ~10-min deep-dive + linked Short
+  [5]  📈  Learning Mode            Self-improvement analysis from past uploads
+  [6]  💡  YouTube Studio Ideas     Real YT suggestions, thumbnails & adapted scripts
+  [7]  📋  View Content Plan        Browse lessons + brain rot topic tracker
+  [8]  🎭  RotGen Character Mode    ByteBot AI character + gameplay + auto-subtitles
+  [9]  🚪  Exit
+```
+
+Live stats bar shows lessons done / brain rot topics done on every menu render.
+
+---
+
+## RotGen Character Mode (Option 8) — New in v2
+
+Works like **rotgen.org**: animated character talking over gameplay, fully auto-pilot.
+
+**Layout (1080×1920):**
+```
+┌────────────────────────────┐  y=0
+│  CHARACTER PANEL  (768px)  │  ByteBot animated avatar, dark gradient
+├────────────────────────────┤  y=768
+│  GAMEPLAY VIDEO   (992px)  │  subway surfers / minecraft / Pexels auto
+├────────────────────────────┤  y=1760
+│  SUBTITLE BAR    (160px)   │  current spoken text, 6-word chunks
+└────────────────────────────┘  y=1920
+```
+
+**ByteBot character (`assets/characters/bytebot.png`):**
+- PIL-drawn cartoon AI avatar with transparent background
+- Cyan glowing eyes, circuit traces on cheeks, visor with LED dots, ByteBot badge
+- 48-frame animation loop (2 s at 24 fps): head bob (sine wave), mouth open/close pulse, eye blink
+
+**Auto-pilot flow:**
+1. Random viral AI topic picked from 10 hooks
+2. Ollama writes a ≤60-word ByteBot monologue
+3. Piper TTS narrates (pyttsx3 fallback)
+4. 48 character frames pre-generated (~0.12 s), freed after `gc.collect()`
+5. Gameplay auto-selected: `assets/viral_gameplay/` → `assets/gameplay/` → Pexels queries
+6. Proportional subtitle chunks composited as `ImageClip` layers
+7. Encoded: H.264 ultrafast, 24 fps, AAC 192 k, 3 threads
+8. Logged to `rotgen_plan.json`
+
+Drop your own PNG into `assets/characters/` to replace ByteBot.
+
+---
+
 ## Features
 
-- **Interactive terminal menu** — clean ASCII home screen with four options
-- **AI-powered lesson curriculum** — Ollama generates a 20-lesson structured series, picks up where it left off across runs
-- **Long-form educational videos** — 1920x1080, ~3-5 minutes, 7-8 content slides per lesson with intro and outro
-- **Short-form YouTube Shorts** — 1080x1920, 30-60 seconds, one punchy highlight per lesson
-- **Brain Rot Shorts mode** — viral AI content with bold stroke text, vignette overlays, and five attention-grabbing color palettes
-- **Auto subtitle fitting** — font size scales down automatically until all text fits; never overflows a slide
-- **Automated YouTube upload** — Selenium drives a pre-logged-in Firefox profile; no OAuth setup needed
-- **Pexels background videos** — fetched by keyword query and cached locally so they are only downloaded once
-- **Piper neural TTS** — natural-sounding voice output; falls back to pyttsx3 if the voice model is not installed
-- **Progress output on all operations** — per-step print statements and clear status indicators throughout the pipeline
+| Feature | Detail |
+|---------|--------|
+| **Educational curriculum** | Ollama generates a 20-lesson series; resumes where it left off |
+| **Long-form videos** | 1920×1080, 7-8 slides, Pexels background, TTS + music |
+| **Brain Rot Shorts** | 1080×1920, stroke text, 5 palettes, vignette, fast pacing |
+| **Tutorial mode** | ~10-min deep-dive + linked Short, auto-uploaded pair |
+| **Viral Gameplay mode** | Educational content with forced gameplay background |
+| **YouTube Studio Ideas** | Real YouTube Data API v3 search → real thumbnails + adapted Ollama script |
+| **Learning mode** | Ollama analyses past upload log, writes improvement suggestions |
+| **RotGen Character mode** | Animated character + gameplay + subtitles — see above |
+| **ANSI colour menu** | Live stats, emoji labels, descriptions per option |
+| **Auto subtitle fitting** | `auto_scale_text` shrinks font until text fits; never overflows |
+| **Emoji-safe TTS** | `strip_emojis()` removes all Unicode emoji ranges before speech |
+| **tqdm progress bars** | ETA on every TTS, slide render, and video build loop |
+| **Pexels caching** | Videos downloaded once, reused across runs |
+| **Piper neural TTS** | Natural voice; pyttsx3 fallback if voice model missing |
 
 ---
 
 ## Prerequisites
 
 - **Python 3.12+**
-- **Ollama** installed and running with the `qwen2.5-coder:3b` model pulled
-- **Firefox** with a YouTube-logged-in profile (used by the Selenium uploader)
-- *(Optional)* **Piper TTS** voice file at `~/.local/share/piper-tts/voices/en-us-lessac-medium.onnx` for natural neural speech
-- *(Optional)* Gameplay MP4 files placed in `assets/gameplay/` for Brain Rot background videos
+- **Ollama** running with `qwen2.5-coder:3b` pulled (`ollama pull qwen2.5-coder:3b`)
+- **Firefox** logged in to YouTube (Selenium uploader drives this profile)
+- **Pexels API key** — set `PEXELS_API_KEY` in `src/generator.py` or let the code use the bundled one
+- *(Optional)* **Piper TTS** at `~/.local/share/piper-tts/voices/en-us-lessac-medium.onnx`
+- *(Optional)* Gameplay MP4s in `assets/viral_gameplay/` for offline gameplay backgrounds
+- *(Optional)* YouTube Data API key for Option 6 (prompted on first use, saved to `config.json`)
 
 ---
 
@@ -50,50 +108,12 @@ No OpenAI. No Anthropic. No paid APIs of any kind.
 git clone https://github.com/galaxycoils/supershorts
 cd supershorts
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+ollama serve &
 ollama pull qwen2.5-coder:3b
-```
-
-Make sure Ollama is running before starting the pipeline:
-
-```bash
-ollama serve
-```
-
----
-
-## Usage
-
-```bash
 python main.py
 ```
-
-The terminal menu appears:
-
-```
-  ____                       ____  _                _
- / ___| _   _ _ __   ___ _ _/ ___|| |__   ___  _ __| |_ ___
- \___ \| | | | '_ \ / _ \ '__\___ \| '_ \ / _ \| '__| __/ __|
-  ___) | |_| | |_) |  __/ |   ___) | | | | (_) | |  | |_\__ \
- |____/ \__,_| .__/ \___|_|  |____/|_| |_|\___/|_|   \__|___/
-              |_|
-                          v1.0  |  Powered by Ollama + MoviePy
-
-=================================================================
-
-  [1]  Start YouTube Video Generation
-  [2]  Generate Brain Rot Shorts
-  [3]  View Content Plan
-  [4]  Exit
-```
-
-| Option | Description |
-|--------|-------------|
-| **[1] Start YouTube Video Generation** | Loads `content_plan.json` (auto-generates if missing), picks the next pending lessons, produces long-form video + companion Short for each, and uploads both to YouTube. |
-| **[2] Generate Brain Rot Shorts** | Loads `brainrot_plan.json` (auto-creates if missing), generates viral topic scripts via Ollama, renders bold-styled slides, composes Shorts, and uploads them. |
-| **[3] View Content Plan** | Prints a table of all lessons with chapter, part, completion status, and title. |
-| **[4] Exit** | Quits the program. |
 
 ---
 
@@ -101,72 +121,81 @@ The terminal menu appears:
 
 ```
 supershorts/
-├── main.py                  # Entry point — launches menu; also contains the lesson production pipeline
-├── menu.py                  # Interactive terminal menu and banner
+├── main.py                   # Entry point — menu dispatch + lesson production pipeline
+├── menu.py                   # ANSI colour menu, live stats, content plan view
 ├── src/
-│   ├── generator.py         # Core engine: Ollama curriculum/content generation, TTS, PIL slide rendering, MoviePy video composition
-│   ├── brainrot.py          # Brain Rot viral Shorts pipeline: topic gen, punchy scripting, outlined-text slides, fast video assembly
-│   ├── browser_uploader.py  # YouTube upload via Selenium + Firefox browser profile
-│   └── uploader.py          # YouTube Data API v3 OAuth upload (backup method)
+│   ├── generator.py          # Core engine: LLM gen, TTS, PIL slides, MoviePy compose
+│   ├── brainrot.py           # Brain Rot pipeline: topics, scripts, stroke slides, video
+│   ├── rotgen.py             # RotGen Character Mode: ByteBot, animation, subtitles, compose
+│   ├── ideagenerator.py      # YouTube Studio Ideas: YT API v3, thumbnail download, dialogue gen
+│   ├── learning.py           # Upload logger + Ollama improvement analysis
+│   ├── browser_uploader.py   # YouTube upload via Selenium + Firefox (DO NOT MODIFY)
+│   └── uploader.py           # YouTube Data API v3 OAuth upload — backup (DO NOT MODIFY)
 ├── assets/
-│   ├── backgrounds/         # Slide background images (JPG/PNG)
-│   ├── fonts/               # arial.ttf used for all text rendering
-│   ├── music/               # bg_music.mp3 looped under all videos
-│   └── gameplay/            # (Optional) MP4 gameplay clips for Brain Rot backgrounds
-├── output/                  # All generated files: audio, slides, and final MP4s
-├── content_plan.json        # Lesson curriculum with chapter/part/title/status/youtube_id (auto-generated)
-└── brainrot_plan.json       # Brain Rot topic tracking with hook/angle/status (auto-created on first run)
+│   ├── characters/           # Drop custom PNG here to replace ByteBot
+│   │   └── bytebot.png       # Default ByteBot character (RGBA, 400×500)
+│   ├── backgrounds/          # Slide background images
+│   ├── fonts/arial.ttf       # Font for all text rendering
+│   ├── music/bg_music.mp3    # Background music (looped)
+│   ├── gameplay/             # Local gameplay clips (optional)
+│   ├── viral_gameplay/       # Subway Surfers / Minecraft clips (optional)
+│   └── pexels/               # Cached Pexels background videos
+├── output/                   # All generated audio, slides, and MP4s
+├── content_plan.json         # Lesson curriculum (auto-generated)
+├── brainrot_plan.json        # Brain Rot topic tracker
+├── rotgen_plan.json          # RotGen video log
+├── performance_log.json      # Upload history for Learning mode
+└── requirements.txt
 ```
 
 ---
 
-## How It Works
+## Pipeline Diagram
 
 ```
-Ollama (local LLM — qwen2.5-coder:3b)
-    |
-    | generates curriculum (content_plan.json)
-    | generates lesson slides + short highlight + hashtags
-    | generates brain rot topics, hooks, and scripts
-    v
-Piper TTS  (falls back to pyttsx3)
-    |
-    | converts narration text to .wav per slide
-    v
-PIL (Pillow)
-    |
-    | renders slide images at 1920x1080 (long) or 1080x1920 (short/brain rot)
-    | auto-scales font until all text fits the content box
-    | brain rot mode: bold stroke text, vignette, accent bar, random color palette
-    v
-MoviePy
-    |
-    | loads Pexels background video (cached) or local gameplay clip
-    | composites slide images over background with fade in/out
-    | mixes narration audio + background music loop
-    | encodes to H.264 .mp4 (ultrafast preset, 24fps)
-    v
-Selenium + Firefox
-    |
-    | drives pre-logged-in Firefox profile
-    | uploads .mp4, title, description, tags to YouTube
-    | waits 30 seconds between long-form and Short uploads
+Ollama (qwen2.5-coder:3b, local)
+    │
+    ├─ curriculum / lesson content / brainrot scripts / rotgen monologue
+    │
+    ▼
+Piper TTS  (pyttsx3 fallback)
+    │
+    ├─ narration → .wav per slide / per video
+    │
+    ▼
+PIL (Pillow 12.2+)
+    │
+    ├─ slide images 1920×1080 or 1080×1920
+    ├─ auto_scale_text: shrink font until fits
+    ├─ brainrot: stroke text + numpy vignette gradient (285× vs pixel loop)
+    ├─ rotgen: 48-frame character animation at 24fps (0.12s build time)
+    │
+    ▼
+MoviePy 1.0.3
+    │
+    ├─ CompositeVideoClip: background + slide/character + subtitles
+    ├─ ImageSequenceClip for character animation (no per-frame callbacks)
+    ├─ Pexels auto-download + cache
+    ├─ H.264 ultrafast, 24fps, AAC 192k, 3 threads (M1 optimised)
+    │
+    ▼
+Selenium + Firefox  (YouTube upload — stable, unmodified)
 ```
 
 ---
 
 ## Configuration
 
-Key constants in `src/generator.py`:
+**`src/generator.py` constants:**
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `YOUR_NAME` | `"Chaitanya"` | Creator name shown in slide footers, video descriptions, and channel branding |
-| `PEXELS_API_KEY` | *(set yours)* | Pexels API key for fetching background videos |
-| `LESSONS_PER_RUN` | `2` | Number of lessons processed per invocation of option [1] |
-| `SHORTS_PER_RUN` | `3` | Number of Brain Rot Shorts produced per invocation of option [2] |
+| `YOUR_NAME` | `"Chaitanya"` | Creator name in footers / descriptions / branding |
+| `PEXELS_API_KEY` | set yours | Pexels API key for background videos |
+| `LESSONS_PER_RUN` | `2` (in `main.py`) | Lessons per Option 1 run |
+| `SHORTS_PER_RUN` | `3` (in `brainrot.py`) | Brain Rot Shorts per Option 2 run |
 
-To change the Ollama model, update the `model` variable inside `ollama_generate()` in `src/generator.py`.
+**YouTube Data API key** (Option 6): prompted on first use, saved to `config.json`.
 
 ---
 
@@ -177,29 +206,46 @@ ollama
 pyttsx3
 pydub
 moviepy==1.0.3
-Pillow==9.5.0
+Pillow>=12.2.0
+numpy
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 requests
-```
-
-Install with:
-
-```bash
-pip install -r requirements.txt
+selenium
+webdriver-manager
+tqdm
 ```
 
 ---
 
 ## Notes
 
-- **YouTube upload** uses Selenium to drive your existing Firefox profile. Log in to YouTube in Firefox once; SuperShorts handles the rest — no OAuth credentials or API keys required.
-- **Ollama must be running** before starting either pipeline. Launch it with `ollama serve` in a separate terminal.
-- **All AI generation is 100% local.** No calls are made to OpenAI, Anthropic, or any other paid AI service.
-- **Pexels videos are cached** in `assets/pexels/` by video ID. Repeated runs reuse downloaded files.
-- **Generated files accumulate** in `output/`. Audio clips, slide images, and MP4s are not cleaned up automatically — periodically delete stale files to reclaim disk space.
-- **macOS note**: the code sets ImageMagick's binary path to `/opt/homebrew/bin/convert`. Adjust in `src/generator.py` if your installation differs.
+- **Upload flow is stable** — `src/browser_uploader.py` and `src/uploader.py` not touched by new features
+- **Ollama must be running** — `ollama serve` before launching
+- **All AI is local** — no calls to paid APIs; Pexels is the only external network dependency (cached after first use)
+- **Custom RotGen character** — drop any RGBA PNG into `assets/characters/`; the pipeline auto-loads the first file found
+- **Memory-safe** — character frames freed with `gc.collect()` after `ImageSequenceClip` built (~115MB peak)
+- **macOS note** — ImageMagick binary set to `/opt/homebrew/bin/convert`; adjust in `generator.py` if needed
+
+---
+
+## Changelog
+
+### v2.0 — 2026-04-16
+- **RotGen Character Mode** (Option 8): ByteBot animated AI character + auto gameplay + live subtitles
+- **ByteBot asset** (`assets/characters/bytebot.png`): PIL-drawn RGBA avatar, custom character support
+- **YouTube Studio Ideas** (Option 6): YouTube Data API v3 real suggestions + thumbnail downloads + Ollama dialogue adaptation
+- **ANSI colour menu**: live stats bar, emoji labels, descriptions, coloured content plan viewer
+- **Brain Rot performance**: numpy gradient replaces 2M pixel loop (285× speedup, 0.80s → 0.003s per slide)
+- **Pillow 12.2** upgrade: patched 4 CVEs (1 critical arbitrary code exec, 3 high)
+- **Tutorial mode** (Option 4): ~10-min deep-dive videos with linked Short
+- **tqdm progress bars**: ETA on all TTS, slide, and video build loops
+- **Emoji-safe TTS**: Unicode regex strips all emoji ranges before speech synthesis
+- **Learning mode** (Option 5): Ollama analyses upload history, writes improvement suggestions
+
+### v1.0 — initial
+- Educational curriculum, Brain Rot Shorts, Selenium upload
 
 ---
 
