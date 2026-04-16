@@ -143,12 +143,26 @@ def ollama_generate(prompt: str, json_mode: bool = True) -> dict:
         text = text.split("```json")[1].split("```")[0]
     elif "```" in text:
         text = text.split("```")[1]
+
+    def _safe_json(s: str) -> dict:
+        """Parse JSON tolerantly: strip trailing commas, control chars, BOM."""
+        s = s.strip().lstrip('\ufeff')
+        # Remove trailing commas before ] or } — common Ollama output issue
+        s = re.sub(r',\s*([}\]])', r'\1', s)
+        # Strip control chars except tab/newline
+        s = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', s)
+        return json.loads(s)
+
     try:
-        return json.loads(text)
+        return _safe_json(text)
     except Exception:
-        import re
         match = re.search(r'\{.*\}', text, re.DOTALL)
-        return json.loads(match.group(0)) if match else {}
+        if match:
+            try:
+                return _safe_json(match.group(0))
+            except Exception:
+                pass
+        return {}
 
 _EMOJI_RE = re.compile(
     "[\U0001F600-\U0001F64F"   # emoticons
@@ -510,23 +524,57 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
         traceback.print_exc()
         raise
 
+# ── Tutorial topics — auto-picked when user presses Enter ─────────────────────
+TUTORIAL_TOPICS = [
+    "Build Your First AI Agent with Python",
+    "Local LLMs with Ollama – Complete Beginner Guide",
+    "Vector Databases Explained Simply for Developers",
+    "LangChain vs LangGraph – Which One Should You Use",
+    "Prompt Engineering Masterclass – From Beginner to Pro",
+    "Fine-Tuning LLMs on Your Own Data – Step by Step",
+    "RAG (Retrieval-Augmented Generation) Explained and Built",
+    "How to Run DeepSeek Locally on Any Machine",
+    "Building Multi-Agent AI Systems from Scratch",
+    "Function Calling and Tool Use in Modern LLMs",
+    "Embeddings and Semantic Search – How They Really Work",
+    "Build a Fully Local AI Coding Assistant",
+    "AI Safety and Alignment – What Every Developer Must Know",
+    "Transformer Architecture Explained Without the Math",
+    "The Complete Guide to Open-Source AI Models in 2026",
+]
+
 # NEW: Tutorial Generation
 def generate_tutorial_content(topic: str):
     print(f"📚 Generating ~10-minute tutorial for: {topic}")
     prompt = f"""
     Create a 10-minute tutorial script for topic: {topic}.
-    Break into 15-20 slides. Each slide: title + detailed content (explanation + code/examples + analogies).
-    Also create a 60-second Short highlight script.
-    Return ONLY JSON: {{"long_slides": [...], "short_highlight": "...", "hashtags": "..." }}
+    Break into 12-15 slides (keep it tight — quality over quantity).
+    Each slide needs a short "title" and detailed "content" (clear explanation, real analogy, code hint or example where relevant).
+    Also write a punchy 60-second Short highlight that hooks in the first sentence.
+    Return ONLY valid JSON:
+    {{
+      "long_slides": [{{"title": "...", "content": "..."}}],
+      "short_highlight": "60-second spoken script here",
+      "hashtags": "#Tutorial #AI #Dev"
+    }}
     """
-    return ollama_generate(prompt, json_mode=True)
+    result = ollama_generate(prompt, json_mode=True)
+    # Validate structure
+    if not result.get("long_slides"):
+        print("⚠️  Ollama returned empty long_slides — retrying once...")
+        result = ollama_generate(prompt, json_mode=True)
+    return result
 
 # NEW: Tutorial Pipeline (long + linked short)
 def start_tutorial_generation():
     from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
     from src.learning import log_upload
-    
-    topic = input("Enter tutorial topic: ")
+
+    raw = input("Enter tutorial topic (or press Enter to auto-pick): ").strip()
+    topic = raw if raw else random.choice(TUTORIAL_TOPICS)
+    if not raw:
+        print(f"  Auto-picked: {topic}")
+
     content = generate_tutorial_content(topic)
     
     # If content is string, try to parse it (fallback for direct ollama calls or inconsistencies)
@@ -592,8 +640,8 @@ def start_tutorial_generation():
     
     if long_video_id:
         log_upload(topic, long_video_id, "tutorial")
-        print("⏳ Waiting 120 seconds before uploading short...")
-        time.sleep(120)
+        print("⏳ Waiting 30 seconds before uploading short...")
+        time.sleep(30)
         
         short_title = f"{topic[:80]} #Shorts #Tutorial"
         short_desc = f"{short_txt}\n\nWatch full tutorial: https://youtube.com/watch?v={long_video_id}\n\n{hashtags}"
