@@ -496,95 +496,122 @@ def compose_rotgen_video(
 
 # ─────────────────────────── main entry ─────────────────────────────────────
 
-def run_rotgen_pipeline() -> None:
-    """RotGen Character Mode — fully auto-pilot brain rot video."""
-    print("\n  ByteBot RotGen — AI Character Mode\n")
-    ensure_dirs()
+ROTGEN_SHORTS_PER_RUN = 3
+UPLOAD_WAIT_SECONDS   = 30    # gap between uploads (same as other modes)
 
-    # ── Script ───────────────────────────────────────────────────────────────
-    topic       = random.choice(VIRAL_TOPICS)
+
+def _produce_one_rotgen(
+    topic: str,
+    panel_bg: np.ndarray,
+    custom_img,
+    upload_fn,
+    log_fn,
+) -> dict:
+    """Produce + upload a single RotGen Short. Returns result dict."""
+    import time as _time
+
     script_data = generate_rotgen_script(topic)
     script_text = strip_emojis(script_data.get("script", ""))
     title       = script_data.get("title", topic)[:100]
     hashtags    = script_data.get("hashtags", "#AI #Shorts #ByteBot")
 
     if not script_text.strip():
-        print("  No script generated.")
-        return
+        print("  No script — skipping.")
+        return {"status": "skipped"}
 
     wc = len(script_text.split())
-    print(f"  Script ({wc} words, ~{wc/170*60:.0f}s at 170wpm): {script_text[:80]}...")
+    print(f"  Script ({wc}w ~{wc/170*60:.0f}s): {script_text[:70]}...")
 
-    # ── TTS ───────────────────────────────────────────────────────────────────
+    # TTS
     unique_id  = datetime.datetime.now().strftime("rotgen_%Y%m%d_%H%M%S")
-    audio_src  = OUTPUT_DIR / f"{unique_id}_vo.mp3"
-    audio_path = text_to_speech(script_text, audio_src)
+    audio_path = text_to_speech(script_text, OUTPUT_DIR / f"{unique_id}_vo.mp3")
     audio_clip = AudioFileClip(str(audio_path))
     total_dur  = audio_clip.duration
-    print(f"  Audio duration: {total_dur:.1f}s")
+    print(f"  Audio: {total_dur:.1f}s")
 
-    # ── Character clip ────────────────────────────────────────────────────────
-    panel_bg   = _build_panel_background()
-    custom_img = _load_custom_character()
-    print("  Building character animation...")
-    char_clip  = build_character_clip(
-        speaking=True,
-        duration=total_dur,
-        panel_bg=panel_bg,
-        custom_img=custom_img,
+    # Character animation
+    char_clip = build_character_clip(True, total_dur, panel_bg, custom_img)
+
+    # Subtitles
+    sub_clips = build_subtitle_clips(
+        assign_subtitle_timings(chunk_script(script_text), total_dur)
     )
 
-    # ── Subtitles ─────────────────────────────────────────────────────────────
-    print("  Building subtitles...")
-    chunks        = chunk_script(script_text)
-    timings       = assign_subtitle_timings(chunks, total_dur)
-    sub_clips     = build_subtitle_clips(timings)
-    print(f"  {len(sub_clips)} subtitle chunks")
+    # Gameplay
+    gameplay_clip = build_gameplay_clip(get_rotgen_gameplay(), total_dur)
 
-    # ── Gameplay ──────────────────────────────────────────────────────────────
-    print("  Selecting gameplay video...")
-    bg_path       = get_rotgen_gameplay()
-    gameplay_clip = build_gameplay_clip(bg_path, total_dur)
-
-    # ── Compose + encode ──────────────────────────────────────────────────────
+    # Compose
     output_path = OUTPUT_DIR / f"{unique_id}.mp4"
-    print(f"\n  Composing video → {output_path.name}")
+    print(f"  Composing → {output_path.name}")
     compose_rotgen_video(char_clip, gameplay_clip, sub_clips, audio_clip, output_path)
 
-    # ── Upload ────────────────────────────────────────────────────────────────
-    from src.browser_uploader import upload_to_youtube_browser
-    from src.learning import log_upload
-
+    # Upload
     short_title = f"{title[:80]} #Shorts"
     desc = (
-        f"{script_text}\n\n"
-        f"{hashtags}\n\n"
+        f"{script_text}\n\n{hashtags}\n\n"
         f"AI for Developers by {YOUR_NAME} — powered by ByteBot"
     )
-    tags = "AI,Shorts,BrainRot,ByteBot,AIFacts,Tech"
+    print(f"  Uploading → {short_title[:60]}...")
+    video_id = upload_fn(output_path, short_title, desc, "AI,Shorts,BrainRot,ByteBot,AIFacts,Tech")
 
-    print(f"\n  Uploading to YouTube...")
-    video_id = upload_to_youtube_browser(output_path, short_title, desc, tags)
+    if video_id:
+        log_fn(short_title, video_id, "rotgen")
+        print(f"  Live: https://youtube.com/watch?v={video_id}")
+    else:
+        print(f"  Upload failed — saved locally: {output_path.name}")
 
-    # ── Log ───────────────────────────────────────────────────────────────────
-    plan = load_rotgen_plan()
-    plan["videos"].append({
+    return {
         "title":      short_title,
         "topic":      topic,
         "path":       str(output_path),
         "youtube_id": video_id or None,
         "created_at": datetime.date.today().isoformat(),
         "status":     "complete" if video_id else "upload_failed",
-    })
-    save_rotgen_plan(plan)
+    }
 
-    if video_id:
-        log_upload(short_title, video_id, "rotgen")
-        print(f"\n  ByteBot video live!")
-        print(f"  YouTube: https://youtube.com/watch?v={video_id}")
-    else:
-        print(f"\n  Upload failed or returned no ID — video saved locally.")
 
-    print(f"  Title:    {short_title}")
-    print(f"  Hashtags: {hashtags}")
-    print(f"  File:     {output_path}")
+def run_rotgen_pipeline() -> None:
+    """RotGen Character Mode — 3 shorts back-to-back, auto-pilot."""
+    import time as _time
+    from tqdm import tqdm
+    from src.browser_uploader import upload_to_youtube_browser
+    from src.learning import log_upload
+
+    print("\n  ByteBot RotGen — AI Character Mode\n")
+    ensure_dirs()
+
+    # Build panel + load character ONCE — reused across all 3 videos
+    panel_bg   = _build_panel_background()
+    custom_img = _load_custom_character()
+
+    # Pick 3 unique topics
+    topics = random.sample(VIRAL_TOPICS, min(ROTGEN_SHORTS_PER_RUN, len(VIRAL_TOPICS)))
+
+    plan      = load_rotgen_plan()
+    results   = []
+    bar_fmt   = "{l_bar}{bar}| {n_fmt}/{total_fmt} shorts [{elapsed}<{remaining}]"
+
+    for i, topic in enumerate(tqdm(topics, desc="  RotGen Shorts",
+                                   unit="short", bar_format=bar_fmt)):
+        print(f"\n  ── Short {i+1}/{ROTGEN_SHORTS_PER_RUN}: {topic} ──")
+        try:
+            entry = _produce_one_rotgen(topic, panel_bg, custom_img,
+                                        upload_to_youtube_browser, log_upload)
+            results.append(entry)
+            plan["videos"].append(entry)
+            save_rotgen_plan(plan)
+
+            # Wait between uploads (skip after last)
+            if i < len(topics) - 1 and entry.get("youtube_id"):
+                print(f"\n  Waiting {UPLOAD_WAIT_SECONDS}s before next upload...")
+                _time.sleep(UPLOAD_WAIT_SECONDS)
+
+        except Exception as e:
+            print(f"  Error on '{topic}': {e}")
+            import traceback; traceback.print_exc()
+
+    # Summary
+    done   = sum(1 for r in results if r.get("status") == "complete")
+    failed = len(results) - done
+    print(f"\n  RotGen done — {done}/{ROTGEN_SHORTS_PER_RUN} uploaded"
+          + (f", {failed} failed/local" if failed else "") + ".")
