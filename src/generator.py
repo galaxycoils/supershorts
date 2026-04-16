@@ -185,9 +185,34 @@ def strip_emojis(text: str) -> str:
     return re.sub(r' {2,}', ' ', text).strip()
 
 
+def strip_markdown(text: str) -> str:
+    """Remove markdown formatting so TTS doesn't read 'asterisk asterisk'."""
+    # Bold/italic: **text** → text, *text* → text, __text__ → text, _text_ → text
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'\*(.+?)\*',     r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'__(.+?)__',     r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'_(.+?)_',       r'\1', text, flags=re.DOTALL)
+    # Headers: ## Title → Title
+    text = re.sub(r'#{1,6}\s+', '', text)
+    # Inline code and code blocks
+    text = re.sub(r'```[\s\S]*?```', '', text)
+    text = re.sub(r'`[^`]*`', '', text)
+    # Bullet/list markers at start of lines
+    text = re.sub(r'^\s*[-•*+]\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE)
+    # Links: [text](url) → text
+    text = re.sub(r'\[(.+?)\]\(.+?\)', r'\1', text)
+    # Horizontal rules
+    text = re.sub(r'^\s*[-*_]{3,}\s*$', '', text, flags=re.MULTILINE)
+    # Collapse extra whitespace
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r' {2,}', ' ', text)
+    return text.strip()
+
+
 def text_to_speech(text: str, output_path: Path) -> Path:
     """Better local TTS using Piper (natural neural voice) with pyttsx3 fallback."""
-    text = strip_emojis(text)
+    text = strip_markdown(strip_emojis(text))
     print(f"🗣️ TTS → {Path(output_path).stem} ({len(text)} chars)...")
     wav_path = output_path.with_suffix('.wav')
     try:
@@ -411,16 +436,17 @@ def generate_visuals(output_dir, video_type, slide_content=None, thumbnail_title
 
     draw = ImageDraw.Draw(final_bg)
     try:
-        title_font = ImageFont.truetype(str(FONT_FILE), 80 if video_type == 'long' else 90)
-        content_font = ImageFont.truetype(str(FONT_FILE), 45 if video_type == 'long' else 55)
         footer_font = ImageFont.truetype(str(FONT_FILE), 25 if video_type == 'long' else 35)
     except IOError:
-        title_font = content_font = footer_font = FALLBACK_THUMBNAIL_FONT
-        
+        footer_font = FALLBACK_THUMBNAIL_FONT
+
     if not is_thumbnail:
         header_height = int(height * 0.18)
         draw.rectangle([0, 0, width, header_height], fill=(25, 40, 65, 200))
-        draw.text((width//2, header_height//2), title, fill="white", font=title_font, anchor="mm")
+        # Auto-scale title to fit header box — prevents overflow on long titles
+        title_box = (40, 8, width - 40, header_height - 8)
+        auto_scale_text(draw, title, str(FONT_FILE), 56 if video_type == 'long' else 62, title_box,
+                        fill="white", min_size=20)
         content_y = header_height + 80
         draw.rectangle([20, content_y - 40, width - 20, height - 120], fill=(0, 0, 0, 150))
         content_text = slide_content.get("content", "")
@@ -430,7 +456,10 @@ def generate_visuals(output_dir, video_type, slide_content=None, thumbnail_title
         footer_text = f"AI for Developers by {YOUR_NAME} • Slide {slide_number}/{total_slides}"
         draw.text((width//2, footer_y), footer_text, fill="white", font=footer_font, anchor="mm")
     else:
-        draw.text((width//2, height//2 - 100), title, fill="white", font=title_font, anchor="mm")
+        # Auto-scale thumbnail title to fit centre of frame
+        thumb_box = (60, height // 4, width - 60, 3 * height // 4)
+        auto_scale_text(draw, title, str(FONT_FILE), 80 if video_type == 'long' else 90, thumb_box,
+                        fill="white", min_size=24)
         
     file_prefix = "thumbnail" if is_thumbnail else f"slide_{slide_number:02d}"
     path = output_dir / f"{file_prefix}.png"
