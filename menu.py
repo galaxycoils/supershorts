@@ -34,7 +34,7 @@ BANNER_LINES = [
     r" |____/ \__,_| .__/ \___|_|  |____/|_| |_|\___/|_|   \__|___/",
     r"              |_|",
 ]
-TAGLINE = "  v2.0  │  Powered by Ollama + MoviePy  │  Local-AI Content Engine"
+TAGLINE = "  v2.6  │  Powered by Ollama + MoviePy  │  Local-AI Content Engine"
 
 MENU_OPTIONS = [
     ("1", "📚", "Educational Videos",        "Long-form + linked Short (curriculum-based)"),
@@ -185,3 +185,22 @@ def view_content_plan():
 
     print()
     input(GREY("  Press Enter to return..."))
+
+
+def ask_video_count(mode_label: str, default: int = 3) -> int:
+    """Prompt user for batch video count with validation (1-10). Warns if >5 on 8GB RAM."""
+    print()
+    raw = input(BOLD(f"  How many {mode_label} videos to generate? [1-10, default {default}]: ")).strip()
+    if not raw:
+        n = default
+    else:
+        try:
+            n = int(raw)
+        except ValueError:
+            print(RED(f"  Invalid input. Using default ({default})."))
+            n = default
+    n = max(1, min(10, n))
+    if n > 5:
+        print(GOLD(f"  ⚠  {n} videos may stress 8GB RAM — consider 3-5 for stability."))
+    print(GREY(f"  Generating {n} {mode_label} video(s)...\n"))
+    return n

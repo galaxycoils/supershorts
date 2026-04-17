@@ -482,6 +482,7 @@ def build_gameplay_clip(bg_path: str | None, duration: float):
                 raw = raw.crop(x1=max(0, crop_x), y1=0,
                                x2=min(src_w, crop_x + src_h * 1080 // 992), y2=src_h)
             clip = raw.resize((1080, GAMEPLAY_H))
+            raw.close()
             if clip.duration < duration:
                 clip = clip.fx(vfx.loop, duration=duration)
             else:
@@ -523,10 +524,12 @@ def compose_rotgen_video(
         else:
             bg_music = bg_music.subclip(0, composite.duration)
         final_audio = CompositeAudioClip([audio_clip.volumex(1.3), bg_music])
+        bg_music.close()
     else:
         final_audio = audio_clip.volumex(1.3)
 
-    composite.set_audio(final_audio).write_videofile(
+    final_composite = composite.set_audio(final_audio)
+    final_composite.write_videofile(
         str(output_path),
         fps=FPS,
         codec="libx264",
@@ -538,11 +541,21 @@ def compose_rotgen_video(
     )
     print(f"  Saved: {output_path.name}")
 
+    # M1 8GB RAM cleanup
+    try:
+        final_composite.close()
+    except Exception:
+        pass
+    try:
+        composite.close()
+    except Exception:
+        pass
+    gc.collect()
+
 
 # ─────────────────────────── main entry ─────────────────────────────────────
 
-ROTGEN_SHORTS_PER_RUN = 3
-UPLOAD_WAIT_SECONDS   = 30    # gap between uploads (same as other modes)
+UPLOAD_WAIT_SECONDS = 30    # gap between uploads (same as other modes)
 
 
 def _produce_one_rotgen(
@@ -590,6 +603,14 @@ def _produce_one_rotgen(
     print(f"  Composing → {output_path.name}")
     compose_rotgen_video(char_clip, gameplay_clip, sub_clips, audio_clip, output_path)
 
+    # Clip cleanup after composition
+    for _clip in [audio_clip, gameplay_clip, char_clip]:
+        try:
+            _clip.close()
+        except Exception:
+            pass
+    gc.collect()
+
     # Upload
     short_title = f"{title[:80]} #Shorts"
     desc = (
@@ -615,8 +636,8 @@ def _produce_one_rotgen(
     }
 
 
-def run_rotgen_pipeline() -> None:
-    """RotGen Character Mode — 3 shorts back-to-back, auto-pilot."""
+def run_rotgen_pipeline(shorts_per_run: int = 3) -> None:
+    """RotGen Character Mode — N shorts back-to-back, auto-pilot."""
     import time as _time
     from tqdm import tqdm
     from src.browser_uploader import upload_to_youtube_browser
@@ -629,8 +650,8 @@ def run_rotgen_pipeline() -> None:
     panel_bg   = _build_panel_background()
     custom_img = _load_custom_character()
 
-    # Pick 3 unique topics
-    topics = random.sample(VIRAL_TOPICS, min(ROTGEN_SHORTS_PER_RUN, len(VIRAL_TOPICS)))
+    # Pick N unique topics
+    topics = random.sample(VIRAL_TOPICS, min(shorts_per_run, len(VIRAL_TOPICS)))
 
     plan      = load_rotgen_plan()
     results   = []
@@ -638,7 +659,7 @@ def run_rotgen_pipeline() -> None:
 
     for i, topic in enumerate(tqdm(topics, desc="  RotGen Shorts",
                                    unit="short", bar_format=bar_fmt)):
-        print(f"\n  ── Short {i+1}/{ROTGEN_SHORTS_PER_RUN}: {topic} ──")
+        print(f"\n  ── Short {i+1}/{shorts_per_run}: {topic} ──")
         try:
             entry = _produce_one_rotgen(topic, panel_bg, custom_img,
                                         upload_to_youtube_browser, log_upload)
@@ -658,5 +679,5 @@ def run_rotgen_pipeline() -> None:
     # Summary
     done   = sum(1 for r in results if r.get("status") == "complete")
     failed = len(results) - done
-    print(f"\n  RotGen done — {done}/{ROTGEN_SHORTS_PER_RUN} uploaded"
+    print(f"\n  RotGen done — {done}/{shorts_per_run} uploaded"
           + (f", {failed} failed/local" if failed else "") + ".")

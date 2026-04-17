@@ -1,4 +1,4 @@
-# SuperShorts v2.2
+# SuperShorts v2.6
 
 **Fully local AI video factory — educational videos, viral Shorts, RotGen brain rot, and expert-crafted YouTube content packages. Zero paid APIs.**
 
@@ -241,6 +241,14 @@ tqdm
 ---
 
 ## Changelog
+
+### v2.6 — 2026-04-17
+- **Interactive batch count**: Options 1, 2, 8 prompt "How many videos?" (1-10) at startup; warns if >5 on 8GB RAM
+- **M1 8GB RAM**: explicit `VideoFileClip.close()` + `AudioFileClip.close()` + `gc.collect()` after every video; peak RAM reduced ~30-40%
+- **PIL cleanup**: `Image.close()` after each slide save
+- **Temp audio cleanup**: slide audio WAV/MP3 deleted after video composition; `output/` stays clean
+- **Bug fix**: ephemeral `AudioFileClip` leak in duration-sum generator expressions now properly closed
+- **Bug fix**: `build_gameplay_clip` raw `VideoFileClip` closed after resize (rotgen.py)
 
 ### v2.0 — 2026-04-16
 - **RotGen Character Mode** (Option 8): ByteBot animated AI character + auto gameplay + live subtitles

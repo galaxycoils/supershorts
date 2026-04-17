@@ -17,6 +17,7 @@ from pathlib import Path
 from pydub import AudioSegment
 from tqdm import tqdm
 import pyttsx3
+import gc
 import time
 import datetime
 
@@ -518,6 +519,7 @@ def generate_visuals(output_dir, video_type, slide_content=None, thumbnail_title
     file_prefix = "thumbnail" if is_thumbnail else f"slide_{slide_number:02d}"
     path = output_dir / f"{file_prefix}.png"
     final_bg.save(path)
+    final_bg.close()
     return str(path)
 
 def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_title,
@@ -541,7 +543,11 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
         if not bg_path:
             bg_path = get_local_gameplay(video_type)
 
-        total_duration = sum(AudioFileClip(str(a)).duration for a in audio_paths) + 0.5 * len(audio_paths)
+        _dur_clips = [AudioFileClip(str(a)) for a in audio_paths]
+        total_duration = sum(c.duration for c in _dur_clips) + 0.5 * len(audio_paths)
+        for _c in _dur_clips:
+            _c.close()
+        del _dur_clips
 
         if bg_path and not STATIC_MODE:
             print(f"🎮 Using background: {Path(bg_path).name} (loaded once)")
@@ -577,6 +583,7 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
                 final_clip = CompositeVideoClip([img_clip], size=target_size)
 
             final_clip = final_clip.set_audio(audio_clip)
+            audio_clip.close()
             image_clips.append(final_clip)
 
         final_video = concatenate_videoclips(image_clips, method="compose")
@@ -599,6 +606,7 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
                 bg_music = bg_music.subclip(0, final_video.duration)
             composite = CompositeAudioClip([final_video.audio.volumex(1.2), bg_music])
             final_video = final_video.set_audio(composite)
+            bg_music.close()
 
         # Ultra-fast write settings for M1 8GB
         print(f"🎬 Encoding video → {Path(output_path).name}")
@@ -613,7 +621,19 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
             logger='bar',
         )
         print(f"✅ Video saved: {Path(output_path).name}")
-        
+
+        # M1 8GB RAM cleanup
+        try:
+            final_video.close()
+        except Exception:
+            pass
+        if bg_clip is not None:
+            try:
+                bg_clip.close()
+            except Exception:
+                pass
+        gc.collect()
+
     except Exception as e:
         print(f"❌ Video creation error: {e}")
         import traceback

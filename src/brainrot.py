@@ -1,4 +1,5 @@
 """src/brainrot.py - Brain Rot / High-Engagement Viral Shorts Generator"""
+import gc
 import json
 import random
 import datetime
@@ -33,7 +34,6 @@ from src.generator import (
 
 BRAINROT_PLAN_FILE = Path("brainrot_plan.json")
 OUTPUT_DIR = Path("output")
-SHORTS_PER_RUN = 3
 
 # Attention-grabbing color palettes
 BRAINROT_PALETTES = [
@@ -271,7 +271,11 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
                 if bg_path:
                     break
 
-        total_duration = sum(AudioFileClip(str(a)).duration for a in audio_paths) + 0.3 * len(audio_paths)
+        _dur_clips = [AudioFileClip(str(a)) for a in audio_paths]
+        total_duration = sum(c.duration for c in _dur_clips) + 0.3 * len(audio_paths)
+        for _c in _dur_clips:
+            _c.close()
+        del _dur_clips
 
         if bg_path:
             print(f"🎮 Background: {Path(bg_path).name}")
@@ -301,6 +305,7 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
                 segment = img_clip
 
             segment = segment.set_audio(audio_clip)
+            audio_clip.close()
             clips.append(segment)
 
         final = concatenate_videoclips(clips, method="compose")
@@ -323,6 +328,7 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
                 bg_music = bg_music.subclip(0, final.duration)
             composite_audio = CompositeAudioClip([final.audio.volumex(1.2), bg_music])
             final = final.set_audio(composite_audio)
+            bg_music.close()
 
         print(f"🎬 Encoding → {Path(output_path).name}")
         final.write_videofile(
@@ -337,6 +343,18 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
         )
         print(f"✅ Brain rot video saved: {Path(output_path).name}")
 
+        # M1 8GB RAM cleanup
+        try:
+            final.close()
+        except Exception:
+            pass
+        if bg_clip is not None:
+            try:
+                bg_clip.close()
+            except Exception:
+                pass
+        gc.collect()
+
     except Exception as e:
         print(f"❌ Brain rot video error: {e}")
         import traceback
@@ -344,7 +362,7 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
         raise
 
 
-def run_brainrot_pipeline():
+def run_brainrot_pipeline(shorts_per_run: int = 3):
     """Main entry point: generate and upload brain rot shorts."""
     print("🧠 Starting Brain Rot Shorts Pipeline...")
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -370,7 +388,7 @@ def run_brainrot_pipeline():
 
     from src.browser_uploader import upload_to_youtube_browser
 
-    batch = pending[:SHORTS_PER_RUN]
+    batch = pending[:shorts_per_run]
     processed = 0
     for topic in tqdm(batch, desc="Brain Rot Shorts", unit="short",
                       bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} shorts [{elapsed}<{remaining}]"):
@@ -427,6 +445,7 @@ def run_brainrot_pipeline():
             save_brainrot_plan(plan)
             print(f"✅ Done: {topic['title']}")
             processed += 1
+            gc.collect()
 
         except Exception as e:
             print(f"❌ Failed topic '{topic['title']}': {e}")

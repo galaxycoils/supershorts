@@ -1,4 +1,5 @@
-# main.py - SuperShorts v2.0
+# main.py - SuperShorts v2.6
+import gc
 import os
 import json
 import datetime
@@ -26,7 +27,6 @@ import menu
 
 CONTENT_PLAN_FILE = Path("content_plan.json")
 OUTPUT_DIR = Path("output")
-LESSONS_PER_RUN = 2
 
 def get_content_plan():
     if not CONTENT_PLAN_FILE.exists():
@@ -92,6 +92,12 @@ def produce_lesson_videos(lesson):
     long_full_script = '\n'.join(slide_scripts)
     compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', lesson['title'],
                   script=long_full_script)
+    # Cleanup long-form slide audio temp files
+    for _ap in slide_audio_paths:
+        try:
+            Path(_ap).unlink(missing_ok=True)
+        except Exception:
+            pass
     long_thumb_path = generate_visuals(
         output_dir=OUTPUT_DIR,
         video_type='long',
@@ -121,6 +127,12 @@ def produce_lesson_videos(lesson):
     print(f"🎥 Creating short video at: {short_video_path}")
     compose_video([short_slide_path], [short_audio_path], short_video_path, 'short', lesson['title'],
                   script=short_script)
+    # Cleanup short audio temp files
+    for _ap in [short_audio_path, str(short_audio_mp3_path)]:
+        try:
+            Path(_ap).unlink(missing_ok=True)
+        except Exception:
+            pass
     short_thumb_path = generate_visuals(
         output_dir=OUTPUT_DIR,
         video_type='short',
@@ -160,7 +172,7 @@ def produce_lesson_videos(lesson):
         return long_video_id
     return None
 
-def main_flow():
+def main_flow(lessons_per_run: int = 2):
     print("🚀 Starting Money Printer V2 (100% Local Ollama)")
     print(f"📁 Current working dir: {os.getcwd()}")
     print(f"📁 OUTPUT_DIR: {OUTPUT_DIR.resolve()}")
@@ -175,7 +187,7 @@ def main_flow():
             update_content_plan(new_plan)
             plan = new_plan
             pending = [(i, lesson) for i, lesson in enumerate(new_plan['lessons']) if lesson['status'] == 'pending']
-        for _, lesson in pending[:LESSONS_PER_RUN]:
+        for _, lesson in pending[:lessons_per_run]:
             try:
                 video_id = produce_lesson_videos(lesson)
                 if video_id:
@@ -189,6 +201,7 @@ def main_flow():
             except Exception as e:
                 print(f"❌ Failed to produce lesson: {e}")
                 traceback.print_exc()
+            gc.collect()
     except Exception as e:
         print(f"❌ Critical error: {e}")
         traceback.print_exc()
@@ -198,9 +211,11 @@ def main():
         choice = menu.show_menu()
         try:
             if choice == "1":
-                main_flow()
+                count = menu.ask_video_count("Educational", default=2)
+                main_flow(lessons_per_run=count)
             elif choice == "2":
-                start_brainrot_generation()
+                count = menu.ask_video_count("Brain Rot", default=3)
+                start_brainrot_generation(count)
             elif choice == "3":
                 start_viral_gameplay_mode()
             elif choice == "4":
@@ -213,7 +228,8 @@ def main():
                 menu.view_content_plan()
                 continue  # skip the "Press Enter" since view_content_plan has its own
             elif choice == "8":
-                start_rotgen_mode()
+                count = menu.ask_video_count("RotGen", default=3)
+                start_rotgen_mode(count)
             elif choice == "9":
                 generate_youtube_content_package()
             elif choice == "10":
