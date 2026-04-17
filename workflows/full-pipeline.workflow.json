@@ -1,0 +1,80 @@
+{
+  "name": "supershorts-full-pipeline",
+  "version": "1.0.0",
+  "description": "Full content pipeline: all modes in sequence with smart ordering",
+  "trigger": {
+    "type": "manual"
+  },
+  "environment": {
+    "LOG_LEVEL": "info"
+  },
+  "tasks": [
+    {
+      "id": "ensure-output-dir",
+      "name": "Ensure output directory exists",
+      "type": "python",
+      "fn": "ensure_output_dir",
+      "timeout": 10
+    },
+    {
+      "id": "educational-videos",
+      "name": "Educational Videos (2)",
+      "type": "python",
+      "fn": "run_educational",
+      "args": { "count": 2 },
+      "depends_on": ["ensure-output-dir"],
+      "timeout": 3600,
+      "retry": { "attempts": 1, "delay": 30 }
+    },
+    {
+      "id": "brainrot-shorts",
+      "name": "Brain Rot Shorts (2)",
+      "type": "python",
+      "fn": "run_brainrot",
+      "args": { "count": 2 },
+      "depends_on": ["educational-videos"],
+      "timeout": 3600,
+      "retry": { "attempts": 1, "delay": 30 }
+    },
+    {
+      "id": "rotgen-videos",
+      "name": "RotGen Character Videos (1)",
+      "type": "python",
+      "fn": "run_rotgen",
+      "args": { "count": 1 },
+      "depends_on": ["brainrot-shorts"],
+      "timeout": 2400,
+      "retry": { "attempts": 1, "delay": 30 }
+    },
+    {
+      "id": "tcm-video",
+      "name": "TCM Educational Short (1)",
+      "type": "python",
+      "fn": "run_tcm_batch",
+      "args": {
+        "count": 1,
+        "focus": "Traditional Chinese Medicine (TCM)",
+        "extra": ""
+      },
+      "depends_on": ["rotgen-videos"],
+      "timeout": 1800,
+      "retry": { "attempts": 1, "delay": 30 }
+    },
+    {
+      "id": "learning-analysis",
+      "name": "Learning Mode Analysis",
+      "type": "python",
+      "fn": "run_learning",
+      "depends_on": ["educational-videos", "brainrot-shorts", "rotgen-videos", "tcm-video"],
+      "timeout": 120
+    },
+    {
+      "id": "log-summary",
+      "name": "Write Pipeline Summary",
+      "type": "python",
+      "fn": "write_summary",
+      "depends_on": ["learning-analysis"],
+      "timeout": 10
+    }
+  ]
+}

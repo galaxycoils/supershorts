@@ -1,134 +1,115 @@
-# menu.py - SuperShorts interactive terminal menu
-import os
-import sys
+# menu.py - SuperShorts interactive terminal menu (rich edition)
 import json
 from pathlib import Path
+
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.text import Text
+from rich.prompt import Prompt
+from rich import box
+from rich.rule import Rule
 
 CONTENT_PLAN_FILE  = Path("content_plan.json")
 BRAINROT_PLAN_FILE = Path("brainrot_plan.json")
 
-# ─── ANSI colour helpers ─────────────────────────────────────────
-_IS_TTY = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+console = Console()
 
-def _c(code: str, text: str) -> str:
-    """Wrap text in ANSI colour code (no-op if not a TTY)."""
-    return f"\033[{code}m{text}\033[0m" if _IS_TTY else text
-
-def DIM(t):   return _c("2",      t)
-def BOLD(t):  return _c("1",      t)
-def CYAN(t):  return _c("96",     t)
-def GREEN(t): return _c("92",     t)
-def RED(t):   return _c("91",     t)
-def GOLD(t):  return _c("93",     t)
-def BLUE(t):  return _c("94",     t)
-def MAG(t):   return _c("95",     t)
-def GREY(t):  return _c("90",     t)
-
-
-# ─── Banner ──────────────────────────────────────────────────────
-BANNER_LINES = [
-    r"  ____                       ____  _                _       ",
-    r" / ___| _   _ _ __   ___ _ _/ ___|| |__   ___  _ __| |_ ___ ",
-    r" \___ \| | | | '_ \ / _ \ '__\___ \| '_ \ / _ \| '__| __/ __|",
-    r"  ___) | |_| | |_) |  __/ |   ___) | | | | (_) | |  | |_\__ \\",
-    r" |____/ \__,_| .__/ \___|_|  |____/|_| |_|\___/|_|   \__|___/",
-    r"              |_|",
-]
-TAGLINE = "  v2.6  │  Powered by Ollama + MoviePy  │  Local-AI Content Engine"
-
+# ─── Menu options ─────────────────────────────────────────────────
 MENU_OPTIONS = [
-    ("1", "📚", "Educational Videos",        "Long-form + linked Short (curriculum-based)"),
-    ("2", "🧠", "Brain Rot Viral Shorts",     "Sensationalized AI shorts, 30–45 s"),
-    ("3", "🎮", "Viral Gameplay Mode",        "Subway Surfers-style background + AI narration"),
-    ("4", "🎓", "Tutorial Videos",            "~10-min deep-dive + linked Short"),
-    ("5", "📈", "Learning Mode",              "Self-improvement analysis from past uploads"),
-    ("6", "💡", "YouTube Studio Ideas",       "Real YT suggestions, thumbnails & scripts"),
-    ("7", "📋", "View Content Plan",          "Browse lessons + brain rot topic tracker"),
-    ("8", "🎭", "RotGen Character Mode",       "ByteBot AI character + gameplay + auto-subtitles"),
-    ("9", "📦", "YouTube Content Package",    "Expert AI: topic → script → 5-min video → upload"),
-    ("10","🚪", "Exit",                       ""),
+    ("1",  "📚", "Educational Videos",       "Long-form + linked Short (curriculum-based)"),
+    ("2",  "🧠", "Brain Rot Viral Shorts",    "Sensationalized AI shorts, 30–45 s"),
+    ("3",  "🎮", "Viral Gameplay Mode",       "Subway Surfers-style background + AI narration"),
+    ("4",  "🎓", "Tutorial Videos",           "~10-min deep-dive + linked Short"),
+    ("5",  "📈", "Learning Mode",             "Self-improvement analysis from past uploads"),
+    ("6",  "💡", "YouTube Studio Ideas",      "Real YT suggestions, thumbnails & scripts"),
+    ("7",  "📋", "View Content Plan",         "Browse lessons + brain rot topic tracker"),
+    ("8",  "🎭", "RotGen Character Mode",      "ByteBot AI character + gameplay + auto-subtitles"),
+    ("9",  "📦", "YouTube Content Package",   "Expert AI: topic → script → 5-min video → upload"),
+    ("10", "✂️",  "Automatic Video Clipper",   "Long YouTube/podcast → viral vertical Shorts"),
+    ("11", "🌿", "TCM Educational Mode",      "Traditional Chinese Medicine content series"),
+    ("12", "🚪", "Exit",                      ""),
 ]
 
 
-def clear_screen():
-    os.system("cls" if os.name == "nt" else "clear")
-
-
-def _stats_line() -> str:
-    """Quick stats: lessons done / brainrot done."""
-    lessons_done = lessons_total = 0
-    br_done = br_total = 0
+def _stats() -> tuple[int, int, int, int]:
+    """Return (lessons_done, lessons_total, br_done, br_total)."""
+    ld = lt = bd = bt = 0
     try:
         if CONTENT_PLAN_FILE.exists():
             plan = json.loads(CONTENT_PLAN_FILE.read_text())
             ls = plan.get("lessons", [])
-            lessons_total = len(ls)
-            lessons_done  = sum(1 for l in ls if l.get("status") == "complete")
+            lt = len(ls)
+            ld = sum(1 for l in ls if l.get("status") == "complete")
     except Exception:
         pass
     try:
         if BRAINROT_PLAN_FILE.exists():
             bp = json.loads(BRAINROT_PLAN_FILE.read_text())
             ts = bp.get("topics", [])
-            br_total = len(ts)
-            br_done  = sum(1 for t in ts if t.get("status") == "complete")
+            bt = len(ts)
+            bd = sum(1 for t in ts if t.get("status") == "complete")
     except Exception:
         pass
+    return ld, lt, bd, bt
+
+
+def show_menu() -> str:
+    console.clear()
+
+    # ── Header panel ──────────────────────────────────────────────
+    header = Text(justify="center")
+    header.append("SuperShorts", style="bold cyan")
+    header.append("  v2.6  ", style="dim")
+    header.append("│", style="dim")
+    header.append("  Ollama + MoviePy  ", style="cyan")
+    header.append("│", style="dim")
+    header.append("  Local-AI Content Engine", style="dim")
+    console.print(Panel(header, border_style="cyan", padding=(0, 2)))
+
+    # ── Stats bar ────────────────────────────────────────────────
+    ld, lt, bd, bt = _stats()
     parts = []
-    if lessons_total:
-        parts.append(f"Lessons {GREEN(str(lessons_done))}/{lessons_total}")
-    if br_total:
-        parts.append(f"Brain Rot {GREEN(str(br_done))}/{br_total}")
-    return "  " + GREY("  ·  ".join(parts)) if parts else ""
+    if lt:
+        parts.append(f"[green]{ld}[/green][dim]/{lt}[/dim] Lessons")
+    if bt:
+        parts.append(f"[green]{bd}[/green][dim]/{bt}[/dim] Brain Rot")
+    if parts:
+        console.print("  " + "  [dim]·[/dim]  ".join(parts))
+        console.print()
 
+    # ── Menu table ───────────────────────────────────────────────
+    table = Table(
+        box=box.SIMPLE,
+        show_header=False,
+        padding=(0, 1),
+        border_style="dim",
+    )
+    table.add_column("num",   style="bold yellow",  no_wrap=True, min_width=4)
+    table.add_column("icon",  no_wrap=True,          min_width=2)
+    table.add_column("label", style="bold white",   no_wrap=True, min_width=26)
+    table.add_column("desc",  style="dim",           no_wrap=True, overflow="ellipsis")
 
-def show_menu():
-    clear_screen()
-
-    # Banner
-    for line in BANNER_LINES:
-        print(CYAN(BOLD(line)))
-    print(GOLD(TAGLINE))
-    print()
-
-    # Stats bar
-    stats = _stats_line()
-    if stats:
-        print(stats)
-        print()
-
-    # Divider
-    print(GREY("  " + "─" * 61))
-    print()
-
-    # Options
     for key, icon, label, desc in MENU_OPTIONS:
-        num   = GOLD(f"  [{key}]")
-        icon_ = icon + " "
-        lbl   = BOLD(label)
-        dsc   = GREY(f"  —  {desc}") if desc else ""
-        print(f"{num}  {icon_}{lbl}{dsc}")
+        table.add_row(f"[{key}]", icon, label, desc)
 
-    print()
-    print(GREY("  " + "─" * 61))
-    print()
-    return input(BOLD("  Select option: ")).strip()
+    console.print(table)
+    console.print(Rule(style="dim"))
+    console.print()
+
+    return Prompt.ask("  [bold]Select option[/bold]").strip()
 
 
-# ─── Content Plan view ───────────────────────────────────────────
+# ─── Content Plan view ────────────────────────────────────────────
 
 def view_content_plan():
-    clear_screen()
+    console.clear()
 
-    for line in BANNER_LINES:
-        print(CYAN(BOLD(line)))
-    print(GOLD(TAGLINE))
-    print()
-    print(BOLD(CYAN("  CONTENT PLAN")))
-    print(GREY("  " + "─" * 61))
-    print()
+    header = Text("  CONTENT PLAN  ", style="bold cyan", justify="center")
+    console.print(Panel(header, border_style="cyan", padding=(0, 2)))
+    console.print()
 
-    # ── Educational lessons ──
+    # ── Educational lessons ──────────────────────────────────────
     if CONTENT_PLAN_FILE.exists():
         try:
             plan     = json.loads(CONTENT_PLAN_FILE.read_text())
@@ -136,31 +117,41 @@ def view_content_plan():
             complete = sum(1 for l in lessons if l.get("status") == "complete")
             pending  = len(lessons) - complete
 
-            print(BOLD("  Educational Lessons"))
-            print(f"  Total {BOLD(str(len(lessons)))}  │  "
-                  f"{GREEN('✔')} Complete {GREEN(str(complete))}  │  "
-                  f"⏳ Pending {GOLD(str(pending))}")
-            print()
-            print(GREY(f"  {'Ch':>3}  {'Pt':>3}  {'Status':>10}  Title"))
-            print(GREY("  " + "─" * 58))
+            summary = (
+                f"[bold]Educational Lessons[/bold]  "
+                f"Total [bold]{len(lessons)}[/bold]  │  "
+                f"[green]✔[/green] Complete [green]{complete}[/green]  │  "
+                f"⏳ Pending [yellow]{pending}[/yellow]"
+            )
+            console.print(summary)
+            console.print()
+
+            tbl = Table(box=box.SIMPLE_HEAD, border_style="dim", padding=(0, 1))
+            tbl.add_column("Ch",     style="dim",         no_wrap=True, min_width=3)
+            tbl.add_column("Pt",     style="dim",         no_wrap=True, min_width=3)
+            tbl.add_column("",       no_wrap=True,        min_width=1)   # status symbol
+            tbl.add_column("Title",  style="white",       no_wrap=False)
+            tbl.add_column("YT ID",  style="dim cyan",    no_wrap=True)
 
             for l in lessons:
-                status  = l.get("status", "pending")
-                symbol  = GREEN("✔") if status == "complete" else GOLD("·")
-                ch      = str(l.get("chapter", "?"))
-                pt      = str(l.get("part",    "?"))
-                title   = l.get("title", "")[:46]
-                yt_id   = l.get("youtube_id")
-                yt_str  = GREY(f" ↗ yt/{yt_id[:8]}") if yt_id else ""
-                print(f"  {ch:>3}  {pt:>3}  {symbol:>10}  {title}{yt_str}")
+                status = l.get("status", "pending")
+                sym    = "[green]✔[/green]" if status == "complete" else "[yellow]·[/yellow]"
+                ch     = str(l.get("chapter", "?"))
+                pt     = str(l.get("part",    "?"))
+                title  = l.get("title", "")[:50]
+                yt_id  = l.get("youtube_id", "")
+                yt_str = yt_id[:11] if yt_id else ""
+                tbl.add_row(ch, pt, sym, title, yt_str)
+
+            console.print(tbl)
         except Exception as e:
-            print(RED(f"  Error: {e}"))
+            console.print(f"[red]Error loading lessons: {e}[/red]")
     else:
-        print(GREY("  No content_plan.json found."))
+        console.print("[dim]No content_plan.json found.[/dim]")
 
-    print()
+    console.print()
 
-    # ── Brain Rot topics ──
+    # ── Brain Rot topics ─────────────────────────────────────────
     if BRAINROT_PLAN_FILE.exists():
         try:
             bp     = json.loads(BRAINROT_PLAN_FILE.read_text())
@@ -168,39 +159,49 @@ def view_content_plan():
             done   = sum(1 for t in topics if t.get("status") == "complete")
             pend   = len(topics) - done
 
-            print(BOLD("  Brain Rot Topics"))
-            print(f"  Total {BOLD(str(len(topics)))}  │  "
-                  f"{GREEN('✔')} Complete {GREEN(str(done))}  │  "
-                  f"⏳ Pending {GOLD(str(pend))}")
-            print()
-            print(GREY(f"  {'Status':>10}  Title"))
-            print(GREY("  " + "─" * 50))
+            summary = (
+                f"[bold]Brain Rot Topics[/bold]  "
+                f"Total [bold]{len(topics)}[/bold]  │  "
+                f"[green]✔[/green] Complete [green]{done}[/green]  │  "
+                f"⏳ Pending [yellow]{pend}[/yellow]"
+            )
+            console.print(summary)
+            console.print()
+
+            tbl2 = Table(box=box.SIMPLE_HEAD, border_style="dim", padding=(0, 1))
+            tbl2.add_column("",      no_wrap=True,  min_width=1)
+            tbl2.add_column("Title", style="white", no_wrap=False)
+
             for t in topics:
                 st  = t.get("status", "pending")
-                sym = GREEN("✔") if st == "complete" else GOLD("·")
-                tit = t.get("title", "")[:54]
-                print(f"  {sym:>10}  {tit}")
+                sym = "[green]✔[/green]" if st == "complete" else "[yellow]·[/yellow]"
+                tit = t.get("title", "")[:60]
+                tbl2.add_row(sym, tit)
+
+            console.print(tbl2)
         except Exception:
             pass
 
-    print()
-    input(GREY("  Press Enter to return..."))
+    console.print()
+    console.input("[dim]  Press Enter to return…[/dim]")
 
 
 def ask_video_count(mode_label: str, default: int = 3) -> int:
-    """Prompt user for batch video count with validation (1-10). Warns if >5 on 8GB RAM."""
-    print()
-    raw = input(BOLD(f"  How many {mode_label} videos to generate? [1-10, default {default}]: ")).strip()
-    if not raw:
+    """Prompt user for batch video count (1–10). Warns if >5 on 8 GB RAM."""
+    console.print()
+    raw = Prompt.ask(
+        f"  [bold]How many {mode_label} videos to generate?[/bold]",
+        default=str(default),
+    )
+    try:
+        n = int(raw)
+    except ValueError:
+        console.print(f"[red]  Invalid input. Using default ({default}).[/red]")
         n = default
-    else:
-        try:
-            n = int(raw)
-        except ValueError:
-            print(RED(f"  Invalid input. Using default ({default})."))
-            n = default
     n = max(1, min(10, n))
     if n > 5:
-        print(GOLD(f"  ⚠  {n} videos may stress 8GB RAM — consider 3-5 for stability."))
-    print(GREY(f"  Generating {n} {mode_label} video(s)...\n"))
+        console.print(
+            f"[yellow]  ⚠  {n} videos may stress 8 GB RAM — consider 3–5 for stability.[/yellow]"
+        )
+    console.print(f"[dim]  Generating {n} {mode_label} video(s)…[/dim]\n")
     return n

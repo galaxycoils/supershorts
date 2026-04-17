@@ -1,0 +1,60 @@
+{
+  "name": "supershorts-daily",
+  "version": "1.0.0",
+  "description": "Daily content generation: 2 educational lessons + 3 brainrot shorts",
+  "trigger": {
+    "type": "schedule",
+    "config": {
+      "schedule": "0 9 * * *",
+      "comment": "Runs every day at 9 AM"
+    }
+  },
+  "environment": {
+    "LOG_LEVEL": "info"
+  },
+  "tasks": [
+    {
+      "id": "ensure-output-dir",
+      "name": "Ensure output directory exists",
+      "type": "python",
+      "fn": "ensure_output_dir",
+      "timeout": 10
+    },
+    {
+      "id": "educational-videos",
+      "name": "Generate 2 Educational Videos",
+      "type": "python",
+      "fn": "run_educational",
+      "args": { "count": 2 },
+      "depends_on": ["ensure-output-dir"],
+      "timeout": 3600,
+      "retry": { "attempts": 1, "delay": 30 }
+    },
+    {
+      "id": "brainrot-shorts",
+      "name": "Generate 3 Brain Rot Shorts",
+      "type": "python",
+      "fn": "run_brainrot",
+      "args": { "count": 3 },
+      "depends_on": ["ensure-output-dir"],
+      "timeout": 3600,
+      "retry": { "attempts": 1, "delay": 30 }
+    },
+    {
+      "id": "learning-analysis",
+      "name": "Run Learning Mode Analysis",
+      "type": "python",
+      "fn": "run_learning",
+      "depends_on": ["educational-videos", "brainrot-shorts"],
+      "timeout": 120
+    },
+    {
+      "id": "log-summary",
+      "name": "Write Daily Summary Log",
+      "type": "python",
+      "fn": "write_summary",
+      "depends_on": ["learning-analysis"],
+      "timeout": 10
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "name": "tcm-weekly",
+  "version": "1.0.0",
+  "description": "Weekly TCM content batch: 5 Traditional Chinese Medicine educational shorts",
+  "trigger": {
+    "type": "schedule",
+    "config": {
+      "schedule": "0 10 * * 1",
+      "comment": "Every Monday at 10 AM"
+    }
+  },
+  "environment": {
+    "LOG_LEVEL": "info"
+  },
+  "tasks": [
+    {
+      "id": "ensure-output-dir",
+      "name": "Ensure output directory exists",
+      "type": "python",
+      "fn": "ensure_output_dir",
+      "timeout": 10
+    },
+    {
+      "id": "tcm-batch",
+      "name": "Generate 5 TCM Videos",
+      "type": "python",
+      "fn": "run_tcm_batch",
+      "args": {
+        "count": 5,
+        "focus": "Traditional Chinese Medicine (TCM)",
+        "extra": ""
+      },
+      "depends_on": ["ensure-output-dir"],
+      "timeout": 7200,
+      "retry": { "attempts": 1, "delay": 60 }
+    },
+    {
+      "id": "learning-analysis",
+      "name": "Learning Mode Analysis",
+      "type": "python",
+      "fn": "run_learning",
+      "depends_on": ["tcm-batch"],
+      "timeout": 120
+    },
+    {
+      "id": "log-summary",
+      "name": "Write Weekly TCM Summary",
+      "type": "python",
+      "fn": "write_summary",
+      "depends_on": ["learning-analysis"],
+      "timeout": 10
+    }
+  ]
+}

@@ -86,12 +86,12 @@ def upload_to_youtube_browser(video_path, title, description, tags, thumbnail_pa
         try:
             not_for_kids = driver.find_element(By.NAME, YOUTUBE_NOT_MADE_FOR_KIDS_NAME)
             driver.execute_script("arguments[0].click();", not_for_kids)
-        except:
+        except Exception:
             # Try finding by text if name fails
             try:
                 el = driver.find_element(By.XPATH, "//*[contains(text(), 'No, it')]")
                 driver.execute_script("arguments[0].click();", el)
-            except:
+            except Exception:
                 print("⚠️ Could not set audience, might fail later.")
         
         time.sleep(2)
@@ -102,7 +102,7 @@ def upload_to_youtube_browser(video_path, title, description, tags, thumbnail_pa
             try:
                 next_btn = driver.find_element(By.ID, YOUTUBE_NEXT_BUTTON_ID)
                 driver.execute_script("arguments[0].click();", next_btn)
-            except:
+            except Exception:
                 print(f"⚠️ Could not click Next ({i+1}), trying generic Next...")
                 btns = driver.find_elements(By.XPATH, "//*[text()='Next']")
                 if btns: driver.execute_script("arguments[0].click();", btns[0])
@@ -114,7 +114,7 @@ def upload_to_youtube_browser(video_path, title, description, tags, thumbnail_pa
             radios = driver.find_elements(By.XPATH, YOUTUBE_RADIO_BUTTON_XPATH)
             if len(radios) >= 3:
                 driver.execute_script("arguments[0].click();", radios[1]) # Usually Unlisted
-        except:
+        except Exception:
             print("⚠️ Could not set visibility.")
         
         # Click Done
@@ -122,7 +122,7 @@ def upload_to_youtube_browser(video_path, title, description, tags, thumbnail_pa
         try:
             done_btn = driver.find_element(By.ID, YOUTUBE_DONE_BUTTON_ID)
             driver.execute_script("arguments[0].click();", done_btn)
-        except:
+        except Exception:
             done_btns = driver.find_elements(By.XPATH, "//*[text()='Done' or text()='Save' or text()='Publish']")
             if done_btns: driver.execute_script("arguments[0].click();", done_btns[0])
         
@@ -140,7 +140,7 @@ def upload_to_youtube_browser(video_path, title, description, tags, thumbnail_pa
                     video_id = href.split("/")[-1]
                     if "?" in video_id: video_id = video_id.split("?")[0]
                     break
-        except:
+        except Exception:
             pass
 
         print(f"🎉 Success! Video ID: {video_id}")

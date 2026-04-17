@@ -414,11 +414,18 @@ def render_subtitle_frame(text: str) -> np.ndarray:
             chosen_lines = [l1, l2]
             break
     else:
-        # fallback: smallest tried
+        # Fallback: force midpoint 2-line split + size-20 font so text never overflows
+        words = text.split()
+        if len(words) >= 2:
+            mid = max(1, len(words) // 2)
+            chosen_lines = [' '.join(words[:mid]), ' '.join(words[mid:])]
+        else:
+            chosen_lines = [text]
         try:
             font = ImageFont.truetype(str(FONT_FILE), 20)
-        except IOError:
+        except (IOError, OSError):
             pass
+        chosen_size = 20
 
     line_h  = chosen_size + 6
     total_h = len(chosen_lines) * line_h
@@ -482,7 +489,6 @@ def build_gameplay_clip(bg_path: str | None, duration: float):
                 raw = raw.crop(x1=max(0, crop_x), y1=0,
                                x2=min(src_w, crop_x + src_h * 1080 // 992), y2=src_h)
             clip = raw.resize((1080, GAMEPLAY_H))
-            raw.close()
             if clip.duration < duration:
                 clip = clip.fx(vfx.loop, duration=duration)
             else:
@@ -518,17 +524,17 @@ def compose_rotgen_video(
 
     # Audio mix: TTS loud + gentle bg music
     if BACKGROUND_MUSIC_PATH.exists():
-        bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.18)
+        bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.22)
         if bg_music.duration < composite.duration:
             bg_music = bg_music.fx(vfx.loop, duration=composite.duration)
         else:
             bg_music = bg_music.subclip(0, composite.duration)
         final_audio = CompositeAudioClip([audio_clip.volumex(1.3), bg_music])
-        bg_music.close()
     else:
         final_audio = audio_clip.volumex(1.3)
 
     final_composite = composite.set_audio(final_audio)
+
     final_composite.write_videofile(
         str(output_path),
         fps=FPS,

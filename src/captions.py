@@ -80,8 +80,17 @@ def render_subtitle_frame(text: str, video_w: int, subtitle_h: int = SUBTITLE_H)
                 break
 
     if not chosen_font:
-        chosen_font = ImageFont.load_default()
-        chosen_lines = [text]
+        # Force midpoint 2-line split so text never overflows MAX_W
+        words = text.split()
+        if len(words) >= 2:
+            mid = max(1, len(words) // 2)
+            chosen_lines = [' '.join(words[:mid]), ' '.join(words[mid:])]
+        else:
+            chosen_lines = [text]
+        try:
+            chosen_font = ImageFont.truetype(str(FONT_FILE), 20)
+        except (IOError, OSError):
+            chosen_font = ImageFont.load_default()
 
     line_h = (chosen_font.size if hasattr(chosen_font, 'size') else 20) + 6
     total_h = len(chosen_lines) * line_h
