@@ -1,7 +1,9 @@
 """src/brainrot.py - Brain Rot / High-Engagement Viral Shorts Generator"""
 import json
+import os
 import random
 import datetime
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -21,6 +23,7 @@ from src.generator import (
     get_local_background,
     auto_scale_text,
     draw_wrapped_text,
+    get_encoder_kwargs,
     FONT_FILE,
     ASSETS_PATH,
     YOUR_NAME,
@@ -33,6 +36,7 @@ from src.generator import (
 BRAINROT_PLAN_FILE = Path("brainrot_plan.json")
 OUTPUT_DIR = Path("output")
 SHORTS_PER_RUN = 3
+MAX_PARALLEL_SLIDES = min(4, os.cpu_count() or 2)
 
 # Attention-grabbing color palettes
 BRAINROT_PALETTES = [
@@ -92,13 +96,15 @@ Return ONLY valid JSON:
 
 def generate_brainrot_script(topic):
     """Generate punchy meme-like script for a brain rot short."""
+    from src.learning import get_learning_context
     print(f"📝 Scripting: '{topic['title']}'...")
+    learning_context = get_learning_context()
     prompt = f"""You are writing a viral 30-45 second YouTube Short script about AI.
 
 Topic: {topic['title']}
 Hook: {topic['hook']}
 Angle: {topic['angle']}
-
+{learning_context}
 Rules:
 - Total script UNDER 80 words
 - First sentence = the HOOK (instant curiosity, shocking)
@@ -314,12 +320,7 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title):
         final.write_videofile(
             str(output_path),
             fps=24,
-            codec="libx264",
-            audio_codec="aac",
-            audio_bitrate="192k",
-            preset="ultrafast",
-            threads=3,
-            logger='bar',
+            **get_encoder_kwargs(),
         )
         print(f"✅ Brain rot video saved: {Path(output_path).name}")
 
@@ -371,22 +372,27 @@ def run_brainrot_pipeline():
 
             full_script = strip_emojis(script.get("full_script", " ".join(s["text"] for s in slides_data)))
 
-            # Per-slide TTS + visuals with progress
-            slide_audio_paths = []
-            slide_image_paths = []
+            # Per-slide TTS + visuals in parallel (preserves slide order)
             total_slides = len(slides_data)
+            slide_audio_paths = [None] * total_slides
+            slide_image_paths = [None] * total_slides
 
-            for idx, slide in enumerate(tqdm(slides_data, desc="  Slides", unit="slide", leave=False,
-                                              bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
+            def _produce_slide(idx, slide):
                 slide_text = strip_emojis(slide.get("text", ""))
-                s_audio_path = OUTPUT_DIR / f"brainrot_s{idx+1}_{unique_id}.mp3"
-                s_tts = text_to_speech(slide_text, s_audio_path)
-                slide_audio_paths.append(s_tts)
-
-                img_path = render_brainrot_slide(
+                audio = text_to_speech(slide_text,
+                                       OUTPUT_DIR / f"brainrot_s{idx+1}_{unique_id}.mp3")
+                img = render_brainrot_slide(
                     slide_dir, slide_text, idx + 1, total_slides, palette=palette
                 )
-                slide_image_paths.append(img_path)
+                return audio, img
+
+            with ThreadPoolExecutor(max_workers=MAX_PARALLEL_SLIDES) as pool:
+                futures = {pool.submit(_produce_slide, idx, s): idx
+                           for idx, s in enumerate(slides_data)}
+                for fut in tqdm(futures, desc="  Slides", unit="slide", leave=False,
+                                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]"):
+                    idx = futures[fut]
+                    slide_audio_paths[idx], slide_image_paths[idx] = fut.result()
 
             video_path = OUTPUT_DIR / f"brainrot_video_{unique_id}.mp4"
             create_brainrot_video(slide_image_paths, slide_audio_paths, video_path, topic["title"])
@@ -401,7 +407,16 @@ def run_brainrot_pipeline():
             video_id = upload_to_youtube_browser(video_path, title, desc, tags)
             if video_id:
                 from src.learning import log_upload
+                from src.artefacts import record_and_cleanup
                 log_upload(title, video_id, "brainrot")
+                record_and_cleanup(
+                    mode="brainrot",
+                    title=title,
+                    video_id=video_id,
+                    video_path=video_path,
+                    audio_paths=slide_audio_paths,
+                    slide_dir=slide_dir,
+                )
 
             # Mark complete
             for t in plan["topics"]:
@@ -419,3 +434,8 @@ def run_brainrot_pipeline():
             traceback.print_exc()
 
     print(f"\n🏁 Brain Rot Pipeline complete. Processed {processed} shorts.")
+    try:
+        from src.learning import suggest_improvements
+        suggest_improvements()
+    except Exception as e:
+        print(f"⚠️ Learning refresh skipped: {e}")

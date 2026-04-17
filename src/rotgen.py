@@ -1,8 +1,10 @@
 # src/rotgen.py — RotGen Character Mode
-# Split-screen brain rot: animated AI character (top) + gameplay (middle) + subtitles (bottom)
-# Layout: 1080×1920  │  Character panel 0–768  │  Gameplay 768–1760  │  Subtitle bar 1760–1920
+# Split-screen brain rot: animated AI character (top) + gameplay (bottom)
+# Layout: 1080×1920  │  Character panel 0–768  │  Gameplay 768–1920
+# Captions are handled by YouTube (auto + uploaded SRT) rather than burned in.
 
 import gc
+import hashlib
 import math
 import json
 import random
@@ -30,6 +32,7 @@ from src.generator import (
     get_local_viral_gameplay,
     get_local_gameplay,
     get_relevant_pexels_video,
+    get_encoder_kwargs,
     FONT_FILE,
     ASSETS_PATH,
     BACKGROUND_MUSIC_PATH,
@@ -40,12 +43,13 @@ from src.generator import (
 # ─────────────────────────── constants ──────────────────────────────────────
 
 CHARACTERS_PATH    = ASSETS_PATH / "characters"
+ROTGEN_CACHE_PATH  = ASSETS_PATH / "rotgen_cache"
 ROTGEN_PLAN_FILE   = Path("rotgen_plan.json")
 
 CANVAS_W, CANVAS_H = 400, 500      # character drawing canvas
 PANEL_W,  PANEL_H  = 1080, 768     # character panel (top of frame)
-GAMEPLAY_H         = 992            # 1920 - 768 - 160
-SUBTITLE_H         = 160
+GAMEPLAY_H         = 1152           # 1920 - 768, now that subtitles are off
+SUBTITLE_H         = 160            # retained for legacy helpers; unused in composite
 VIDEO_W,  VIDEO_H  = 1080, 1920
 FPS                = 24
 ANIMATION_FRAMES   = 48             # 2-second loop
@@ -83,7 +87,22 @@ ROTGEN_PEXELS_QUERIES = [
 
 def ensure_dirs() -> None:
     CHARACTERS_PATH.mkdir(exist_ok=True, parents=True)
+    ROTGEN_CACHE_PATH.mkdir(exist_ok=True, parents=True)
     OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
+
+
+def _frames_cache_key(speaking: bool, num_frames: int,
+                      panel_bg: np.ndarray,
+                      custom_img: Image.Image | None) -> str:
+    """Hash everything that affects the rendered frame sequence."""
+    h = hashlib.sha1()
+    h.update(f"{speaking}|{num_frames}".encode())
+    h.update(panel_bg.tobytes()[:4096])  # small slice is enough; bg is deterministic
+    if custom_img is not None:
+        h.update(custom_img.tobytes()[:4096])
+    else:
+        h.update(b"default-bytebot")
+    return h.hexdigest()[:16]
 
 
 def load_rotgen_plan() -> dict:
@@ -138,14 +157,16 @@ def _enforce_word_count(text: str) -> str:
 
 
 def generate_rotgen_script(topic: str | None = None) -> dict:
+    from src.learning import get_learning_context
     if not topic:
         topic = random.choice(VIRAL_TOPICS)
     print(f"  Topic: {topic}")
+    learning_context = get_learning_context()
     prompt = f"""
 You are scripting a 31-40 second YouTube Short for a character called ByteBot.
 ByteBot is an enthusiastic AI educator who talks directly to camera.
 Topic: {topic}
-
+{learning_context}
 Rules:
 - EXACTLY 90-110 words (this is critical — TTS must hit 31-40 seconds)
 - First-person, conversational, energetic
@@ -324,7 +345,22 @@ def generate_panel_frames(
     """
     Pre-generate `num_frames` full 1080×768 RGB numpy arrays.
     Each frame = panel_bg copy + character drawn on top via RGBA composite.
+    Memoised to `assets/rotgen_cache/` — the animation is deterministic so
+    repeated runs reuse the same frame stack instead of re-rendering 48 PNGs.
     """
+    ROTGEN_CACHE_PATH.mkdir(exist_ok=True, parents=True)
+    cache_key = _frames_cache_key(speaking, num_frames, panel_bg, custom_img)
+    cache_file = ROTGEN_CACHE_PATH / f"frames_{cache_key}.npz"
+    if cache_file.exists():
+        try:
+            with np.load(cache_file) as data:
+                stack = data["frames"]
+                if stack.shape[0] == num_frames:
+                    print(f"  Reusing cached character frames ({cache_key})")
+                    return [stack[i] for i in range(num_frames)]
+        except Exception as e:
+            print(f"  Cache read failed ({e}), regenerating frames.")
+
     print(f"  Generating {num_frames} character frames ({'speaking' if speaking else 'idle'})...")
     frames = []
     for i in range(num_frames):
@@ -339,6 +375,10 @@ def generate_panel_frames(
         panel.paste(canvas, (CHAR_PASTE_X, CHAR_PASTE_Y), canvas)
         frames.append(np.array(panel))
 
+    try:
+        np.savez_compressed(cache_file, frames=np.stack(frames))
+    except Exception as e:
+        print(f"  Cache write failed ({e}); continuing without cache.")
     return frames
 
 
@@ -503,13 +543,16 @@ def compose_rotgen_video(
     audio_clip,
     output_path: Path,
 ) -> None:
-    """Layer order (bottom → top): gameplay | character panel | subtitle clips."""
+    """Layer order (bottom → top): gameplay | character panel.
+
+    Subtitles are no longer burned in — YouTube auto-captions + the SRT we
+    upload alongside the video handle it, so the text never gets cropped on
+    different aspect ratios.
+    """
     game_pos  = gameplay_clip.set_position((0, PANEL_H))            # y=768
     char_pos  = character_clip.set_position((0, 0))                 # y=0
-    sub_clips = [sc.set_position((0, PANEL_H + GAMEPLAY_H))         # y=1760
-                 for sc in subtitle_clips]
 
-    all_clips = [game_pos, char_pos] + sub_clips
+    all_clips = [game_pos, char_pos]
     composite = CompositeVideoClip(all_clips, size=(VIDEO_W, VIDEO_H))
 
     # Audio mix: TTS loud + gentle bg music
@@ -526,12 +569,7 @@ def compose_rotgen_video(
     composite.set_audio(final_audio).write_videofile(
         str(output_path),
         fps=FPS,
-        codec="libx264",
-        audio_codec="aac",
-        audio_bitrate="192k",
-        preset="ultrafast",
-        threads=3,
-        logger="bar",
+        **get_encoder_kwargs(),
     )
     print(f"  Saved: {output_path.name}")
 
@@ -574,18 +612,22 @@ def _produce_one_rotgen(
     # Character animation
     char_clip = build_character_clip(True, total_dur, panel_bg, custom_img)
 
-    # Subtitles
-    sub_clips = build_subtitle_clips(
-        assign_subtitle_timings(chunk_script(script_text), total_dur)
-    )
-
     # Gameplay
     gameplay_clip = build_gameplay_clip(get_rotgen_gameplay(), total_dur)
 
-    # Compose
+    # Compose (no burned-in subtitles — SRT sidecar + YouTube auto-captions handle text)
     output_path = OUTPUT_DIR / f"{unique_id}.mp4"
     print(f"  Composing → {output_path.name}")
-    compose_rotgen_video(char_clip, gameplay_clip, sub_clips, audio_clip, output_path)
+    compose_rotgen_video(char_clip, gameplay_clip, [], audio_clip, output_path)
+
+    # Sidecar SRT so YouTube has an accurate caption track to start from.
+    from src.artefacts import write_srt, record_and_cleanup
+    srt_path = OUTPUT_DIR / f"{unique_id}.srt"
+    try:
+        write_srt(script_text, total_dur, srt_path)
+    except Exception as e:
+        print(f"  SRT generation skipped: {e}")
+        srt_path = None
 
     # Upload
     short_title = f"{title[:80]} #Shorts"
@@ -599,6 +641,14 @@ def _produce_one_rotgen(
     if video_id:
         log_fn(short_title, video_id, "rotgen")
         print(f"  Live: https://youtube.com/watch?v={video_id}")
+        record_and_cleanup(
+            mode="rotgen",
+            title=short_title,
+            video_id=video_id,
+            video_path=output_path,
+            audio_paths=[audio_path],
+            extra_paths=[srt_path] if srt_path else None,
+        )
     else:
         print(f"  Upload failed — saved locally: {output_path.name}")
 
@@ -657,3 +707,8 @@ def run_rotgen_pipeline() -> None:
     failed = len(results) - done
     print(f"\n  RotGen done — {done}/{ROTGEN_SHORTS_PER_RUN} uploaded"
           + (f", {failed} failed/local" if failed else "") + ".")
+    try:
+        from src.learning import suggest_improvements
+        suggest_improvements()
+    except Exception as e:
+        print(f"  Learning refresh skipped: {e}")

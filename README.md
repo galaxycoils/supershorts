@@ -54,11 +54,12 @@ Works like **rotgen.org**: animated character talking over gameplay, fully auto-
 ┌────────────────────────────┐  y=0
 │  CHARACTER PANEL  (768px)  │  ByteBot animated avatar, dark gradient
 ├────────────────────────────┤  y=768
-│  GAMEPLAY VIDEO   (992px)  │  subway surfers / minecraft / Pexels auto
-├────────────────────────────┤  y=1760
-│  SUBTITLE BAR    (160px)   │  current spoken text, 6-word chunks
+│  GAMEPLAY VIDEO  (1152px)  │  subway surfers / minecraft / Pexels auto
 └────────────────────────────┘  y=1920
 ```
+
+Captions are handled by YouTube (auto-captions + an uploaded SRT sidecar) so
+text never gets cropped on devices with a different aspect ratio.
 
 **ByteBot character (`assets/characters/bytebot.png`):**
 - PIL-drawn cartoon AI avatar with transparent background
@@ -183,13 +184,19 @@ PIL (Pillow 12.2+)
     ▼
 MoviePy 1.0.3
     │
-    ├─ CompositeVideoClip: background + slide/character + subtitles
-    ├─ ImageSequenceClip for character animation (no per-frame callbacks)
+    ├─ CompositeVideoClip: background + slide/character
+    ├─ ImageSequenceClip for character animation (frames cached to disk after first build)
     ├─ Pexels auto-download + cache
-    ├─ H.264 ultrafast, 24fps, AAC 192k, 3 threads (M1 optimised)
+    ├─ h264_videotoolbox on Apple Silicon (~3-5× faster than libx264 ultrafast); libx264 elsewhere
+    ├─ TTS + slide rendering parallelised across cores
     │
     ▼
-Selenium + Firefox  (YouTube upload — stable, unmodified)
+Selenium + Firefox  (YouTube upload)
+    │
+    ├─ Waits for the share link to appear in Studio (size-scaled, not a fixed 10s sleep)
+    ├─ Polls YouTube Data API v3 until videos.list reports processed/succeeded
+    ├─ Optional SRT sidecar so auto-captions are accurate
+    ├─ On success: delete local mp4/wav/png, append breadcrumb to upload_history.json
 ```
 
 ---
@@ -205,7 +212,21 @@ Selenium + Firefox  (YouTube upload — stable, unmodified)
 | `LESSONS_PER_RUN` | `2` (in `main.py`) | Lessons per Option 1 run |
 | `SHORTS_PER_RUN` | `3` (in `brainrot.py`) | Brain Rot Shorts per Option 2 run |
 
-**YouTube Data API key** (Option 6): prompted on first use, saved to `config.json`.
+**YouTube Data API key** (Option 6 + upload completion polling): prompted on
+first use for Option 6, saved to `config.json`. The uploader also reads
+`YOUTUBE_API_KEY` from the environment; whichever is set is used to poll
+`videos.list?part=status,processingDetails` until the upload has actually
+finished processing (up to 30 min for long videos). Without a key, the
+uploader falls back to a size-scaled sleep.
+
+**Firefox profile:** override with `YT_FIREFOX_PROFILE=/path/to/profile` if
+you aren't on the default Mac path.
+
+**Auto-cleanup + upload history:** after every successful upload the mp4,
+intermediate audio, slide PNGs, and thumbnails are deleted, and a one-line
+breadcrumb (title, mode, video ID, size, deleted paths) is appended to
+`upload_history.json` at the repo root. Failed uploads keep their files
+untouched so you can retry.
 
 ---
 

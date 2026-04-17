@@ -18,6 +18,11 @@ client_secrets.json
 
 # Assets cache (large files)
 assets/pexels/
+assets/rotgen_cache/
+assets/learning_suggestions.txt
+
+# Upload breadcrumb (per-machine, not source)
+upload_history.json
 
 # macOS
 .DS_Store

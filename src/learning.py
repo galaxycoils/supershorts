@@ -24,6 +24,24 @@ def log_upload(title: str, video_id: str, mode: str):
 
 SUGGESTIONS_FILE = Path("assets/learning_suggestions.txt")
 
+
+def get_learning_context() -> str:
+    """Return any stored learning suggestions wrapped for prompt injection.
+
+    Consumed by every generator (educational, brainrot, rotgen, idea) so the
+    passive feedback loop from `suggest_improvements` actually steers output.
+    Returns an empty string when no suggestions exist or on any read error.
+    """
+    if SUGGESTIONS_FILE.exists():
+        try:
+            text = SUGGESTIONS_FILE.read_text().strip()
+            if text:
+                return f"\n\nPAST LEARNING IMPROVEMENTS (Implement these!):\n{text}\n"
+        except Exception:
+            return ""
+    return ""
+
+
 def suggest_improvements():
     try:
         raw = json.loads(LOG_FILE.read_text()) if LOG_FILE.exists() else []

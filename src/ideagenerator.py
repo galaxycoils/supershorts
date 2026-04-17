@@ -131,13 +131,15 @@ def download_yt_thumbnail(video_data: dict) -> str | None:
 
 def generate_dialogue_from_yt(video_data: dict) -> dict:
     """Ollama generates a 60-90 second Short script from a real YT video."""
+    from src.learning import get_learning_context
     title = video_data.get("title", "")
     desc  = video_data.get("description", "")[:600]
+    learning_context = get_learning_context()
     prompt = f"""You are a YouTube Shorts scriptwriter for the SuperShorts channel.
 A trending video exists:
 TITLE: {title}
 DESCRIPTION: {desc}
-
+{learning_context}
 Write a punchy 60-90 second Short script on the same topic — punchier and more hooky.
 Rules: hook first 2 seconds, plain spoken language, address viewer as "you", end with CTA.
 Return ONLY JSON:
@@ -174,16 +176,18 @@ Return ONLY JSON:
 
 def generate_ideas(num_ideas: int = 5) -> list:
     """Pure Ollama idea generation (no YouTube API needed)."""
+    from src.learning import get_learning_context
     data     = load_performance_data()
     trending = get_trending_context()
     past_data = (
         "\n".join(f"- {e.get('title','Untitled')} ({e.get('mode','?')})" for e in data[-10:])
         if data else "No past data. Generate fresh ideas."
     )
+    learning_context = get_learning_context()
     prompt = f"""You are YouTube Studio's AI Idea Generator.
 TRENDING: {trending}
 PAST PERFORMANCE: {past_data}
-
+{learning_context}
 Generate {num_ideas} YouTube Short ideas. Each object must have:
 - title (clickbait + searchable, include emoji)
 - hook (first 2-second sentence)
@@ -249,6 +253,7 @@ def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
     """
     from src.browser_uploader import upload_to_youtube_browser
     from src.learning import log_upload
+    from src.artefacts import record_and_cleanup
 
     title    = strip_emojis(idea.get("title", f"Idea {index+1}"))[:100]
     dialogue = strip_emojis(idea.get("dialogue", idea.get("script", "")))
@@ -292,6 +297,15 @@ def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
     if video_id:
         log_upload(short_title, video_id, "studio_idea")
         print(f"  Live: https://youtube.com/watch?v={video_id}")
+        record_and_cleanup(
+            mode="studio_idea",
+            title=short_title,
+            video_id=video_id,
+            video_path=video_path,
+            audio_paths=[audio_path],
+            slide_dir=slide_dir,
+            thumbnail_path=local_thumb if local_thumb and "output/" in str(local_thumb) else None,
+        )
         return {"status": "complete", "title": short_title, "youtube_id": video_id}
     else:
         print(f"  Upload failed — saved: {video_path.name}")
@@ -359,3 +373,8 @@ def start_idea_generator():
     failed = len(results) - done
     print(f"\n  Studio Ideas done — {done}/{len(ideas)} uploaded"
           + (f", {failed} failed/local" if failed else "") + ".")
+    try:
+        from src.learning import suggest_improvements
+        suggest_improvements()
+    except Exception as e:
+        print(f"  Learning refresh skipped: {e}")

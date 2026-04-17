@@ -4,6 +4,7 @@ import json
 import datetime
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tqdm import tqdm
 from src.generator import (
@@ -22,11 +23,25 @@ from src.rotgen import run_rotgen_pipeline as start_rotgen_mode
 from src.learning import start_learning_mode, log_upload
 from src.ideagenerator import start_idea_generator
 from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
+from src.artefacts import record_and_cleanup
 import menu
 
 CONTENT_PLAN_FILE = Path("content_plan.json")
 OUTPUT_DIR = Path("output")
 LESSONS_PER_RUN = 2
+MAX_PARALLEL_SLIDES = min(4, os.cpu_count() or 2)
+
+
+def _parallel_map(fn, items, desc):
+    """Run fn over items in a thread pool, preserving input order."""
+    results = [None] * len(items)
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_SLIDES) as pool:
+        futures = {pool.submit(fn, i, item): i for i, item in enumerate(items)}
+        for fut in tqdm(futures, desc=desc, unit="slide",
+                        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]"):
+            idx = futures[fut]
+            results[idx] = fut.result()
+    return results
 
 def get_content_plan():
     if not CONTENT_PLAN_FILE.exists():
@@ -67,25 +82,24 @@ def produce_lesson_videos(lesson):
         *[s['content'] for s in lesson_content['long_form_slides']],
         "Thanks for watching! If you found this helpful, make sure to subscribe to our channel and hit the like button."
     ]
-    slide_audio_paths = []
-    for i, script in enumerate(tqdm(slide_scripts, desc="  TTS (long)", unit="slide",
-                                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
-        audio_path = OUTPUT_DIR / f"audio_slide_{i+1}_{unique_id}.mp3"
-        wav_path = text_to_speech(script, audio_path)
-        slide_audio_paths.append(wav_path)
+    def _tts_one(i, script):
+        return text_to_speech(script, OUTPUT_DIR / f"audio_slide_{i+1}_{unique_id}.mp3")
+
+    slide_audio_paths = _parallel_map(_tts_one, slide_scripts, "  TTS (long)")
 
     slide_dir = OUTPUT_DIR / f"slides_long_{unique_id}"
-    slide_paths = []
-    for i, slide in enumerate(tqdm(all_slides, desc="  Slides (long)", unit="slide",
-                                   bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
-        path = generate_visuals(
+    total = len(all_slides)
+
+    def _visual_one(i, slide):
+        return generate_visuals(
             output_dir=slide_dir,
             video_type='long',
             slide_content=slide,
             slide_number=i + 1,
-            total_slides=len(all_slides)
+            total_slides=total,
         )
-        slide_paths.append(path)
+
+    slide_paths = _parallel_map(_visual_one, all_slides, "  Slides (long)")
     long_video_path = OUTPUT_DIR / f"long_video_{unique_id}.mp4"
     print(f"🎥 Creating long-form video at: {long_video_path}")
     compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', lesson['title'])
@@ -132,6 +146,15 @@ def produce_lesson_videos(lesson):
     )
     if long_video_id:
         log_upload(lesson['title'], long_video_id, "educational")
+        record_and_cleanup(
+            mode="educational",
+            title=lesson['title'],
+            video_id=long_video_id,
+            video_path=long_video_path,
+            audio_paths=slide_audio_paths,
+            slide_dir=slide_dir,
+            thumbnail_path=long_thumb_path,
+        )
         print("⏳ Waiting 30 seconds before uploading the short...")
         time.sleep(30)
         highlight = (lesson_content.get('short_form_highlight') or '').strip()
@@ -150,6 +173,15 @@ def produce_lesson_videos(lesson):
         )
         if short_video_id:
             log_upload(short_title, short_video_id, "short")
+            record_and_cleanup(
+                mode="short",
+                title=short_title,
+                video_id=short_video_id,
+                video_path=short_video_path,
+                audio_paths=[short_audio_path],
+                slide_dir=short_slide_dir,
+                thumbnail_path=short_thumb_path,
+            )
         return long_video_id
     return None
 
@@ -182,6 +214,11 @@ def main_flow():
             except Exception as e:
                 print(f"❌ Failed to produce lesson: {e}")
                 traceback.print_exc()
+        try:
+            from src.learning import suggest_improvements
+            suggest_improvements()
+        except Exception as e:
+            print(f"⚠️ Learning refresh skipped: {e}")
     except Exception as e:
         print(f"❌ Critical error: {e}")
         traceback.print_exc()
