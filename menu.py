@@ -6,6 +6,51 @@ from pathlib import Path
 
 CONTENT_PLAN_FILE  = Path("content_plan.json")
 BRAINROT_PLAN_FILE = Path("brainrot_plan.json")
+CONFIG_FILE        = Path("config.json")
+
+_COUNT_MIN = 1
+_COUNT_MAX = 20
+
+
+def ask_count(key: str, label: str, default: int) -> int:
+    """Prompt "how many this run?" with a persistent default in config.json.
+
+    Empty input keeps the saved default; a number 1-20 overrides it and is
+    written back so it becomes next run's default.
+    """
+    try:
+        cfg = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    except Exception:
+        cfg = {}
+    counts = cfg.get("counts", {}) if isinstance(cfg.get("counts", {}), dict) else {}
+    saved = counts.get(key, default)
+    try:
+        saved = int(saved)
+    except (TypeError, ValueError):
+        saved = default
+    saved = max(_COUNT_MIN, min(_COUNT_MAX, saved))
+
+    prompt = f"  {BOLD(label)} {GREY(f'[default {saved}, 1-{_COUNT_MAX}]')}: "
+    try:
+        raw = input(prompt).strip()
+    except EOFError:
+        raw = ""
+
+    if not raw:
+        return saved
+    try:
+        n = int(raw)
+    except ValueError:
+        print(GREY(f"  (not a number — using {saved})"))
+        return saved
+    n = max(_COUNT_MIN, min(_COUNT_MAX, n))
+    counts[key] = n
+    cfg["counts"] = counts
+    try:
+        CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
+    except Exception as e:
+        print(GREY(f"  (could not persist count: {e})"))
+    return n
 
 # ─── ANSI colour helpers ─────────────────────────────────────────
 _IS_TTY = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
@@ -89,6 +134,11 @@ def show_menu():
     for line in BANNER_LINES:
         print(CYAN(BOLD(line)))
     print(GOLD(TAGLINE))
+    try:
+        from src.hardware import describe
+        print("  " + GREY(describe()))
+    except Exception:
+        pass
     print()
 
     # Stats bar

@@ -35,8 +35,6 @@ from src.generator import (
 
 BRAINROT_PLAN_FILE = Path("brainrot_plan.json")
 OUTPUT_DIR = Path("output")
-SHORTS_PER_RUN = 3
-MAX_PARALLEL_SLIDES = min(4, os.cpu_count() or 2)
 
 # Attention-grabbing color palettes
 BRAINROT_PALETTES = [
@@ -317,12 +315,26 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title):
             final = final.set_audio(composite_audio)
 
         print(f"🎬 Encoding → {Path(output_path).name}")
-        final.write_videofile(
-            str(output_path),
-            fps=24,
-            **get_encoder_kwargs(),
-        )
-        print(f"✅ Brain rot video saved: {Path(output_path).name}")
+        try:
+            final.write_videofile(
+                str(output_path),
+                fps=24,
+                **get_encoder_kwargs(),
+            )
+            print(f"✅ Brain rot video saved: {Path(output_path).name}")
+        finally:
+            for c in clips:
+                try: c.close()
+                except Exception: pass
+            for attr in ("audio",):
+                try:
+                    getattr(final, attr, None) and final.audio.close()
+                except Exception: pass
+            try: final.close()
+            except Exception: pass
+            if bg_clip is not None:
+                try: bg_clip.close()
+                except Exception: pass
 
     except Exception as e:
         print(f"❌ Brain rot video error: {e}")
@@ -356,8 +368,10 @@ def run_brainrot_pipeline():
         pending = [t for t in plan["topics"] if t.get("status") == "pending"]
 
     from src.browser_uploader import upload_to_youtube_browser
+    import menu
 
-    batch = pending[:SHORTS_PER_RUN]
+    shorts_this_run = menu.ask_count("brainrot", "Brain rot shorts this run", 3)
+    batch = pending[:shorts_this_run]
     processed = 0
     for topic in tqdm(batch, desc="Brain Rot Shorts", unit="short",
                       bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} shorts [{elapsed}<{remaining}]"):
@@ -386,7 +400,8 @@ def run_brainrot_pipeline():
                 )
                 return audio, img
 
-            with ThreadPoolExecutor(max_workers=MAX_PARALLEL_SLIDES) as pool:
+            from src.hardware import max_parallel_slides
+            with ThreadPoolExecutor(max_workers=max_parallel_slides()) as pool:
                 futures = {pool.submit(_produce_slide, idx, s): idx
                            for idx, s in enumerate(slides_data)}
                 for fut in tqdm(futures, desc="  Slides", unit="slide", leave=False,
@@ -432,6 +447,9 @@ def run_brainrot_pipeline():
             print(f"❌ Failed topic '{topic['title']}': {e}")
             import traceback
             traceback.print_exc()
+        finally:
+            import gc
+            gc.collect()
 
     print(f"\n🏁 Brain Rot Pipeline complete. Processed {processed} shorts.")
     try:

@@ -24,18 +24,17 @@ from src.learning import start_learning_mode, log_upload
 from src.ideagenerator import start_idea_generator
 from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
 from src.artefacts import record_and_cleanup
+from src.hardware import max_parallel_slides
 import menu
 
 CONTENT_PLAN_FILE = Path("content_plan.json")
 OUTPUT_DIR = Path("output")
-LESSONS_PER_RUN = 2
-MAX_PARALLEL_SLIDES = min(4, os.cpu_count() or 2)
 
 
 def _parallel_map(fn, items, desc):
     """Run fn over items in a thread pool, preserving input order."""
     results = [None] * len(items)
-    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_SLIDES) as pool:
+    with ThreadPoolExecutor(max_workers=max_parallel_slides()) as pool:
         futures = {pool.submit(fn, i, item): i for i, item in enumerate(items)}
         for fut in tqdm(futures, desc=desc, unit="slide",
                         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]"):
@@ -200,7 +199,9 @@ def main_flow():
             update_content_plan(new_plan)
             plan = new_plan
             pending = [(i, lesson) for i, lesson in enumerate(new_plan['lessons']) if lesson['status'] == 'pending']
-        for _, lesson in pending[:LESSONS_PER_RUN]:
+        lessons_this_run = menu.ask_count("lessons", "Lessons this run", 2)
+        import gc
+        for _, lesson in pending[:lessons_this_run]:
             try:
                 video_id = produce_lesson_videos(lesson)
                 if video_id:
@@ -214,6 +215,8 @@ def main_flow():
             except Exception as e:
                 print(f"❌ Failed to produce lesson: {e}")
                 traceback.print_exc()
+            finally:
+                gc.collect()
         try:
             from src.learning import suggest_improvements
             suggest_improvements()

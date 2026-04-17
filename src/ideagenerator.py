@@ -325,13 +325,16 @@ def start_idea_generator():
     print("\n  YouTube Studio Idea Generator — Auto-Pilot Mode\n")
 
     # ── gather ideas ─────────────────────────────────────────────
+    import menu
+    n = menu.ask_count("ideas", "Studio ideas this run", 5)
+
     api_key   = get_yt_api_key()
     ideas     = []
 
     if api_key:
         print("\n  Searching YouTube for trending AI content...")
         yt_videos = fetch_yt_suggestions("AI productivity tutorial 2025",
-                                          max_results=5, api_key=api_key)
+                                          max_results=n, api_key=api_key)
         if yt_videos:
             print(f"  Found {len(yt_videos)} trending videos — generating adapted scripts...")
             for vid in tqdm(yt_videos, desc="  Adapting", unit="video"):
@@ -343,7 +346,7 @@ def start_idea_generator():
             print("  No YT results — falling back to Ollama ideas.")
 
     if not ideas:
-        ideas = generate_ideas(num_ideas=5)
+        ideas = generate_ideas(num_ideas=n)
 
     if not ideas:
         print("  No ideas generated.")

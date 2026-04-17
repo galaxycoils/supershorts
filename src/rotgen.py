@@ -566,17 +566,23 @@ def compose_rotgen_video(
     else:
         final_audio = audio_clip.volumex(1.3)
 
-    composite.set_audio(final_audio).write_videofile(
-        str(output_path),
-        fps=FPS,
-        **get_encoder_kwargs(),
-    )
-    print(f"  Saved: {output_path.name}")
+    final = composite.set_audio(final_audio)
+    try:
+        final.write_videofile(
+            str(output_path),
+            fps=FPS,
+            **get_encoder_kwargs(),
+        )
+        print(f"  Saved: {output_path.name}")
+    finally:
+        for c in (final, composite, game_pos, char_pos,
+                  gameplay_clip, character_clip, final_audio, audio_clip):
+            try: c.close()
+            except Exception: pass
 
 
 # ─────────────────────────── main entry ─────────────────────────────────────
 
-ROTGEN_SHORTS_PER_RUN = 3
 UPLOAD_WAIT_SECONDS   = 30    # gap between uploads (same as other modes)
 
 
@@ -672,12 +678,13 @@ def run_rotgen_pipeline() -> None:
     print("\n  ByteBot RotGen — AI Character Mode\n")
     ensure_dirs()
 
-    # Build panel + load character ONCE — reused across all 3 videos
+    # Build panel + load character ONCE — reused across all videos this run
     panel_bg   = _build_panel_background()
     custom_img = _load_custom_character()
 
-    # Pick 3 unique topics
-    topics = random.sample(VIRAL_TOPICS, min(ROTGEN_SHORTS_PER_RUN, len(VIRAL_TOPICS)))
+    import menu
+    shorts_this_run = menu.ask_count("rotgen", "RotGen shorts this run", 3)
+    topics = random.sample(VIRAL_TOPICS, min(shorts_this_run, len(VIRAL_TOPICS)))
 
     plan      = load_rotgen_plan()
     results   = []
@@ -685,7 +692,7 @@ def run_rotgen_pipeline() -> None:
 
     for i, topic in enumerate(tqdm(topics, desc="  RotGen Shorts",
                                    unit="short", bar_format=bar_fmt)):
-        print(f"\n  ── Short {i+1}/{ROTGEN_SHORTS_PER_RUN}: {topic} ──")
+        print(f"\n  ── Short {i+1}/{shorts_this_run}: {topic} ──")
         try:
             entry = _produce_one_rotgen(topic, panel_bg, custom_img,
                                         upload_to_youtube_browser, log_upload)
@@ -701,11 +708,14 @@ def run_rotgen_pipeline() -> None:
         except Exception as e:
             print(f"  Error on '{topic}': {e}")
             import traceback; traceback.print_exc()
+        finally:
+            import gc
+            gc.collect()
 
     # Summary
     done   = sum(1 for r in results if r.get("status") == "complete")
     failed = len(results) - done
-    print(f"\n  RotGen done — {done}/{ROTGEN_SHORTS_PER_RUN} uploaded"
+    print(f"\n  RotGen done — {done}/{shorts_this_run} uploaded"
           + (f", {failed} failed/local" if failed else "") + ".")
     try:
         from src.learning import suggest_improvements

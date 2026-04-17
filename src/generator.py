@@ -46,25 +46,30 @@ def get_encoder_kwargs() -> dict:
 
     Apple Silicon gets hardware-accelerated h264_videotoolbox (~3-5x faster
     than libx264 ultrafast). Everything else falls back to libx264 ultrafast
-    with all but one core available.
+    with all but one core available. On low-memory hosts (M1 8 GB etc.) we
+    drop the bitrate and cap threads so videotoolbox's ring buffer doesn't
+    blow past 4 GB while MoviePy still holds its input clips in RAM.
     """
     import platform
+    from src.hardware import encoder_bitrate, is_low_mem
+    cores = os.cpu_count() or 4
     if platform.system() == "Darwin" and platform.machine() == "arm64":
+        threads = min(4, cores) if is_low_mem() else cores
         return dict(
             codec="h264_videotoolbox",
             audio_codec="aac",
             audio_bitrate="192k",
-            ffmpeg_params=["-b:v", "6M"],
-            threads=os.cpu_count() or 4,
+            ffmpeg_params=["-b:v", encoder_bitrate()],
+            threads=threads,
             logger="bar",
         )
-    cores = os.cpu_count() or 4
+    threads = min(4, cores) if is_low_mem() else max(1, cores - 1)
     return dict(
         codec="libx264",
         audio_codec="aac",
         audio_bitrate="192k",
         preset="ultrafast",
-        threads=max(1, cores - 1),
+        threads=threads,
         logger="bar",
     )
 
@@ -527,13 +532,23 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
             final_video = final_video.set_audio(composite)
 
         print(f"🎬 Encoding video → {Path(output_path).name}")
-        final_video.write_videofile(
-            str(output_path),
-            fps=24,
-            **get_encoder_kwargs(),
-        )
-        print(f"✅ Video saved: {Path(output_path).name}")
-        
+        try:
+            final_video.write_videofile(
+                str(output_path),
+                fps=24,
+                **get_encoder_kwargs(),
+            )
+            print(f"✅ Video saved: {Path(output_path).name}")
+        finally:
+            for c in image_clips:
+                try: c.close()
+                except Exception: pass
+            try: final_video.close()
+            except Exception: pass
+            if bg_clip is not None:
+                try: bg_clip.close()
+                except Exception: pass
+
     except Exception as e:
         print(f"❌ Video creation error: {e}")
         import traceback

@@ -209,8 +209,8 @@ Selenium + Firefox  (YouTube upload)
 |----------|---------|-------------|
 | `YOUR_NAME` | `"Chaitanya"` | Creator name in footers / descriptions / branding |
 | `PEXELS_API_KEY` | set yours | Pexels API key for background videos |
-| `LESSONS_PER_RUN` | `2` (in `main.py`) | Lessons per Option 1 run |
-| `SHORTS_PER_RUN` | `3` (in `brainrot.py`) | Brain Rot Shorts per Option 2 run |
+| `counts.lessons` / `counts.brainrot` / `counts.rotgen` / `counts.ideas` | prompted each run | Saved in `config.json`; asked at pipeline start with the last value as default. Clamped 1–20. |
+| `SUPERSHORTS_LOW_MEM` | auto-detected (`≤10 GB RAM → on`) | `1` forces low-memory profile (2 parallel slides, 4 Mbps encode); `0` forces standard. |
 
 **YouTube Data API key** (Option 6 + upload completion polling): prompted on
 first use for Option 6, saved to `config.json`. The uploader also reads
@@ -227,6 +227,19 @@ intermediate audio, slide PNGs, and thumbnails are deleted, and a one-line
 breadcrumb (title, mode, video ID, size, deleted paths) is appended to
 `upload_history.json` at the repo root. Failed uploads keep their files
 untouched so you can retry.
+
+**Low-memory profile (M1 8 GB etc.):** on startup `menu.show_menu()` prints
+one line like `host: arm64 Darwin (8.0 GB RAM, 8 CPUs) → low-mem profile,
+2 parallel slides`. When engaged, per-slide TTS + rendering runs 2 workers
+instead of 4, the h264_videotoolbox bitrate drops to 4 Mbps, encoder
+threads cap at 4, and MoviePy clips are explicitly `.close()`d plus
+`gc.collect()`ed between videos. Set `SUPERSHORTS_LOW_MEM=1` / `0` to
+force either profile regardless of detected RAM.
+
+**Per-run counts:** each pipeline asks "how many videos this run?" at
+start, with the previous answer as the default. Empty input keeps the
+saved default; a number 1–20 overwrites it in `config.json` under
+`counts.{lessons,brainrot,rotgen,ideas}`.
 
 ---
 
