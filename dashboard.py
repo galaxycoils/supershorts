@@ -166,10 +166,11 @@ def api_run(mode):
              f"import sys; sys.path.insert(0,'{PROJECT_ROOT}'); {code}"]
     proc  = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                              stdin=subprocess.PIPE, cwd=str(PROJECT_ROOT))
-    # Auto-accept all interactive Prompt.ask() defaults by feeding newlines,
-    # then close stdin so the subprocess knows input is exhausted.
+    # Feed stdin: explicit input from UI modal, or auto-accept defaults.
+    stdin_input = (request.json or {}).get("stdin_input", None)
     try:
-        proc.stdin.write(b"\n" * 30)
+        data = stdin_input.encode() if stdin_input is not None else b"\n" * 30
+        proc.stdin.write(data)
         proc.stdin.close()
     except OSError:
         pass
@@ -208,6 +209,12 @@ def api_stream(job_id):
     return Response(stream_with_context(generate()),
                     mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+@app.route("/api/plan-status")
+def api_plan_status():
+    tcm = _read_json(PROJECT_ROOT / "tcm_plan.json", {})
+    tcm_pending = sum(1 for l in tcm.get("lessons", []) if l.get("status") == "pending")
+    return jsonify({"tcm_pending": tcm_pending})
 
 @app.route("/api/jobs")
 def api_jobs():
@@ -772,6 +779,176 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   .two-col  { grid-template-columns: 1fr; }
   .sidebar  { width: 180px; }
 }
+
+/* ── MODAL ────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75);
+  z-index: 500;
+  display: flex; align-items: center; justify-content: center;
+  animation: fade-in .15s ease;
+}
+@keyframes fade-in { from{opacity:0} to{opacity:1} }
+
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-top: 2px solid var(--coral);
+  width: 480px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  animation: slide-up .18s ease;
+}
+@keyframes slide-up { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.modal-title {
+  font-family: 'Fira Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.modal-title span { color: var(--coral); margin-right: 6px; }
+.modal-close {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--dim);
+  width: 24px; height: 24px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  font-family: 'Fira Code', monospace;
+  transition: border-color .15s, color .15s;
+}
+.modal-close:hover { border-color: var(--red); color: var(--red); }
+
+.modal-section { margin-bottom: 18px; }
+.modal-section-label {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-family: 'Fira Code', monospace;
+}
+
+/* Clickable option cards */
+.opt-cards { display: flex; flex-direction: column; gap: 4px; }
+.opt-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  user-select: none;
+}
+.opt-card:hover { border-color: var(--border2); }
+.opt-card.selected { border-color: var(--coral); background: var(--coral3); }
+.opt-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--dim);
+  flex-shrink: 0;
+  transition: border-color .15s, background .15s;
+}
+.opt-card.selected .opt-dot { border-color: var(--coral); background: var(--coral); }
+.opt-label { font-size: 12px; color: var(--cream2); font-family: 'Fira Sans', sans-serif; }
+.opt-card.selected .opt-label { color: var(--cream); }
+
+/* Text / number fields */
+.field { margin-bottom: 14px; }
+.field label {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-family: 'Fira Code', monospace;
+}
+.field input[type=text], .field input[type=number], .field input[type=url] {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-bottom: 2px solid var(--border2);
+  color: var(--cream);
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color .15s;
+}
+.field input:focus { border-color: var(--coral); border-bottom-color: var(--coral); }
+.field input::placeholder { color: var(--dim); }
+.field input[type=number] { width: 80px; }
+.field-hint { font-size: 10px; color: var(--dim); margin-top: 4px; font-family: 'Fira Code', monospace; }
+
+/* Toggle row (yes/no) */
+.toggle-row { display: flex; gap: 6px; }
+.toggle-btn {
+  flex: 1;
+  padding: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--cream2);
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.toggle-btn:hover { border-color: var(--border2); }
+.toggle-btn.selected { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
+
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.btn-cancel {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--dim);
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.btn-cancel:hover { border-color: var(--cream2); color: var(--cream2); }
+.btn-launch {
+  background: var(--coral);
+  border: none;
+  color: #080808;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  padding: 7px 22px;
+  cursor: pointer;
+  transition: opacity .15s;
+  text-transform: uppercase;
+}
+.btn-launch:hover { opacity: .88; }
+.btn-launch:disabled { opacity: .35; cursor: default; }
 </style>
 </head>
 <body>
@@ -918,6 +1095,21 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   </div>
 </div>
 
+<!-- ── Config Modal ──────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title-el"></div>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close modal">✕</button>
+    </div>
+    <div id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">cancel</button>
+      <button class="btn-launch" id="btn-modal-launch" onclick="launchFromModal()">launch ▶</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── SVG Icons (Lucide) ────────────────────────────────────────────
 const ICONS = {
@@ -988,6 +1180,9 @@ function adj(id, d) {
 
 // ── Run mode ──────────────────────────────────────────────────────
 async function runMode(id) {
+  // Interactive modes open a config modal first
+  if (NEEDS_CONFIG.has(id)) { openModal(id); return; }
+
   const btn = document.getElementById('rb-'+id);
   btn.textContent = '…'; btn.classList.add('active'); btn.disabled = true;
 
@@ -1183,6 +1378,203 @@ function tick() {
   document.getElementById('clock').textContent =
     new Date().toLocaleTimeString('en-US',{hour12:false});
 }
+
+// ── Modal system ──────────────────────────────────────────────────
+let _modalMode = null;
+let _modalStdinFn = null;
+
+// Modes that need a config dialog before launching
+const NEEDS_CONFIG = new Set(['tcm','tutorial','viral','ideas','clipper']);
+
+function optCard(value, label, selected) {
+  return `<div class="opt-card${selected?' selected':''}" onclick="selectOpt(this,'${value}')" tabindex="0"
+              onkeydown="if(event.key==='Enter'||event.key===' ')selectOpt(this,'${value}')">
+    <div class="opt-dot"></div>
+    <div class="opt-label">${label}</div>
+  </div>`;
+}
+
+function selectOpt(el, value) {
+  const cards = el.closest('.opt-cards');
+  cards.querySelectorAll('.opt-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  cards.dataset.value = value;
+  // Show/hide conditional fields
+  const conditional = document.querySelectorAll('[data-show-if]');
+  conditional.forEach(f => {
+    const [key, val] = f.dataset.showIf.split('=');
+    const container = document.querySelector(`.opt-cards[data-key="${key}"]`);
+    if (container) f.style.display = (container.dataset.value === val) ? '' : 'none';
+  });
+}
+
+function toggleBtn(el, group) {
+  document.querySelectorAll(`[data-group="${group}"]`).forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function getToggleVal(group) {
+  const el = document.querySelector(`[data-group="${group}"].selected`);
+  return el ? el.dataset.value : null;
+}
+
+async function openModal(mode) {
+  _modalMode = mode;
+  const overlay = document.getElementById('modal-overlay');
+  const title = document.getElementById('modal-title-el');
+  const body = document.getElementById('modal-body');
+
+  if (mode === 'tcm') {
+    title.innerHTML = '<span>TCM</span> Configure';
+    const ps = await fetch('/api/plan-status').then(r=>r.json()).catch(()=>({tcm_pending:0}));
+    const hasPending = ps.tcm_pending > 0;
+    body.innerHTML = `
+      ${hasPending ? `
+      <div class="modal-section">
+        <div class="modal-section-label">Existing Plan · ${ps.tcm_pending} lessons pending</div>
+        <div class="toggle-row">
+          <button class="toggle-btn selected" data-group="use_existing" data-value="y"
+            onclick="toggleBtn(this,'use_existing');toggleTcmSections()">
+            continue existing plan
+          </button>
+          <button class="toggle-btn" data-group="use_existing" data-value="n"
+            onclick="toggleBtn(this,'use_existing');toggleTcmSections()">
+            generate new plan
+          </button>
+        </div>
+      </div>` : ''}
+      <div id="tcm-topic-section" ${hasPending?'style="display:none"':''}>
+        <div class="modal-section">
+          <div class="modal-section-label">Topic Focus</div>
+          <div class="opt-cards" data-key="topic" data-value="1">
+            ${optCard('1','Traditional Chinese Medicine (TCM)',true)}
+            ${optCard('2','Eastern Medicine',false)}
+            ${optCard('3','Ayurvedic Medicine',false)}
+            ${optCard('4','Holistic Wellness',false)}
+            ${optCard('5','Custom…',false)}
+          </div>
+        </div>
+        <div class="field" data-show-if="topic=5" style="display:none">
+          <label for="tcm-custom">Custom Topic</label>
+          <input type="text" id="tcm-custom" placeholder="e.g. Qi Gong for beginners">
+        </div>
+        <div class="field">
+          <label for="tcm-extra">Sub-topics / extra details <span style="color:var(--dim);font-weight:400">(optional)</span></label>
+          <input type="text" id="tcm-extra" placeholder="e.g. focus on anxiety, sleep, herbal remedies">
+        </div>
+      </div>
+      <div class="field" id="tcm-count-field">
+        <label for="tcm-count">Videos to generate</label>
+        <input type="number" id="tcm-count" value="3" min="1" max="10">
+        <div class="field-hint">1–10 · recommended ≤5 on 8 GB RAM</div>
+      </div>
+    `;
+    _modalStdinFn = () => {
+      const hasPending2 = !!document.querySelector('[data-group="use_existing"]');
+      if (hasPending2) {
+        const useExisting = getToggleVal('use_existing');
+        const count = document.getElementById('tcm-count').value || '3';
+        if (useExisting === 'y') return `y\n${count}\n`;
+        // user chose new plan
+        const topic = document.querySelector('.opt-cards[data-key="topic"]')?.dataset.value || '1';
+        const custom = document.getElementById('tcm-custom')?.value || '';
+        const extra  = document.getElementById('tcm-extra')?.value || '';
+        return `n\n${topic}\n${topic==='5'?custom+'\n':''}${extra}\n${count}\n`;
+      } else {
+        const topic = document.querySelector('.opt-cards[data-key="topic"]')?.dataset.value || '1';
+        const custom = document.getElementById('tcm-custom')?.value || '';
+        const extra  = document.getElementById('tcm-extra')?.value || '';
+        const count = document.getElementById('tcm-count').value || '3';
+        return `${topic}\n${topic==='5'?custom+'\n':''}${extra}\n${count}\n`;
+      }
+    };
+
+  } else if (mode === 'tutorial') {
+    title.innerHTML = '<span>Tutorial</span> Topic';
+    body.innerHTML = `
+      <div class="field">
+        <label for="tut-topic">Tutorial topic</label>
+        <input type="text" id="tut-topic" placeholder="e.g. Python decorators (blank = auto-pick)">
+      </div>`;
+    _modalStdinFn = () => (document.getElementById('tut-topic').value || '') + '\n';
+
+  } else if (mode === 'viral') {
+    title.innerHTML = '<span>Viral</span> Topic';
+    body.innerHTML = `
+      <div class="field">
+        <label for="viral-topic">Video topic</label>
+        <input type="text" id="viral-topic" placeholder="e.g. satisfying marble runs (blank = random)">
+      </div>`;
+    _modalStdinFn = () => (document.getElementById('viral-topic').value || '') + '\n';
+
+  } else if (mode === 'ideas') {
+    title.innerHTML = '<span>YT Ideas</span> API Key';
+    body.innerHTML = `
+      <div class="field">
+        <label for="ideas-key">YouTube Data API v3 key</label>
+        <input type="text" id="ideas-key" placeholder="AIza… (blank = Ollama-only mode)">
+        <div class="field-hint">Optional — leave blank to use Ollama for idea generation</div>
+      </div>`;
+    _modalStdinFn = () => (document.getElementById('ideas-key').value || '') + '\n';
+
+  } else if (mode === 'clipper') {
+    title.innerHTML = '<span>Clipper</span> Source';
+    body.innerHTML = `
+      <div class="field">
+        <label for="clip-url">YouTube URL or local video path</label>
+        <input type="url" id="clip-url" placeholder="https://youtube.com/watch?v=...">
+      </div>`;
+    _modalStdinFn = () => (document.getElementById('clip-url').value || '') + '\n';
+  }
+
+  overlay.style.display = 'flex';
+  // Focus first input or launch button
+  setTimeout(() => {
+    const first = body.querySelector('input,button');
+    if (first) first.focus();
+  }, 50);
+}
+
+function toggleTcmSections() {
+  const useExisting = getToggleVal('use_existing');
+  const section = document.getElementById('tcm-topic-section');
+  if (section) section.style.display = useExisting === 'n' ? '' : 'none';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+  _modalMode = null;
+  _modalStdinFn = null;
+}
+
+async function launchFromModal() {
+  if (!_modalMode || !_modalStdinFn) return;
+  const stdin_input = _modalStdinFn();
+  const mode = _modalMode;
+  closeModal();
+
+  const btn = document.getElementById('rb-'+mode);
+  if (btn) { btn.textContent = '…'; btn.classList.add('active'); btn.disabled = true; }
+
+  const res = await fetch(`/api/run/${mode}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ count: counts[mode] || 1, stdin_input })
+  });
+  const {job_id} = await res.json();
+
+  openStream(job_id, () => {
+    if (btn) { btn.textContent = 'run ▶'; btn.classList.remove('active'); btn.disabled = false; }
+    refreshStats();
+  });
+}
+
+// Close modal on overlay click or Escape
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('modal-overlay').style.display !== 'none') closeModal();
+});
 
 // ── Init ──────────────────────────────────────────────────────────
 buildModeGrid();
