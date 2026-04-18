@@ -19,6 +19,10 @@ from flask import Flask, Response, jsonify, request, stream_with_context
 PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Use venv python if present (has all deps), else fall back to current interpreter
+_VENV_PY = PROJECT_ROOT / "venv" / "bin" / "python3"
+PYTHON = str(_VENV_PY) if _VENV_PY.exists() else sys.executable
+
 app   = Flask(__name__)
 START = time.time()
 
@@ -158,7 +162,7 @@ def api_run(mode):
         return jsonify({"error": "unknown mode"}), 400
     count = max(1, min(10, int((request.json or {}).get("count", 1))))
     code  = MODE_COMMANDS[mode].format(count=count)
-    cmd   = [sys.executable, "-c",
+    cmd   = [PYTHON, "-c",
              f"import sys; sys.path.insert(0,'{PROJECT_ROOT}'); {code}"]
     proc  = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                              cwd=str(PROJECT_ROOT))
@@ -171,7 +175,7 @@ def api_run(mode):
 def api_workflow(name):
     if name not in WORKFLOW_COMMANDS:
         return jsonify({"error": "unknown workflow"}), 400
-    cmd  = WORKFLOW_COMMANDS[name].split()
+    cmd  = [PYTHON] + WORKFLOW_COMMANDS[name].split()[1:]  # replace python3 with venv python
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             cwd=str(PROJECT_ROOT))
     job_id = str(uuid.uuid4())[:8]
