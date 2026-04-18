@@ -345,6 +345,10 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
     finally:
         # M1 8GB RAM cleanup — close audio clips AFTER write
         safe_close(audio_clips_to_close, final, bg_clip, bg_music)
+        try:
+            Path(temp_audio).unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def run_brainrot_pipeline(shorts_per_run: int = 3):

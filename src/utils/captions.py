@@ -14,7 +14,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import ImageClip, CompositeVideoClip, VideoClip
 
-from src.generator import PROJECT_ROOT
+from src.core.config import PROJECT_ROOT
 FONT_FILE = PROJECT_ROOT / "assets" / "fonts" / "arial.ttf"
 
 SUBTITLE_H        = 160     # height of subtitle bar

@@ -31,15 +31,15 @@ JOBS: dict[str, dict] = {}
 
 MODE_COMMANDS = {
     "educational": "from main import main_flow; main_flow(lessons_per_run={count})",
-    "brainrot":    "from src.brainrot import run_brainrot_pipeline; run_brainrot_pipeline({count})",
-    "rotgen":      "from src.rotgen import run_rotgen_pipeline; run_rotgen_pipeline({count})",
-    "tcm":         "from src.tcm_mode import run_tcm_mode; run_tcm_mode()",
+    "brainrot":    "from src.modes.brainrot import run_brainrot_pipeline; run_brainrot_pipeline({count})",
+    "rotgen":      "from src.modes.rotgen import run_rotgen_pipeline; run_rotgen_pipeline({count})",
+    "tcm":         "from src.modes.tcm_educational import run_tcm_mode; run_tcm_mode()",
     "tutorial":    "from src.generator import start_tutorial_generation; start_tutorial_generation()",
     "viral":       "from src.generator import start_viral_gameplay_mode; start_viral_gameplay_mode()",
-    "ideas":       "from src.ideagenerator import start_idea_generator; start_idea_generator()",
-    "learning":    "from src.learning import suggest_improvements; suggest_improvements()",
+    "ideas":       "from src.modes.studio_ideas import start_idea_generator; start_idea_generator()",
+    "learning":    "from src.core.learning import suggest_improvements; suggest_improvements()",
     "package":     "from src.generator import generate_youtube_content_package; generate_youtube_content_package()",
-    "clipper":     "from src.clipper_mode import run_video_clipper; run_video_clipper()",
+    "clipper":     "from src.modes.clipper import run_video_clipper; run_video_clipper()",
 }
 
 # Stored as arg lists — avoids split() breaking on paths with spaces
@@ -252,22 +252,18 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   --coral2:  #c84d1f;
   --coral3:  rgba(255,107,53,.1);
   --cream:   #e8ddd4;
-  --cream2:  #a09088;
+  --cream2:  #b8a89e;
   --mint:    #4ade80;
   --red:     #f87171;
   --dim:     #524840;
   --border:  #181410;
   --border2: #242018;
   --sidebar: 220px;
-  /* Spacing */
-  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
-  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
   /* Border radius */
   --r-sm: 2px; --r-md: 4px; --r-lg: 6px;
   /* Shadows */
   --shadow-card: 0 1px 4px rgba(0,0,0,.5);
   --shadow-modal: 0 8px 32px rgba(0,0,0,.7);
-  --shadow-glow: 0 0 12px rgba(255,107,53,.15);
   /* Transitions */
   --t-fast: 0.12s ease; --t-base: 0.18s ease; --t-slow: 0.3s ease;
   /* Z-index stack */
@@ -371,10 +367,10 @@ body {
   font-size: 12px;
   font-weight: 400;
   cursor: pointer;
-  transition: color .15s, background .15s, border-color .15s;
+  transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
   text-align: left;
 }
-.nav-btn svg { flex-shrink: 0; opacity: .55; transition: opacity .15s; }
+.nav-btn svg { flex-shrink: 0; opacity: .55; transition: opacity var(--t-fast); }
 .nav-btn:hover { background: var(--bg3); color: var(--cream); border-left-color: var(--border2); }
 .nav-btn:hover svg { opacity: 1; }
 .nav-btn.active { color: var(--coral); border-left-color: var(--coral); background: var(--coral3); font-weight: 500; }
@@ -398,7 +394,7 @@ body {
   transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
   text-align: left;
 }
-.wf-btn svg { flex-shrink: 0; opacity: .6; transition: opacity .15s; }
+.wf-btn svg { flex-shrink: 0; opacity: .6; transition: opacity var(--t-fast); }
 .wf-btn:hover { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
 .wf-btn:hover svg { stroke: var(--coral); opacity: 1; }
 .wf-btn.running { border-color: var(--coral); color: var(--coral); background: var(--coral3); animation: blink .9s ease infinite; }
@@ -424,7 +420,7 @@ body {
   border-radius: 50%;
   background: var(--dim);
   flex-shrink: 0;
-  transition: background .3s, box-shadow .3s;
+  transition: background var(--t-slow), box-shadow var(--t-slow);
 }
 .led.on  { background: var(--mint); box-shadow: 0 0 6px var(--mint); }
 .led.off { background: var(--red);  box-shadow: 0 0 5px rgba(248,113,113,.4); }
@@ -593,7 +589,7 @@ section { margin-bottom: 30px; }
   border-style: solid;
   border-width: 0 14px 14px 0;
   border-color: transparent var(--border2) transparent transparent;
-  transition: border-color .15s;
+  transition: border-color var(--t-fast);
 }
 .slate:hover::after { border-color: transparent var(--coral) transparent transparent; }
 
@@ -684,7 +680,7 @@ section { margin-bottom: 30px; }
   letter-spacing: 1.5px;
   padding: 3px 8px;
   cursor: pointer;
-  transition: border-color .15s, color .15s;
+  transition: border-color var(--t-fast), color var(--t-fast);
   text-transform: uppercase;
 }
 .term-clear:hover { border-color: var(--coral); color: var(--coral); }
@@ -863,7 +859,7 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   display: flex; align-items: center; justify-content: center;
   font-size: 12px;
   font-family: 'Fira Code', monospace;
-  transition: border-color .15s, color .15s;
+  transition: border-color var(--t-fast), color var(--t-fast);
 }
 .modal-close:hover { border-color: var(--red); color: var(--red); }
 
@@ -888,7 +884,7 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   border: 1px solid var(--border);
   background: var(--bg3);
   cursor: pointer;
-  transition: border-color .15s, background .15s;
+  transition: border-color var(--t-fast), background var(--t-fast);
   user-select: none;
 }
 .opt-card:hover { border-color: var(--border2); }
@@ -898,7 +894,7 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   border-radius: 50%;
   border: 1.5px solid var(--dim);
   flex-shrink: 0;
-  transition: border-color .15s, background .15s;
+  transition: border-color var(--t-fast), background var(--t-fast);
 }
 .opt-card.selected .opt-dot { border-color: var(--coral); background: var(--coral); }
 .opt-label { font-size: 12px; color: var(--cream2); font-family: 'Fira Sans', sans-serif; }
@@ -926,7 +922,7 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   font-size: 12px;
   padding: 8px 10px;
   outline: none;
-  transition: border-color .15s;
+  transition: border-color var(--t-fast);
 }
 .field input:focus { border-color: var(--coral); border-bottom-color: var(--coral); }
 .field input::placeholder { color: var(--dim); }
@@ -945,7 +941,7 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   font-size: 11px;
   cursor: pointer;
   text-align: center;
-  transition: border-color .15s, color .15s, background .15s;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
 }
 .toggle-btn:hover { border-color: var(--border2); }
 .toggle-btn.selected { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
@@ -967,7 +963,7 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   letter-spacing: 1px;
   padding: 7px 16px;
   cursor: pointer;
-  transition: border-color .15s, color .15s;
+  transition: border-color var(--t-fast), color var(--t-fast);
 }
 .btn-cancel:hover { border-color: var(--cream2); color: var(--cream2); }
 .btn-launch {
@@ -980,7 +976,7 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   letter-spacing: 1.5px;
   padding: 7px 22px;
   cursor: pointer;
-  transition: opacity .15s;
+  transition: opacity var(--t-fast);
   text-transform: uppercase;
 }
 .btn-launch:hover { opacity: .88; }
@@ -1222,16 +1218,20 @@ async function runMode(id) {
   const btn = document.getElementById('rb-'+id);
   btn.textContent = '…'; btn.classList.add('active'); btn.disabled = true;
 
-  const res = await fetch(`/api/run/${id}`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({count: counts[id]})
-  });
-  const {job_id} = await res.json();
-
-  openStream(job_id, () => {
+  try {
+    const res = await fetch(`/api/run/${id}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({count: counts[id]})
+    });
+    const {job_id} = await res.json();
+    openStream(job_id, () => {
+      btn.textContent = 'run ▶'; btn.classList.remove('active'); btn.disabled = false;
+      refreshStats();
+    });
+  } catch(e) {
+    termLine(`error: ${e.message}`, 'err');
     btn.textContent = 'run ▶'; btn.classList.remove('active'); btn.disabled = false;
-    refreshStats();
-  });
+  }
 }
 
 // ── Run workflow ──────────────────────────────────────────────────
@@ -1239,13 +1239,17 @@ async function runWorkflow(name) {
   const btn = document.getElementById('wf-'+name);
   btn.classList.add('running');
 
-  const res = await fetch(`/api/workflow/${name}`, {method:'POST'});
-  const {job_id} = await res.json();
-
-  openStream(job_id, () => {
+  try {
+    const res = await fetch(`/api/workflow/${name}`, {method:'POST'});
+    const {job_id} = await res.json();
+    openStream(job_id, () => {
+      btn.classList.remove('running');
+      refreshStats();
+    });
+  } catch(e) {
+    termLine(`error: ${e.message}`, 'err');
     btn.classList.remove('running');
-    refreshStats();
-  });
+  }
 }
 
 // ── SSE stream ────────────────────────────────────────────────────
@@ -1349,7 +1353,7 @@ async function refreshStats() {
   // content plan
   const pb = document.getElementById('plan-tbody');
   pb.innerHTML = (s.lessons||[]).map(l => {
-    const yt = l.youtube_id && l.youtube_id.length===11
+    const yt = l.youtube_id?.length===11
       ? `<a class="yt-link" href="https://youtube.com/watch?v=${l.youtube_id}" target="_blank">${l.youtube_id}</a>`
       : '<span style="color:var(--border2)">—</span>';
     const pill = l.status==='complete'

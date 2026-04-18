@@ -9,7 +9,7 @@ from rich.prompt import Prompt
 
 console = Console()
 
-from src.generator import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT
+from src.core.config import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT
 import concurrent.futures
 
 LOG_FILE = PROJECT_ROOT / "performance_log.json"

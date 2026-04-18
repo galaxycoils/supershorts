@@ -211,3 +211,7 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
         )
     finally:
         safe_close(audio_clips_to_close, image_clips, final_video, bg_clip, bg_music)
+        try:
+            Path(temp_audio).unlink(missing_ok=True)
+        except Exception:
+            pass

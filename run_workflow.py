@@ -49,7 +49,7 @@ def run_educational(count: int = 2, **_):
 
 
 def run_brainrot(count: int = 3, **_):
-    from src.brainrot import run_brainrot_pipeline
+    from src.modes.brainrot import run_brainrot_pipeline
     console.print(f"[cyan]🧠 Brain Rot Shorts × {count}[/cyan]")
     run_brainrot_pipeline(count)
     gc.collect()
@@ -57,7 +57,7 @@ def run_brainrot(count: int = 3, **_):
 
 
 def run_rotgen(count: int = 1, **_):
-    from src.rotgen import run_rotgen_pipeline
+    from src.modes.rotgen import run_rotgen_pipeline
     console.print(f"[cyan]🎭 RotGen Videos × {count}[/cyan]")
     run_rotgen_pipeline(count)
     gc.collect()
@@ -68,12 +68,12 @@ def run_tcm_batch(count: int = 3, focus: str = "Traditional Chinese Medicine (TC
                   extra: str = "", **_):
     """Run TCM mode non-interactively (no prompts)."""
     import ollama
-    from src.tcm_mode import (
+    from src.modes.tcm_educational import (
         TCM_PLAN_FILE, _generate_tcm_curriculum, _show_plan_status
     )
     from src.generator import generate_lesson_content, text_to_speech, generate_visuals, compose_video, _clamp_words
-    from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
-    from src.learning import log_upload
+    from src.infrastructure.browser_uploader import upload_to_youtube_browser as upload_to_youtube
+    from src.core.learning import log_upload
     from main import cleanup_after_upload
 
     console.print(f"[cyan]🌿 TCM Videos × {count} ({focus})[/cyan]")

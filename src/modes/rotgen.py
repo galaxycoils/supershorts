@@ -480,8 +480,13 @@ def build_gameplay_clip(bg_path: str | None, duration: float):
             if src_w > src_h:
                 # Landscape (e.g. 1920×1080) — crop to centre portrait region
                 crop_x = (src_w - src_h * 1080 // 992) // 2
-                raw = raw.crop(x1=max(0, crop_x), y1=0,
-                               x2=min(src_w, crop_x + src_h * 1080 // 992), y2=src_h)
+                cropped = raw.crop(x1=max(0, crop_x), y1=0,
+                                   x2=min(src_w, crop_x + src_h * 1080 // 992), y2=src_h)
+                try:
+                    raw.reader.close()
+                except Exception:
+                    pass
+                raw = cropped
             clip = raw.resize((1080, GAMEPLAY_H))
             if clip.duration < duration:
                 clip = clip.fx(vfx.loop, duration=duration)
