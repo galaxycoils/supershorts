@@ -165,7 +165,14 @@ def api_run(mode):
     cmd   = [PYTHON, "-c",
              f"import sys; sys.path.insert(0,'{PROJECT_ROOT}'); {code}"]
     proc  = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             cwd=str(PROJECT_ROOT))
+                             stdin=subprocess.PIPE, cwd=str(PROJECT_ROOT))
+    # Auto-accept all interactive Prompt.ask() defaults by feeding newlines,
+    # then close stdin so the subprocess knows input is exhausted.
+    try:
+        proc.stdin.write(b"\n" * 30)
+        proc.stdin.close()
+    except OSError:
+        pass
     job_id = str(uuid.uuid4())[:8]
     JOBS[job_id] = {"proc": proc, "output": [], "status": "running", "mode": mode}
     threading.Thread(target=_stream_job, args=(job_id, proc), daemon=True).start()
@@ -529,12 +536,12 @@ section { margin-bottom: 30px; }
 }
 
 /* ── two-col ─────────────────────────────────────────────────────── */
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 
 /* ── production slates ───────────────────────────────────────────── */
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -545,6 +552,7 @@ section { margin-bottom: 30px; }
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  min-width: 0;
   transition: border-color .15s, background .15s;
 }
 .slate:hover { border-color: var(--coral); background: var(--bg3); }
