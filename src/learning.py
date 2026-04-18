@@ -68,8 +68,11 @@ def suggest_improvements():
         SUGGESTIONS_FILE.parent.mkdir(exist_ok=True, parents=True)
         SUGGESTIONS_FILE.write_text(suggestion)
         return suggestion
+    except concurrent.futures.TimeoutError:
+        console.print(f"[red]⚠  Learning error: Ollama timed out after {OLLAMA_TIMEOUT}s[/red]")
+        return f"Ollama timed out after {OLLAMA_TIMEOUT}s"
     except Exception as e:
-        console.print(f"[red]⚠  Learning error: {e}[/red]")
+        console.print(f"[red]⚠  Learning error: {type(e).__name__}: {e}[/red]")
         return str(e)
 
 

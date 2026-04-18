@@ -608,7 +608,7 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
             target_size = (1920, 1080) if video_type == 'long' else (1080, 1920)
             if bg_clip and not STATIC_MODE:
                 final_clip = CompositeVideoClip([
-                    bg_clip.set_duration(duration),
+                    bg_clip.subclip(0, min(duration, bg_clip.duration)),
                     img_clip.set_opacity(0.93).set_position('center')
                 ], size=target_size)
             else:
@@ -616,10 +616,6 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
 
             final_clip = final_clip.set_audio(audio_clip)
             image_clips.append(final_clip)
-            try:
-                audio_clip.close()
-            except Exception:
-                pass
 
         final_video = concatenate_videoclips(image_clips, method="compose")
 
@@ -636,7 +632,8 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
             print("🎵 Adding background music...")
             bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.15)
             if bg_music.duration < final_video.duration:
-                bg_music = bg_music.fx(vfx.loop, duration=final_video.duration)
+                from moviepy.audio.fx.audio_loop import audio_loop
+                bg_music = audio_loop(bg_music, duration=final_video.duration)
             else:
                 bg_music = bg_music.subclip(0, final_video.duration)
             composite = CompositeAudioClip([final_video.audio.volumex(1.2), bg_music])
@@ -644,6 +641,7 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
 
         # Ultra-fast write settings for M1 8GB
         print(f"🎬 Encoding video → {Path(output_path).name}")
+        temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
         final_video.write_videofile(
             str(output_path),
             fps=24,
@@ -653,6 +651,7 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
             preset="ultrafast",      # ← main speed boost
             threads=3,
             logger='bar',
+            temp_audiofile=temp_audio,
         )
         print(f"✅ Video saved: {Path(output_path).name}")
 

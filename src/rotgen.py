@@ -527,7 +527,8 @@ def compose_rotgen_video(
     if BACKGROUND_MUSIC_PATH.exists():
         bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.22)
         if bg_music.duration < composite.duration:
-            bg_music = bg_music.fx(vfx.loop, duration=composite.duration)
+            from moviepy.audio.fx.audio_loop import audio_loop
+            bg_music = audio_loop(bg_music, duration=composite.duration)
         else:
             bg_music = bg_music.subclip(0, composite.duration)
         final_audio = CompositeAudioClip([audio_clip.volumex(1.3), bg_music])
@@ -536,6 +537,7 @@ def compose_rotgen_video(
 
     final_composite = composite.set_audio(final_audio)
 
+    temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
     final_composite.write_videofile(
         str(output_path),
         fps=FPS,
@@ -545,6 +547,7 @@ def compose_rotgen_video(
         preset="ultrafast",
         threads=3,
         logger="bar",
+        temp_audiofile=temp_audio,
     )
     print(f"  Saved: {output_path.name}")
 

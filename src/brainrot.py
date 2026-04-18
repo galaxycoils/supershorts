@@ -290,16 +290,19 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
             bg_clip = None
 
         clips = []
+        audio_clips_to_close = []  # close only after write_videofile
         pairs = list(zip(slide_paths, audio_paths))
         for i, (img_path, audio_path) in enumerate(tqdm(pairs, desc="  Building clips", unit="clip", leave=False,
                                                          bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
             audio_clip = AudioFileClip(str(audio_path))
+            audio_clips_to_close.append(audio_clip)
             duration = audio_clip.duration + 0.3
             img_clip = ImageClip(str(img_path)).set_duration(duration).fadein(0.2).fadeout(0.2)
 
             if bg_clip:
+                # subclip creates a new clip with correct duration — avoids mutating shared bg_clip
                 segment = CompositeVideoClip([
-                    bg_clip.set_duration(duration),
+                    bg_clip.subclip(0, min(duration, bg_clip.duration)),
                     img_clip.set_opacity(0.88).set_position('center')
                 ], size=(1080, 1920))
             else:
@@ -307,10 +310,6 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
 
             segment = segment.set_audio(audio_clip)
             clips.append(segment)
-            try:
-                audio_clip.close()
-            except Exception:
-                pass
 
         final = concatenate_videoclips(clips, method="compose")
 
@@ -327,13 +326,15 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
             print("🎵 Adding music...")
             bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.25)
             if bg_music.duration < final.duration:
-                bg_music = bg_music.fx(vfx.loop, duration=final.duration)
+                from moviepy.audio.fx.audio_loop import audio_loop
+                bg_music = audio_loop(bg_music, duration=final.duration)
             else:
                 bg_music = bg_music.subclip(0, final.duration)
             composite_audio = CompositeAudioClip([final.audio.volumex(1.2), bg_music])
             final = final.set_audio(composite_audio)
 
         print(f"🎬 Encoding → {Path(output_path).name}")
+        temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
         final.write_videofile(
             str(output_path),
             fps=24,
@@ -343,10 +344,16 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
             preset="ultrafast",
             threads=3,
             logger='bar',
+            temp_audiofile=temp_audio,
         )
         print(f"✅ Brain rot video saved: {Path(output_path).name}")
 
-        # M1 8GB RAM cleanup
+        # M1 8GB RAM cleanup — close audio clips AFTER write
+        for _ac in audio_clips_to_close:
+            try:
+                _ac.close()
+            except Exception:
+                pass
         try:
             final.close()
         except Exception:
