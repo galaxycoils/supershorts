@@ -199,15 +199,12 @@ def run_tcm_mode():
     console.print()
 
     # ── Generation loop ───────────────────────────────────────────
-    from src.core.config import (
-        generate_lesson_content,
-        text_to_speech,
-        generate_visuals,
-        compose_video,
-        _clamp_words,
-    )
-    from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
-    from src.learning import log_upload
+    from src.generator import generate_lesson_content
+    from src.infrastructure.tts import text_to_speech
+    from src.engine.video_engine import generate_visuals, compose_video
+    from src.utils.text import _clamp_words
+    from src.infrastructure.browser_uploader import upload_to_youtube_browser as upload_to_youtube
+    from src.core.learning import log_upload
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     produced = 0

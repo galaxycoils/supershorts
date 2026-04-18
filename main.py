@@ -25,7 +25,8 @@ from src.generator import (
     run_video_clipper,
     start_idea_generator,
     log_upload,
-    PROJECT_ROOT
+    PROJECT_ROOT,
+    start_learning_mode
 )
 from src.core.learning import suggest_improvements # learning.py renamed
 

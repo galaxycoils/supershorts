@@ -66,8 +66,8 @@ Return ONLY valid JSON:
     return result
 
 def start_tutorial_generation():
-    from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
-    from src.learning import log_upload
+    from src.infrastructure.browser_uploader import upload_to_youtube_browser as upload_to_youtube
+    from src.core.learning import log_upload
 
     raw = input("Enter tutorial topic (or press Enter to auto-pick): ").strip()
     topic = raw if raw else random.choice(TUTORIAL_TOPICS)

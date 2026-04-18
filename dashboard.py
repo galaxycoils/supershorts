@@ -259,6 +259,19 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
   --border:  #181410;
   --border2: #242018;
   --sidebar: 220px;
+  /* Spacing */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+  /* Border radius */
+  --r-sm: 2px; --r-md: 4px; --r-lg: 6px;
+  /* Shadows */
+  --shadow-card: 0 1px 4px rgba(0,0,0,.5);
+  --shadow-modal: 0 8px 32px rgba(0,0,0,.7);
+  --shadow-glow: 0 0 12px rgba(255,107,53,.15);
+  /* Transitions */
+  --t-fast: 0.12s ease; --t-base: 0.18s ease; --t-slow: 0.3s ease;
+  /* Z-index stack */
+  --z-tooltip: 200; --z-topbar: 300; --z-modal: 500;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -377,11 +390,12 @@ body {
   margin-bottom: 4px;
   background: var(--bg3);
   border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
   color: var(--cream2);
   font-family: 'Fira Code', monospace;
   font-size: 10px;
   cursor: pointer;
-  transition: border-color .15s, color .15s, background .15s;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
   text-align: left;
 }
 .wf-btn svg { flex-shrink: 0; opacity: .6; transition: opacity .15s; }
@@ -433,7 +447,7 @@ body {
   background: var(--bg2);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: var(--z-topbar);
 }
 
 .producing-badge {
@@ -498,6 +512,8 @@ section { margin-bottom: 30px; }
 .kpi {
   background: var(--bg2);
   border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-card);
   padding: 18px 20px 14px;
   position: relative;
   overflow: hidden;
@@ -559,12 +575,14 @@ section { margin-bottom: 30px; }
 .slate {
   background: var(--bg2);
   border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-card);
   padding: 13px 14px;
   position: relative;
   overflow: hidden;
   cursor: pointer;
   min-width: 0;
-  transition: border-color .15s, background .15s;
+  transition: border-color var(--t-fast), background var(--t-fast);
 }
 .slate:hover { border-color: var(--coral); background: var(--bg3); }
 
@@ -606,12 +624,13 @@ section { margin-bottom: 30px; }
 .cnt-btn {
   background: var(--bg3);
   border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
   color: var(--cream2);
-  width: 22px; height: 22px;
+  width: 28px; height: 28px;
   font-size: 14px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background .1s, border-color .1s, color .1s;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
   flex-shrink: 0;
   font-family: 'Fira Code', monospace;
 }
@@ -631,13 +650,14 @@ section { margin-bottom: 30px; }
   margin-left: auto;
   background: transparent;
   border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
   color: var(--cream2);
   font-family: 'Fira Code', monospace;
   font-size: 9px;
   letter-spacing: 1.5px;
   padding: 4px 10px;
   cursor: pointer;
-  transition: border-color .15s, color .15s, background .15s;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
   text-transform: uppercase;
 }
 .run-btn:hover  { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
@@ -673,7 +693,9 @@ section { margin-bottom: 30px; }
   background: #040404;
   border: 1px solid var(--border);
   border-top: 2px solid var(--coral);
-  height: 340px;
+  border-radius: var(--r-sm);
+  min-height: 280px;
+  max-height: 420px;
   overflow-y: auto;
   padding: 12px 14px;
   font-family: 'Fira Code', monospace;
@@ -686,11 +708,11 @@ section { margin-bottom: 30px; }
   width: 6px; height: 12px;
   background: var(--coral);
   opacity: .7;
-  animation: cursor-blink 1.1s step-end infinite;
+  animation: cursor-blink 1.1s ease-in-out infinite;
   vertical-align: middle;
   margin-left: 1px;
 }
-@keyframes cursor-blink { 0%,100%{opacity:.7} 50%{opacity:0} }
+@keyframes cursor-blink { 0%,100%{opacity:.7} 50%{opacity:0} }  /* smooth ease via animation-timing-function on .term-cursor */
 
 .tl { color: var(--cream2); }
 .tl.ok   { color: var(--mint); }
@@ -723,7 +745,7 @@ section { margin-bottom: 30px; }
   padding: 3px 8px;
   white-space: nowrap;
   pointer-events: none;
-  z-index: 10;
+  z-index: var(--z-tooltip);
 }
 .hm-date { font-size: 9px; color: var(--dim); font-family: 'Fira Code', monospace; }
 
@@ -784,11 +806,19 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   .sidebar  { width: 180px; }
 }
 
+@media (max-width: 768px) {
+  .sidebar { width: 0; overflow: hidden; border: none; }
+  .main { margin-left: 0; }
+  .kpi-row { grid-template-columns: 1fr 1fr; }
+  .mode-grid { grid-template-columns: 1fr; }
+  .modal { width: calc(100vw - 24px); }
+}
+
 /* ── MODAL ────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.75);
-  z-index: 500;
+  z-index: var(--z-modal);
   display: flex; align-items: center; justify-content: center;
   animation: fade-in .15s ease;
 }
@@ -798,6 +828,8 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
   background: var(--bg2);
   border: 1px solid var(--border2);
   border-top: 2px solid var(--coral);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-modal);
   width: 480px;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 80px);
@@ -1481,13 +1513,13 @@ async function openModal(mode) {
         if (useExisting === 'y') return `y\n${count}\n`;
         // user chose new plan
         const topic = document.querySelector('.opt-cards[data-key="topic"]')?.dataset.value || '1';
-        const custom = document.getElementById('tcm-custom')?.value || '';
-        const extra  = document.getElementById('tcm-extra')?.value || '';
+        const custom = (document.getElementById('tcm-custom')?.value || '').replace(/[\n\r]/g, ' ');
+        const extra  = (document.getElementById('tcm-extra')?.value || '').replace(/[\n\r]/g, ' ');
         return `n\n${topic}\n${topic==='5'?custom+'\n':''}${extra}\n${count}\n`;
       } else {
         const topic = document.querySelector('.opt-cards[data-key="topic"]')?.dataset.value || '1';
-        const custom = document.getElementById('tcm-custom')?.value || '';
-        const extra  = document.getElementById('tcm-extra')?.value || '';
+        const custom = (document.getElementById('tcm-custom')?.value || '').replace(/[\n\r]/g, ' ');
+        const extra  = (document.getElementById('tcm-extra')?.value || '').replace(/[\n\r]/g, ' ');
         const count = document.getElementById('tcm-count').value || '3';
         return `${topic}\n${topic==='5'?custom+'\n':''}${extra}\n${count}\n`;
       }
@@ -1554,6 +1586,7 @@ function closeModal() {
 async function launchFromModal() {
   if (!_modalMode || !_modalStdinFn) return;
   const stdin_input = _modalStdinFn();
+  if (stdin_input == null) { closeModal(); return; }
   const mode = _modalMode;
   closeModal();
 

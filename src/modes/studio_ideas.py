@@ -9,7 +9,6 @@ import time
 import datetime
 import concurrent.futures
 import requests
-import ollama
 from pathlib import Path
 from tqdm import tqdm
 
@@ -231,8 +230,8 @@ def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
       dialogue → TTS → thumbnail → compose Short → upload
     Returns result dict with status.
     """
-    from src.browser_uploader import upload_to_youtube_browser
-    from src.learning import log_upload
+    from src.infrastructure.browser_uploader import upload_to_youtube_browser
+    from src.core.learning import log_upload
 
     title    = strip_emojis(idea.get("title", f"Idea {index+1}"))[:100]
     dialogue = strip_emojis(idea.get("dialogue", idea.get("script", "")))
@@ -274,8 +273,12 @@ def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
     desc     = f"{dialogue[:500]}\n\n{hashtags}\n\nProduced by SuperShorts"
     short_title = f"{title[:80]} #Shorts"
     print(f"  Uploading → {short_title[:60]}...")
-    video_id = upload_to_youtube_browser(video_path, short_title, desc,
-                                         "AI,Shorts,Viral,Tech,AIFacts")
+    try:
+        video_id = upload_to_youtube_browser(video_path, short_title, desc,
+                                             "AI,Shorts,Viral,Tech,AIFacts")
+    except Exception as e:
+        print(f"  Upload error: {e}")
+        video_id = None
     if video_id:
         log_upload(short_title, video_id, "studio_idea")
         print(f"  Live: https://youtube.com/watch?v={video_id}")

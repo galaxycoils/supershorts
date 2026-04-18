@@ -46,6 +46,7 @@ from src.modes.tcm_educational import run_tcm_mode, _generate_tcm_curriculum
 from src.modes.rotgen import run_rotgen_pipeline
 from src.modes.studio_ideas import start_idea_generator
 from src.modes.clipper import run_video_clipper
+from src.core.learning import start_learning_mode
 
 # --- Core Logic Re-exports ---
 from src.core.learning import log_upload, suggest_improvements

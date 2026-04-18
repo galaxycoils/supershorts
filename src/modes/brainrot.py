@@ -371,7 +371,7 @@ def run_brainrot_pipeline(shorts_per_run: int = 3):
         save_brainrot_plan(plan)
         pending = [t for t in plan["topics"] if t.get("status") == "pending"]
 
-    from src.browser_uploader import upload_to_youtube_browser
+    from src.infrastructure.browser_uploader import upload_to_youtube_browser
 
     batch = pending[:shorts_per_run]
     processed = 0
@@ -418,7 +418,7 @@ def run_brainrot_pipeline(shorts_per_run: int = 3):
             print(f"\n📤 Uploading: {title}")
             video_id = upload_to_youtube_browser(video_path, title, desc, tags)
             if video_id:
-                from src.learning import log_upload
+                from src.core.learning import log_upload
                 log_upload(title, video_id, "brainrot")
 
             # Mark complete

@@ -228,7 +228,7 @@ class WorkflowRunner:
         args["task_results"]  = self.results
 
         max_attempts = task.get("retry", {}).get("attempts", 1) + 1
-        delay        = task.get("retry", {}).get("delay", 5)
+        delay        = max(1, task.get("retry", {}).get("delay", 5))
 
         for attempt in range(1, max_attempts + 1):
             try:
@@ -409,4 +409,3 @@ Examples:
 
 if __name__ == "__main__":
     main()
-)

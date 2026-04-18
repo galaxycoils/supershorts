@@ -554,6 +554,11 @@ def compose_rotgen_video(
     finally:
         # Exhaustive cleanup for 8GB RAM machines
         safe_close(composite, final_composite, bg_music, game_pos, char_pos)
+        # Remove MoviePy temp audio file
+        try:
+            Path(temp_audio).unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 # ─────────────────────────── main entry ─────────────────────────────────────
@@ -636,8 +641,8 @@ def run_rotgen_pipeline(shorts_per_run: int = 3) -> None:
     """RotGen Character Mode — N shorts back-to-back, auto-pilot."""
     import time as _time
     from tqdm import tqdm
-    from src.browser_uploader import upload_to_youtube_browser
-    from src.learning import log_upload
+    from src.infrastructure.browser_uploader import upload_to_youtube_browser
+    from src.core.learning import log_upload
 
     print("\n  ByteBot RotGen — AI Character Mode\n")
     ensure_dirs()

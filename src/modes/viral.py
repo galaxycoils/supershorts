@@ -17,8 +17,8 @@ from src.utils.json import safe_json_parse
 
 def generate_youtube_content_package() -> None:
     """Expert YouTube Content Strategist — auto-picks topic, generates script + video + upload."""
-    from src.browser_uploader import upload_to_youtube_browser
-    from src.learning import log_upload
+    from src.infrastructure.browser_uploader import upload_to_youtube_browser
+    from src.core.learning import log_upload
 
     print("\n  📦 YouTube Content Strategist Activated\n")
 
@@ -92,7 +92,7 @@ Return ONLY valid JSON:
 def start_viral_gameplay_mode():
     """Educational videos with FORCED viral gameplay backgrounds."""
     from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
-    from src.learning import log_upload
+    from src.core.learning import log_upload
     from src.core.config import generate_lesson_content # Keep this until refactored
 
     clips = list(VIRAL_GAMEPLAY_PATH.glob("*.mp4"))
