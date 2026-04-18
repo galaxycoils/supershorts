@@ -222,53 +222,49 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SuperShorts — Production Suite</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:      #0c0a09;
-  --bg2:     #141210;
-  --bg3:     #1e1b18;
-  --bg4:     #252118;
+  --bg:      #080808;
+  --bg2:     #0f0f0f;
+  --bg3:     #161616;
+  --bg4:     #1c1c1c;
   --coral:   #ff6b35;
   --coral2:  #c84d1f;
-  --cream:   #f0e0c8;
-  --cream2:  #b8a898;
-  --mint:    #7cffa4;
-  --red:     #ff4040;
-  --dim:     #6b6058;
-  --border:  #2a2420;
-  --border2: #3a3028;
+  --coral3:  rgba(255,107,53,.1);
+  --cream:   #e8ddd4;
+  --cream2:  #a09088;
+  --mint:    #4ade80;
+  --red:     #f87171;
+  --dim:     #524840;
+  --border:  #181410;
+  --border2: #242018;
+  --sidebar: 220px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html, body { height: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
 
 body {
   display: flex;
   background: var(--bg);
   color: var(--cream);
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
+  font-family: 'Fira Sans', system-ui, sans-serif;
+  font-size: 13px;
   line-height: 1.5;
   overflow-x: hidden;
 }
 
-/* grain filter */
-svg.grain { position: fixed; width: 0; height: 0; }
-
-body::after {
-  content: '';
-  position: fixed; inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  opacity: 0.028;
-  pointer-events: none;
-  z-index: 9998;
-}
+:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
 
 /* ── SIDEBAR ─────────────────────────────────────────────────────── */
 .sidebar {
-  width: 220px;
+  width: var(--sidebar);
   flex-shrink: 0;
   background: var(--bg2);
   border-right: 1px solid var(--border);
@@ -280,96 +276,105 @@ body::after {
   overflow-y: auto;
 }
 
-/* perforated film-strip edge */
 .sidebar::before {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  width: 6px;
+  width: 3px;
   background-image: repeating-linear-gradient(
     to bottom,
-    transparent 0px,
-    transparent 10px,
-    var(--border2) 10px,
-    var(--border2) 18px
+    transparent 0px, transparent 8px,
+    var(--border2) 8px, var(--border2) 14px
   );
+  pointer-events: none;
 }
 
 .sidebar-logo {
-  padding: 28px 20px 20px 20px;
+  padding: 22px 16px 18px 18px;
   border-bottom: 1px solid var(--border);
 }
 
-.logo-word {
-  font-family: 'Fraunces', serif;
-  font-weight: 900;
-  font-size: 26px;
-  line-height: 1;
+.logo-mark {
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+  font-size: 16px;
   letter-spacing: -0.5px;
   color: var(--cream);
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
 }
-.logo-word span { color: var(--coral); }
+.logo-mark .accent { color: var(--coral); }
+.logo-mark .slash  { color: var(--dim); font-weight: 400; margin: 0 2px; }
+
 .logo-sub {
   font-size: 9px;
-  letter-spacing: 3px;
+  letter-spacing: 2.5px;
   color: var(--dim);
   text-transform: uppercase;
-  margin-top: 4px;
-  display: block;
+  margin-top: 5px;
+  font-weight: 500;
 }
 
-.nav-section { padding: 16px 0 8px 0; }
+.nav-section { padding: 14px 0 6px; }
 .nav-label {
-  padding: 0 16px 6px 20px;
+  padding: 0 14px 6px 18px;
   font-size: 9px;
-  letter-spacing: 3px;
+  letter-spacing: 2.5px;
   color: var(--dim);
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .nav-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 9px;
   width: 100%;
-  text-align: left;
-  padding: 8px 16px 8px 20px;
+  padding: 7px 14px 7px 18px;
   background: transparent;
   border: none;
+  border-left: 2px solid transparent;
   color: var(--cream2);
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-family: 'Fira Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
   cursor: pointer;
-  border-left: 3px solid transparent;
-  transition: all .15s;
+  transition: color .15s, background .15s, border-color .15s;
+  text-align: left;
 }
+.nav-btn svg { flex-shrink: 0; opacity: .55; transition: opacity .15s; }
 .nav-btn:hover { background: var(--bg3); color: var(--cream); border-left-color: var(--border2); }
-.nav-btn.active { color: var(--coral); border-left-color: var(--coral); background: rgba(255,107,53,.06); }
+.nav-btn:hover svg { opacity: 1; }
+.nav-btn.active { color: var(--coral); border-left-color: var(--coral); background: var(--coral3); font-weight: 500; }
+.nav-btn.active svg { opacity: 1; stroke: var(--coral); }
 
-/* workflow buttons */
+.wf-section { padding: 4px 10px 8px; }
 .wf-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: calc(100% - 24px);
-  margin: 3px 12px;
-  padding: 7px 10px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 4px;
   background: var(--bg3);
   border: 1px solid var(--border2);
   color: var(--cream2);
-  font-family: 'Space Mono', monospace;
+  font-family: 'Fira Code', monospace;
   font-size: 10px;
   cursor: pointer;
-  transition: all .15s;
+  transition: border-color .15s, color .15s, background .15s;
   text-align: left;
 }
-.wf-btn:hover { border-color: var(--coral); color: var(--coral); }
-.wf-btn.running { border-color: var(--coral); color: var(--coral); animation: pulse .9s ease infinite; }
-.wf-icon { font-size: 14px; flex-shrink: 0; }
+.wf-btn svg { flex-shrink: 0; opacity: .6; transition: opacity .15s; }
+.wf-btn:hover { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
+.wf-btn:hover svg { stroke: var(--coral); opacity: 1; }
+.wf-btn.running { border-color: var(--coral); color: var(--coral); background: var(--coral3); animation: blink .9s ease infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.45} }
 
-/* sidebar bottom */
 .sidebar-bottom {
   margin-top: auto;
-  padding: 12px 16px 16px 20px;
+  padding: 12px 14px 16px 18px;
   border-top: 1px solid var(--border);
 }
 
@@ -377,38 +382,35 @@ body::after {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   font-size: 10px;
   color: var(--dim);
+  font-family: 'Fira Code', monospace;
 }
 .led {
-  width: 7px; height: 7px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--dim);
   flex-shrink: 0;
+  transition: background .3s, box-shadow .3s;
 }
 .led.on  { background: var(--mint); box-shadow: 0 0 6px var(--mint); }
-.led.off { background: var(--red);  box-shadow: 0 0 6px rgba(255,64,64,.5); }
+.led.off { background: var(--red);  box-shadow: 0 0 5px rgba(248,113,113,.4); }
 
-.disk-label { font-size: 9px; color: var(--dim); margin-bottom: 4px; letter-spacing: 1px; }
-.disk-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
-.disk-fill { height: 100%; background: linear-gradient(90deg, var(--coral2), var(--coral)); transition: width .6s ease; }
-.disk-text { font-size: 10px; color: var(--dim); margin-top: 4px; }
+.disk-label { font-size: 9px; color: var(--dim); margin-bottom: 5px; letter-spacing: 1.5px; text-transform: uppercase; }
+.disk-bar   { height: 2px; background: var(--border2); overflow: hidden; }
+.disk-fill  { height: 100%; background: linear-gradient(90deg, var(--coral2), var(--coral)); transition: width .6s ease; }
+.disk-text  { font-size: 10px; color: var(--dim); margin-top: 4px; font-family: 'Fira Code', monospace; }
 
 /* ── MAIN ────────────────────────────────────────────────────────── */
-.main {
-  flex: 1;
-  overflow-y: auto;
-  min-width: 0;
-}
+.main { flex: 1; overflow-y: auto; min-width: 0; }
 
-/* header strip */
 .topbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 20px;
-  padding: 12px 32px;
+  padding: 10px 28px;
   border-bottom: 1px solid var(--border);
   background: var(--bg2);
   position: sticky;
@@ -420,57 +422,65 @@ body::after {
   display: none;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 9px;
+  letter-spacing: 2.5px;
   color: var(--coral);
-  font-weight: 700;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-family: 'Fira Code', monospace;
 }
 .producing-badge.active { display: flex; }
 .producing-dot {
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 7px; height: 7px;
+  border-radius: 50%;
   background: var(--coral);
-  box-shadow: 0 0 10px var(--coral);
-  animation: pulse .7s ease-in-out infinite;
+  box-shadow: 0 0 8px var(--coral);
+  animation: pulse .8s ease-in-out infinite;
 }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.85)} }
 
-#clock { color: var(--dim); font-size: 11px; }
-
-.content { padding: 28px 32px; }
-
-/* section titles */
-h2 {
-  font-family: 'Fraunces', serif;
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--cream);
+#clock {
+  color: var(--dim);
+  font-size: 11px;
+  font-family: 'Fira Code', monospace;
   letter-spacing: .5px;
+}
+
+.content { padding: 22px 28px; }
+
+h2 {
+  font-family: 'Fira Sans', sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--cream);
+  letter-spacing: 2px;
   margin-bottom: 14px;
+  text-transform: uppercase;
 }
 h2 small {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Fira Code', monospace;
   font-size: 10px;
   color: var(--dim);
   font-weight: 400;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   margin-left: 10px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
-section { margin-bottom: 36px; }
+section { margin-bottom: 30px; }
 
 /* ── KPI row ─────────────────────────────────────────────────────── */
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 36px;
+  gap: 10px;
+  margin-bottom: 30px;
 }
 
 .kpi {
   background: var(--bg2);
   border: 1px solid var(--border);
-  padding: 20px 22px 16px;
+  padding: 18px 20px 14px;
   position: relative;
   overflow: hidden;
 }
@@ -481,76 +491,90 @@ section { margin-bottom: 36px; }
   bottom: 0; left: 0; right: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--coral), transparent);
-  opacity: .4;
+  opacity: .3;
 }
 
 .kpi-label {
   font-size: 9px;
-  letter-spacing: 3px;
+  letter-spacing: 2.5px;
   color: var(--dim);
   text-transform: uppercase;
   margin-bottom: 10px;
+  font-weight: 600;
 }
 
 .kpi-value {
-  font-family: 'Fraunces', serif;
-  font-weight: 900;
-  font-size: 54px;
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+  font-size: 46px;
   color: var(--coral);
   line-height: 1;
   letter-spacing: -2px;
+  text-shadow: 0 0 28px rgba(255,107,53,.2);
 }
 
-.kpi-sub { font-size: 10px; color: var(--dim); margin-top: 6px; }
+.kpi-sub { font-size: 10px; color: var(--dim); margin-top: 8px; font-family: 'Fira Code', monospace; }
 
 .kpi-prog {
   height: 1px;
-  background: var(--border);
+  background: var(--border2);
   margin-top: 12px;
+  overflow: hidden;
 }
 .kpi-prog-fill {
   height: 100%;
   background: var(--coral);
-  opacity: .6;
+  opacity: .5;
   transition: width .8s ease;
 }
 
-/* ── two-col layout ──────────────────────────────────────────────── */
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+/* ── two-col ─────────────────────────────────────────────────────── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
 /* ── production slates ───────────────────────────────────────────── */
 .mode-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 
 .slate {
   background: var(--bg2);
   border: 1px solid var(--border);
-  padding: 14px 16px;
+  padding: 13px 14px;
   position: relative;
   overflow: hidden;
+  cursor: pointer;
   transition: border-color .15s, background .15s;
 }
 .slate:hover { border-color: var(--coral); background: var(--bg3); }
-.slate::before {
-  /* clapperboard corner mark */
+
+.slate::after {
   content: '';
   position: absolute;
   top: 0; right: 0;
-  width: 18px; height: 18px;
-  background: linear-gradient(225deg, var(--border2) 50%, transparent 50%);
-  transition: background .15s;
+  border-style: solid;
+  border-width: 0 14px 14px 0;
+  border-color: transparent var(--border2) transparent transparent;
+  transition: border-color .15s;
 }
-.slate:hover::before { background: linear-gradient(225deg, var(--coral) 50%, transparent 50%); }
+.slate:hover::after { border-color: transparent var(--coral) transparent transparent; }
 
-.slate-icon { font-size: 20px; margin-bottom: 6px; display: block; }
+.slate-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  margin-bottom: 8px;
+}
+.slate-icon svg { stroke: var(--coral); }
 
 .slate-name {
-  font-family: 'Fraunces', serif;
-  font-weight: 700;
-  font-size: 15px;
+  font-family: 'Fira Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
   color: var(--cream);
   line-height: 1.1;
   margin-bottom: 2px;
@@ -558,25 +582,26 @@ section { margin-bottom: 36px; }
 
 .slate-desc { font-size: 10px; color: var(--dim); margin-bottom: 10px; line-height: 1.4; }
 
-.slate-controls { display: flex; align-items: center; gap: 8px; }
+.slate-controls { display: flex; align-items: center; gap: 6px; }
 
 .cnt-btn {
   background: var(--bg3);
   border: 1px solid var(--border2);
   color: var(--cream2);
   width: 22px; height: 22px;
-  font-size: 15px;
+  font-size: 14px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all .1s;
+  transition: background .1s, border-color .1s, color .1s;
   flex-shrink: 0;
+  font-family: 'Fira Code', monospace;
 }
 .cnt-btn:hover { background: var(--coral); border-color: var(--coral); color: #000; }
 
 .cnt-val {
-  font-family: 'Fraunces', serif;
-  font-size: 22px;
-  font-weight: 900;
+  font-family: 'Fira Code', monospace;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--coral);
   width: 22px;
   text-align: center;
@@ -586,23 +611,22 @@ section { margin-bottom: 36px; }
 .run-btn {
   margin-left: auto;
   background: transparent;
-  border: 1px solid var(--coral);
-  color: var(--coral);
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 2px;
-  padding: 5px 12px;
+  border: 1px solid var(--border2);
+  color: var(--cream2);
+  font-family: 'Fira Code', monospace;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  padding: 4px 10px;
   cursor: pointer;
-  transition: all .15s;
+  transition: border-color .15s, color .15s, background .15s;
   text-transform: uppercase;
 }
-.run-btn:hover  { background: var(--coral); color: #000; }
-.run-btn:disabled { opacity: .35; cursor: default; }
-.run-btn.active  {
-  background: rgba(255,107,53,.12);
-  border-color: var(--coral);
-  color: var(--coral);
-  animation: pulse .7s ease infinite;
+.run-btn:hover  { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
+.run-btn:disabled { opacity: .3; cursor: default; }
+.run-btn.active {
+  border-color: var(--coral); color: var(--coral);
+  background: var(--coral3);
+  animation: blink .7s ease infinite;
 }
 
 /* ── terminal ────────────────────────────────────────────────────── */
@@ -616,85 +640,93 @@ section { margin-bottom: 36px; }
   background: transparent;
   border: 1px solid var(--border2);
   color: var(--dim);
-  font-family: 'Space Mono', monospace;
+  font-family: 'Fira Code', monospace;
   font-size: 9px;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   padding: 3px 8px;
   cursor: pointer;
-  transition: all .15s;
+  transition: border-color .15s, color .15s;
+  text-transform: uppercase;
 }
 .term-clear:hover { border-color: var(--coral); color: var(--coral); }
 
 .terminal {
-  background: #050302;
+  background: #040404;
   border: 1px solid var(--border);
   border-top: 2px solid var(--coral);
   height: 340px;
   overflow-y: auto;
-  padding: 14px 16px;
+  padding: 12px 14px;
+  font-family: 'Fira Code', monospace;
   font-size: 11px;
-  line-height: 1.65;
+  line-height: 1.7;
 }
+
+.term-cursor {
+  display: inline-block;
+  width: 6px; height: 12px;
+  background: var(--coral);
+  opacity: .7;
+  animation: cursor-blink 1.1s step-end infinite;
+  vertical-align: middle;
+  margin-left: 1px;
+}
+@keyframes cursor-blink { 0%,100%{opacity:.7} 50%{opacity:0} }
 
 .tl { color: var(--cream2); }
 .tl.ok   { color: var(--mint); }
 .tl.err  { color: var(--red); }
 .tl.sys  { color: var(--dim); font-style: italic; }
-.tl.done { color: var(--coral); font-weight: 700; }
+.tl.done { color: var(--coral); font-weight: 600; }
 .tl.prompt { color: var(--coral); }
 
-/* ── heatmap strip ───────────────────────────────────────────────── */
-.heatmap {
-  display: flex;
-  gap: 4px;
-  align-items: flex-end;
-  margin-bottom: 20px;
-}
+/* ── heatmap ─────────────────────────────────────────────────────── */
+.heatmap { display: flex; gap: 4px; align-items: flex-end; margin-bottom: 18px; }
 .hm-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .hm-block {
-  width: 32px; height: 32px;
+  width: 34px; height: 34px;
   background: var(--bg3);
   border: 1px solid var(--border);
   transition: background .4s ease;
+  cursor: default;
   position: relative;
 }
 .hm-block[data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute;
-  bottom: 38px;
-  left: 50%;
+  bottom: 40px; left: 50%;
   transform: translateX(-50%);
   background: var(--bg4);
   border: 1px solid var(--border2);
   color: var(--cream);
   font-size: 10px;
+  font-family: 'Fira Code', monospace;
   padding: 3px 8px;
   white-space: nowrap;
   pointer-events: none;
+  z-index: 10;
 }
-.hm-date { font-size: 9px; color: var(--dim); letter-spacing: -.5px; }
+.hm-date { font-size: 9px; color: var(--dim); font-family: 'Fira Code', monospace; }
 
 /* ── tables ──────────────────────────────────────────────────────── */
-.table-wrap { max-height: 320px; overflow-y: auto; }
-
+.table-wrap { max-height: 300px; overflow-y: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 11px; }
-
 th {
   text-align: left;
-  padding: 7px 12px;
+  padding: 6px 10px;
   color: var(--dim);
   letter-spacing: 2px;
   font-size: 9px;
   border-bottom: 1px solid var(--border);
-  font-weight: 400;
+  font-weight: 600;
   text-transform: uppercase;
   position: sticky; top: 0;
   background: var(--bg2);
+  font-family: 'Fira Code', monospace;
 }
-
 td {
-  padding: 8px 12px;
-  border-bottom: 1px solid rgba(42,36,32,.8);
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(24,20,16,.9);
   color: var(--cream2);
   vertical-align: middle;
 }
@@ -702,28 +734,27 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
 
 .pill {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px 7px;
   font-size: 9px;
   letter-spacing: 1px;
   text-transform: uppercase;
+  font-family: 'Fira Code', monospace;
 }
-.pill-done { background: rgba(124,255,164,.08); color: var(--mint); border: 1px solid rgba(124,255,164,.2); }
-.pill-pend { background: rgba(107,96,88,.1);   color: var(--dim); border: 1px solid var(--border); }
-.pill-mode { background: rgba(255,107,53,.08);  color: var(--coral); border: 1px solid rgba(255,107,53,.2); }
+.pill-done { background: rgba(74,222,128,.07); color: var(--mint); border: 1px solid rgba(74,222,128,.15); }
+.pill-pend { background: rgba(82,72,64,.1); color: var(--dim); border: 1px solid var(--border); }
+.pill-mode { background: var(--coral3); color: var(--coral); border: 1px solid rgba(255,107,53,.15); }
 
-.yt-link { color: var(--coral); text-decoration: none; font-size: 10px; }
+.yt-link { color: var(--coral); text-decoration: none; font-size: 10px; font-family: 'Fira Code', monospace; }
 .yt-link:hover { text-decoration: underline; }
 
-/* breakdown */
-.breakdown { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.breakdown { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
 .bd-row { display: flex; align-items: center; gap: 10px; }
-.bd-label { width: 90px; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bd-bar { flex: 1; height: 4px; background: var(--border); }
-.bd-fill { height: 100%; background: var(--coral); opacity: .7; transition: width .6s ease; }
-.bd-cnt { font-size: 10px; color: var(--coral); width: 28px; text-align: right; }
+.bd-label { width: 86px; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Fira Code', monospace; }
+.bd-bar { flex: 1; height: 2px; background: var(--border2); overflow: hidden; }
+.bd-fill { height: 100%; background: var(--coral); opacity: .6; transition: width .6s ease; }
+.bd-cnt { font-size: 10px; color: var(--coral); width: 24px; text-align: right; font-family: 'Fira Code', monospace; }
 
-/* scrollbars */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); }
 ::-webkit-scrollbar-thumb:hover { background: var(--coral); }
@@ -737,60 +768,74 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
 </head>
 <body>
 
-<!-- ── Sidebar ─────────────────────────────────────────────────── -->
-<aside class="sidebar">
+<aside class="sidebar" role="navigation" aria-label="Main navigation">
 
   <div class="sidebar-logo">
-    <span class="logo-word">SUPER<span>SHORTS</span></span>
-    <span class="logo-sub">Production Suite</span>
+    <div class="logo-mark">SUPER<span class="slash">/</span><span class="accent">SHORTS</span></div>
+    <div class="logo-sub">Production Suite</div>
   </div>
 
   <nav class="nav-section">
     <div class="nav-label">Navigate</div>
-    <button class="nav-btn active" onclick="scrollTo('#kpis')">Dashboard</button>
-    <button class="nav-btn" onclick="scrollTo('#productions')">Productions</button>
-    <button class="nav-btn" onclick="scrollTo('#plan')">Content Plan</button>
-    <button class="nav-btn" onclick="scrollTo('#log')">Upload Log</button>
+    <button class="nav-btn active" onclick="navTo('#kpis',this)" aria-label="Dashboard">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-btn" onclick="navTo('#productions',this)" aria-label="Productions">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
+      Productions
+    </button>
+    <button class="nav-btn" onclick="navTo('#plan',this)" aria-label="Content Plan">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+      Content Plan
+    </button>
+    <button class="nav-btn" onclick="navTo('#log',this)" aria-label="Upload Log">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      Upload Log
+    </button>
   </nav>
 
   <div class="nav-section">
     <div class="nav-label">Workflows</div>
-    <button class="wf-btn" id="wf-daily" onclick="runWorkflow('daily')">
-      <span class="wf-icon">🔁</span>Daily (9 AM)
-    </button>
-    <button class="wf-btn" id="wf-tcm-weekly" onclick="runWorkflow('tcm-weekly')">
-      <span class="wf-icon">🌿</span>TCM Weekly
-    </button>
-    <button class="wf-btn" id="wf-full-pipeline" onclick="runWorkflow('full-pipeline')">
-      <span class="wf-icon">⚡</span>Full Pipeline
-    </button>
+    <div class="wf-section">
+      <button class="wf-btn" id="wf-daily" onclick="runWorkflow('daily')" aria-label="Run daily workflow">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        daily · 9am
+      </button>
+      <button class="wf-btn" id="wf-tcm-weekly" onclick="runWorkflow('tcm-weekly')" aria-label="Run TCM weekly workflow">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+        tcm · weekly
+      </button>
+      <button class="wf-btn" id="wf-full-pipeline" onclick="runWorkflow('full-pipeline')" aria-label="Run full pipeline workflow">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        full · pipeline
+      </button>
+    </div>
   </div>
 
   <div class="sidebar-bottom">
     <div class="ollama-row">
-      <div class="led" id="ollama-led"></div>
-      <span id="ollama-txt">Ollama —</span>
+      <div class="led" id="ollama-led" role="status" aria-label="Ollama connection status"></div>
+      <span id="ollama-txt">ollama —</span>
     </div>
-    <div class="disk-label">DISK · OUTPUT</div>
+    <div class="disk-label">Output Disk</div>
     <div class="disk-bar"><div class="disk-fill" id="disk-fill" style="width:0%"></div></div>
-    <div class="disk-text" id="disk-text">— MB</div>
+    <div class="disk-text" id="disk-text">— mb</div>
   </div>
 
 </aside>
 
-<!-- ── Main ───────────────────────────────────────────────────── -->
-<div class="main">
+<div class="main" role="main">
 
   <div class="topbar">
-    <div class="producing-badge" id="producing-badge">
-      <div class="producing-dot"></div>NOW PRODUCING
+    <div class="producing-badge" id="producing-badge" role="status">
+      <div class="producing-dot"></div>now producing
     </div>
-    <div id="clock">--:--:--</div>
+    <div id="clock" aria-live="off">--:--:--</div>
   </div>
 
   <div class="content">
 
-    <!-- KPI row -->
     <div class="kpi-row" id="kpis">
       <div class="kpi">
         <div class="kpi-label">Total Uploads</div>
@@ -815,35 +860,29 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
       </div>
     </div>
 
-    <!-- 7-day heatmap -->
     <section>
-      <h2>This Week <small>uploads per day</small></h2>
+      <h2>This Week <small>uploads / day</small></h2>
       <div class="heatmap" id="heatmap"></div>
     </section>
 
-    <!-- Productions -->
     <div class="two-col" id="productions">
-
       <section>
-        <h2>Productions <small>select &amp; run</small></h2>
+        <h2>Productions <small>select · run</small></h2>
         <div class="mode-grid" id="mode-grid"></div>
       </section>
-
       <section>
         <div class="term-header">
-          <h2>Live Output <small>sse stream</small></h2>
-          <button class="term-clear" onclick="termClear()">CLEAR</button>
+          <h2>Live Output <small>sse</small></h2>
+          <button class="term-clear" onclick="termClear()" aria-label="Clear terminal">clr</button>
         </div>
-        <div class="terminal" id="terminal">
-          <div class="tl sys">Awaiting production order…</div>
+        <div class="terminal" id="terminal" role="log" aria-live="polite">
+          <div class="tl sys">awaiting production order<span class="term-cursor"></span></div>
         </div>
       </section>
-
     </div>
 
-    <!-- Content Plan -->
     <section id="plan">
-      <h2>Content Plan <small>educational curriculum</small></h2>
+      <h2>Content Plan <small>curriculum</small></h2>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Ch</th><th>Title</th><th>Status</th><th>YouTube</th></tr></thead>
@@ -852,7 +891,6 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
       </div>
     </section>
 
-    <!-- Upload Log + Breakdown -->
     <div class="two-col" id="log">
       <section>
         <h2>Upload Log <small>last 20</small></h2>
@@ -869,22 +907,40 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
       </section>
     </div>
 
-  </div><!-- /content -->
-</div><!-- /main -->
+  </div>
+</div>
 
 <script>
+// ── SVG Icons (Lucide) ────────────────────────────────────────────
+const ICONS = {
+  educational: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  brainrot:    '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  rotgen:      '<path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.6l13.5-4c1.1-.3 2.2.3 2.6 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 3.9"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+  tcm:         '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  tutorial:    '<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>',
+  viral:       '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  ideas:       '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+  learning:    '<line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>',
+  package:     '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+  clipper:     '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/>',
+};
+
+function svgIcon(id, size=13) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id]||''}</svg>`;
+}
+
 // ── State ─────────────────────────────────────────────────────────
 const MODES = [
-  ["educational","📚","Educational","Curriculum long-form + Short"],
-  ["brainrot",   "🧠","Brain Rot",  "Viral sensationalized AI shorts"],
-  ["rotgen",     "🎭","RotGen",     "ByteBot character + gameplay"],
-  ["tcm",        "🌿","TCM",        "Traditional Chinese Medicine"],
-  ["tutorial",   "🎓","Tutorial",   "~10 min deep-dive + linked Short"],
-  ["viral",      "🎮","Viral",      "Subway Surfers gameplay overlay"],
-  ["ideas",      "💡","YT Ideas",   "Real YT suggestions + scripts"],
-  ["learning",   "📈","Learning",   "Analyse uploads, suggest tips"],
-  ["package",    "📦","Content Pkg","Expert AI → 5-min video"],
-  ["clipper",    "✂️","Clipper",    "Long video → vertical Shorts"],
+  ["educational","Educational","Curriculum long-form + Short"],
+  ["brainrot",   "Brain Rot",  "Viral sensationalized AI shorts"],
+  ["rotgen",     "RotGen",     "ByteBot character + gameplay"],
+  ["tcm",        "TCM",        "Traditional Chinese Medicine"],
+  ["tutorial",   "Tutorial",   "~10 min deep-dive + linked Short"],
+  ["viral",      "Viral",      "Subway Surfers gameplay overlay"],
+  ["ideas",      "YT Ideas",   "Real YT suggestions + scripts"],
+  ["learning",   "Learning",   "Analyse uploads, suggest tips"],
+  ["package",    "Content Pkg","Expert AI → 5-min video"],
+  ["clipper",    "Clipper",    "Long video → vertical Shorts"],
 ];
 
 const counts = {};
@@ -893,23 +949,25 @@ let activeJobs = new Set();
 let currentEvt = null;
 
 // ── Scroll nav ────────────────────────────────────────────────────
-function scrollTo(sel) {
+function navTo(sel, btn) {
   const el = document.querySelector(sel);
   if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
 }
 
 // ── Build mode grid ───────────────────────────────────────────────
 function buildModeGrid() {
-  document.getElementById('mode-grid').innerHTML = MODES.map(([id,icon,name,desc]) => `
+  document.getElementById('mode-grid').innerHTML = MODES.map(([id,name,desc]) => `
     <div class="slate" id="slate-${id}">
-      <span class="slate-icon">${icon}</span>
+      <div class="slate-icon">${svgIcon(id)}</div>
       <div class="slate-name">${name}</div>
       <div class="slate-desc">${desc}</div>
       <div class="slate-controls">
-        <button class="cnt-btn" onclick="adj('${id}',-1)">−</button>
-        <div class="cnt-val" id="cv-${id}">1</div>
-        <button class="cnt-btn" onclick="adj('${id}',1)">+</button>
-        <button class="run-btn" id="rb-${id}" onclick="runMode('${id}')">RUN ▶</button>
+        <button class="cnt-btn" onclick="adj('${id}',-1)" aria-label="Decrease count">−</button>
+        <div class="cnt-val" id="cv-${id}" aria-live="polite">1</div>
+        <button class="cnt-btn" onclick="adj('${id}',1)" aria-label="Increase count">+</button>
+        <button class="run-btn" id="rb-${id}" onclick="runMode('${id}')">run ▶</button>
       </div>
     </div>
   `).join('');
@@ -932,7 +990,7 @@ async function runMode(id) {
   const {job_id} = await res.json();
 
   openStream(job_id, () => {
-    btn.textContent = 'RUN ▶'; btn.classList.remove('active'); btn.disabled = false;
+    btn.textContent = 'run ▶'; btn.classList.remove('active'); btn.disabled = false;
     refreshStats();
   });
 }
@@ -986,13 +1044,23 @@ function openStream(job_id, onDone) {
   };
 }
 
-function termClear() { document.getElementById('terminal').innerHTML = ''; }
+function termClear() {
+  document.getElementById('terminal').innerHTML =
+    '<div class="tl sys">terminal cleared<span class="term-cursor"></span></div>';
+}
 function termLine(text, cls='') {
   const t = document.getElementById('terminal');
+  const cursor = t.querySelector('.term-cursor');
+  if (cursor) cursor.remove();
   const d = document.createElement('div');
   d.className = 'tl' + (cls ? ' '+cls : '');
   d.textContent = text;
   t.appendChild(d);
+  if (cls !== 'done' && cls !== 'err') {
+    const c = document.createElement('span');
+    c.className = 'term-cursor';
+    t.appendChild(c);
+  }
   t.scrollTop = t.scrollHeight;
 }
 
@@ -1032,9 +1100,9 @@ async function refreshStats() {
     const pct   = cnt/max;
     const alpha = cnt === 0 ? 0 : 0.15 + pct*0.85;
     const col   = `rgba(255,107,53,${alpha.toFixed(2)})`;
-    const label = date.slice(5); // MM-DD
+    const label = date.slice(5);
     return `<div class="hm-col">
-      <div class="hm-block" style="background:${col};border-color:${cnt?'var(--coral2)':'var(--border)'}" data-tip="${date}: ${cnt} upload${cnt!==1?'s':''}"></div>
+      <div class="hm-block" style="background:${col};border-color:${cnt?'rgba(255,107,53,.3)':'var(--border)'}" data-tip="${date}: ${cnt} upload${cnt!==1?'s':''}"></div>
       <div class="hm-date">${label}</div>
     </div>`;
   }).join('');
@@ -1049,7 +1117,7 @@ async function refreshStats() {
       ? '<span class="pill pill-done">Done</span>'
       : '<span class="pill pill-pend">Pending</span>';
     return `<tr>
-      <td style="color:var(--coral);font-weight:700">${l.chapter}</td>
+      <td style="color:var(--coral);font-weight:600;font-family:'Fira Code',monospace">${l.chapter}</td>
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.title||''}</td>
       <td>${pill}</td><td>${yt}</td>
     </tr>`;
@@ -1089,7 +1157,7 @@ async function refreshHealth() {
     const led = document.getElementById('ollama-led');
     const txt = document.getElementById('ollama-txt');
     led.className = 'led ' + (h.ollama ? 'on' : 'off');
-    txt.textContent = h.ollama ? 'Ollama · connected' : 'Ollama · offline';
+    txt.textContent = h.ollama ? 'ollama · ok' : 'ollama · down';
   } catch(e) {}
 }
 
@@ -1098,7 +1166,7 @@ async function refreshDisk() {
     const d = await fetch('/api/disk').then(r=>r.json());
     const MAX = 2000; // assume 2GB cap for display
     document.getElementById('disk-fill').style.width = `${Math.min(100, d.output_mb/MAX*100).toFixed(1)}%`;
-    document.getElementById('disk-text').textContent = `${d.output_mb} MB output`;
+    document.getElementById('disk-text').textContent = `${d.output_mb} mb output`;
   } catch(e) {}
 }
 
