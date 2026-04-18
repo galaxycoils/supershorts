@@ -9,10 +9,12 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 
+from src.generator import PROJECT_ROOT
+
 console = Console()
 
-CLIPPER_DIR  = Path("src/clipper")
-WORKSPACE    = Path("outputs/clipper")
+CLIPPER_DIR   = PROJECT_ROOT / "src" / "clipper"
+WORKSPACE     = PROJECT_ROOT / "outputs" / "clipper"
 PIPELINE_FILE = CLIPPER_DIR / "run_pipeline.py"
 
 
@@ -70,6 +72,7 @@ def run_video_clipper():
                 check=True,
                 capture_output=True,
                 text=True,
+                timeout=600,
             )
 
         if result.stdout:
@@ -84,6 +87,8 @@ def run_video_clipper():
             console.print(e.stdout)
         if e.stderr:
             console.print(f"[red]{e.stderr}[/red]")
+    except subprocess.TimeoutExpired:
+        console.print("[red]❌ Clipper timed out after 10 minutes.[/red]")
     except FileNotFoundError:
         console.print("[red]❌ Python executable not found for subprocess.[/red]")
     except Exception as e:

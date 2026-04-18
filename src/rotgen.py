@@ -35,12 +35,13 @@ from src.generator import (
     BACKGROUND_MUSIC_PATH,
     OUTPUT_DIR,
     YOUR_NAME,
+    PROJECT_ROOT,
 )
 
 # ─────────────────────────── constants ──────────────────────────────────────
 
 CHARACTERS_PATH    = ASSETS_PATH / "characters"
-ROTGEN_PLAN_FILE   = Path("rotgen_plan.json")
+ROTGEN_PLAN_FILE   = PROJECT_ROOT / "rotgen_plan.json"
 
 CANVAS_W, CANVAS_H = 400, 500      # character drawing canvas
 PANEL_W,  PANEL_H  = 1080, 768     # character panel (top of frame)
@@ -656,10 +657,12 @@ def run_rotgen_pipeline(shorts_per_run: int = 3) -> None:
     panel_bg   = _build_panel_background()
     custom_img = _load_custom_character()
 
-    # Pick N unique topics
-    topics = random.sample(VIRAL_TOPICS, min(shorts_per_run, len(VIRAL_TOPICS)))
+    plan = load_rotgen_plan()
 
-    plan      = load_rotgen_plan()
+    # Pick N unique topics, skipping already-completed ones
+    done = {v["topic"] for v in plan.get("videos", []) if v.get("status") == "complete"}
+    available = [t for t in VIRAL_TOPICS if t not in done] or list(VIRAL_TOPICS)
+    topics = random.sample(available, min(shorts_per_run, len(available)))
     results   = []
     bar_fmt   = "{l_bar}{bar}| {n_fmt}/{total_fmt} shorts [{elapsed}<{remaining}]"
 

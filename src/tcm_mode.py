@@ -3,6 +3,7 @@ import gc
 import json
 import datetime
 import time
+import concurrent.futures
 from pathlib import Path
 
 import ollama
@@ -12,10 +13,12 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich import box
 
+from src.generator import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT, safe_json_parse
+
 console = Console()
 
-TCM_PLAN_FILE = Path("tcm_plan.json")
-OUTPUT_DIR    = Path("output")
+TCM_PLAN_FILE = PROJECT_ROOT / "tcm_plan.json"
+OUTPUT_DIR    = PROJECT_ROOT / "output"
 
 # ── Pexels keywords for TCM background videos ────────────────────
 TCM_BG_KEYWORDS = [
@@ -54,20 +57,21 @@ def _generate_tcm_curriculum(focus: str, extra: str, previous_titles=None) -> di
         "10 lessons. No markdown, no commentary."
     )
     try:
-        resp = ollama.chat(
-            model="qwen2.5-coder:3b",
-            messages=[{"role": "user", "content": prompt}],
-            options={"temperature": 0.7},
-        )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(
+                lambda: ollama.chat(
+                    model=OLLAMA_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    options={"temperature": 0.7},
+                )
+            )
+            resp = future.result(timeout=OLLAMA_TIMEOUT)
         raw = resp["message"]["content"].strip()
         if "```" in raw:
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
-        # Remove trailing commas before } or ]
-        import re
-        raw = re.sub(r",\s*([}\]])", r"\1", raw)
-        return json.loads(raw.strip())
+        return safe_json_parse(raw)
     except Exception as e:
         console.print(f"[yellow]⚠  Curriculum fallback ({e})[/yellow]")
         topics = [

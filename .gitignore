@@ -21,3 +21,11 @@ assets/pexels/
 
 # macOS
 .DS_Store
+
+# Runtime / generated state
+config.json
+brainrot_plan.json
+rotgen_plan.json
+youtube_studio_ideas.json
+assets/learning_suggestions.txt
+*TEMP_MPY_wvf_snd.mp4

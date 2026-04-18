@@ -7,6 +7,7 @@ import json
 import re
 import time
 import datetime
+import concurrent.futures
 import requests
 import ollama
 from pathlib import Path
@@ -19,11 +20,15 @@ from src.generator import (
     strip_emojis,
     _clamp_words,
     OUTPUT_DIR,
+    PROJECT_ROOT,
+    OLLAMA_MODEL,
+    OLLAMA_TIMEOUT,
+    safe_json_parse,
 )
 
-LOG_FILE    = Path("performance_log.json")
-IDEAS_FILE  = Path("youtube_studio_ideas.json")
-CONFIG_FILE = Path("config.json")
+LOG_FILE    = PROJECT_ROOT / "performance_log.json"
+IDEAS_FILE  = PROJECT_ROOT / "youtube_studio_ideas.json"
+CONFIG_FILE = PROJECT_ROOT / "config.json"
 
 
 # ─────────────────────────── helpers ────────────────────────────
@@ -60,14 +65,6 @@ def get_yt_api_key() -> str | None:
         CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
         print("  Key saved to config.json")
     return key or None
-
-
-def _safe_json_parse(text: str):
-    """Tolerant JSON parse — strips trailing commas and control chars."""
-    text = text.strip().lstrip('\ufeff')
-    text = re.sub(r',\s*([}\]])', r'\1', text)
-    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
-    return json.loads(text)
 
 
 # ─────────────────── YouTube Data API v3 ────────────────────────
@@ -115,7 +112,7 @@ def download_yt_thumbnail(video_data: dict) -> str | None:
     video_id = video_data.get("video_id", "unknown")
     if not url:
         return None
-    out_dir = Path("output/thumbnails")
+    out_dir = PROJECT_ROOT / "output" / "thumbnails"
     out_dir.mkdir(exist_ok=True, parents=True)
     dest = out_dir / f"yt_{video_id}.jpg"
     if dest.exists():
@@ -150,15 +147,19 @@ Return ONLY JSON:
   "thumbnail_prompt": "visual description for thumbnail"
 }}"""
     try:
-        resp = ollama.chat(
-            model="qwen2.5-coder:3b",
-            messages=[{"role": "user", "content": prompt}],
-            options={"temperature": 0.75, "num_ctx": 2048},
-        )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(
+                lambda: ollama.chat(
+                    model=OLLAMA_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    options={"temperature": 0.75, "num_ctx": 2048},
+                )
+            )
+            resp = future.result(timeout=OLLAMA_TIMEOUT)
         text = resp["message"]["content"]
         if "```json" in text: text = text.split("```json")[1].split("```")[0]
         elif "```" in text:   text = text.split("```")[1]
-        result = _safe_json_parse(text)
+        result = safe_json_parse(text)
     except Exception as e:
         print(f"  Dialogue gen failed ({e}), using fallback.")
         result = {
@@ -199,16 +200,20 @@ Return ONLY a valid JSON array of {num_ideas} objects."""
 
     print("  Asking Ollama for ideas...")
     try:
-        resp  = ollama.chat(
-            model="qwen2.5-coder:3b",
-            messages=[{"role": "user", "content": prompt}],
-            options={"temperature": 0.8, "num_ctx": 4096},
-        )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(
+                lambda: ollama.chat(
+                    model=OLLAMA_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    options={"temperature": 0.8, "num_ctx": 4096},
+                )
+            )
+            resp = future.result(timeout=OLLAMA_TIMEOUT)
         text  = resp["message"]["content"]
         if "```json" in text: text = text.split("```json")[1].split("```")[0]
         elif "```" in text:   text = text.split("```")[1]
         try:
-            ideas = _safe_json_parse(text)
+            ideas = safe_json_parse(text)
         except Exception:
             match = re.search(r'\[.*\]', text, re.DOTALL)
             ideas = json.loads(match.group(0)) if match else []
@@ -243,7 +248,7 @@ Return ONLY a valid JSON array of {num_ideas} objects."""
 def create_thumbnail_from_idea(idea: dict) -> str:
     """Generate thumbnail PNG for an idea using existing slide renderer."""
     title      = idea.get("title", "New Idea")
-    output_dir = Path("output/thumbnails")
+    output_dir = PROJECT_ROOT / "output" / "thumbnails"
     output_dir.mkdir(exist_ok=True, parents=True)
     return generate_visuals(output_dir=output_dir, video_type='short', thumbnail_title=title)
 

@@ -30,10 +30,11 @@ from src.generator import (
     GAMEPLAY_PATH,
     BACKGROUND_MUSIC_PATH,
     PEXELS_CACHE_DIR,
+    PROJECT_ROOT,
 )
 
-BRAINROT_PLAN_FILE = Path("brainrot_plan.json")
-OUTPUT_DIR = Path("output")
+BRAINROT_PLAN_FILE = PROJECT_ROOT / "brainrot_plan.json"
+OUTPUT_DIR = PROJECT_ROOT / "output"
 
 # Attention-grabbing color palettes
 BRAINROT_PALETTES = [
@@ -305,8 +306,11 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
                 segment = img_clip
 
             segment = segment.set_audio(audio_clip)
-            audio_clip.close()
             clips.append(segment)
+            try:
+                audio_clip.close()
+            except Exception:
+                pass
 
         final = concatenate_videoclips(clips, method="compose")
 
@@ -328,7 +332,6 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
                 bg_music = bg_music.subclip(0, final.duration)
             composite_audio = CompositeAudioClip([final.audio.volumex(1.2), bg_music])
             final = final.set_audio(composite_audio)
-            bg_music.close()
 
         print(f"🎬 Encoding → {Path(output_path).name}")
         final.write_videofile(
@@ -353,6 +356,10 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
                 bg_clip.close()
             except Exception:
                 pass
+        try:
+            bg_music.close()
+        except Exception:
+            pass
         gc.collect()
 
     except Exception as e:

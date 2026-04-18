@@ -41,7 +41,7 @@ def upload_to_youtube(video_path, title, description, tags, thumbnail_path=None)
         youtube = get_authenticated_service()
         if not youtube:
             print("YouTube service not available. Skipping upload.")
-            return "MOCK_VIDEO_ID"
+            return None
         request_body = {
             'snippet': {
                 'title': title,

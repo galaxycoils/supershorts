@@ -9,27 +9,37 @@ from rich.prompt import Prompt
 
 console = Console()
 
-LOG_FILE = Path("performance_log.json")
+from src.generator import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT
+import concurrent.futures
+
+LOG_FILE = PROJECT_ROOT / "performance_log.json"
+_FAKE_IDS = {"BROWSER_UPLOAD_SUCCESS", "MOCK_VIDEO_ID", "UPLOAD_ATTEMPTED", "BROWSER_UPLOAD_FAILED"}
 
 
 def log_upload(title: str, video_id: str, mode: str):
-    entry = {
-        "timestamp": str(datetime.datetime.now()),
-        "title": title,
-        "video_id": video_id,
-        "mode": mode  # "brainrot", "educational", "tutorial", "viral"
-    }
+    if not video_id or video_id in _FAKE_IDS:
+        print(f"⚠️ Skipping log_upload: invalid video_id '{video_id}'")
+        return
     try:
         data = json.loads(LOG_FILE.read_text()) if LOG_FILE.exists() else []
         if not isinstance(data, list):
             data = []
     except (json.JSONDecodeError, Exception):
         data = []
+    if any(e.get("video_id") == video_id for e in data):
+        print(f"⚠️ Skipping duplicate log entry for video_id '{video_id}'")
+        return
+    entry = {
+        "timestamp": str(datetime.datetime.now()),
+        "title": title,
+        "video_id": video_id,
+        "mode": mode  # "brainrot", "educational", "tutorial", "viral"
+    }
     data.append(entry)
     LOG_FILE.write_text(json.dumps(data, indent=2))
 
 
-SUGGESTIONS_FILE = Path("assets/learning_suggestions.txt")
+SUGGESTIONS_FILE = PROJECT_ROOT / "assets" / "learning_suggestions.txt"
 
 
 def suggest_improvements():
@@ -47,7 +57,11 @@ def suggest_improvements():
     )
     try:
         with console.status("[cyan]Analyzing upload history via Ollama…[/cyan]"):
-            response = ollama.chat(model="qwen2.5-coder:3b", messages=[{"role": "user", "content": prompt}])
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                future = ex.submit(
+                    lambda: ollama.chat(model=OLLAMA_MODEL, messages=[{"role": "user", "content": prompt}])
+                )
+                response = future.result(timeout=OLLAMA_TIMEOUT)
         suggestion = response['message']['content']
         console.print("[bold cyan]🧠 Learning Suggestion:[/bold cyan]")
         console.print(suggestion)

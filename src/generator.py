@@ -2,9 +2,11 @@
 import os
 import re
 import json
+import shutil
 import random
 import requests
 import numpy as np
+import concurrent.futures
 from io import BytesIO
 import ollama
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -22,7 +24,8 @@ import time
 import datetime
 
 # --- Configuration ---
-ASSETS_PATH = Path("assets")
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+ASSETS_PATH = PROJECT_ROOT / "assets"
 FONT_FILE = ASSETS_PATH / "fonts/arial.ttf"
 BACKGROUND_MUSIC_PATH = ASSETS_PATH / "music/bg_music.mp3"
 BACKGROUNDS_PATH = ASSETS_PATH / "backgrounds"
@@ -30,16 +33,33 @@ GAMEPLAY_PATH = ASSETS_PATH / "gameplay"
 VIRAL_GAMEPLAY_PATH = ASSETS_PATH / "viral_gameplay"   # ← NEW FOLDER: Subway Surfers etc.
 FALLBACK_THUMBNAIL_FONT = ImageFont.load_default()
 YOUR_NAME = "Chaitanya"
-PEXELS_API_KEY = "jsVc9Hd2JnpHjPeY5347XU9UHDkz75QLtFkGKmxMS4o44GlG4mHo1jAz"
 PEXELS_CACHE_DIR = ASSETS_PATH / "pexels"
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:3b")
+OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "120"))
+
+def _get_pexels_key() -> str:
+    key = os.environ.get("PEXELS_API_KEY", "").strip()
+    if key:
+        return key
+    cfg = PROJECT_ROOT / "config.json"
+    if cfg.exists():
+        try:
+            return json.loads(cfg.read_text()).get("pexels_api_key", "")
+        except Exception:
+            pass
+    return "jsVc9Hd2JnpHjPeY5347XU9UHDkz75QLtFkGKmxMS4o44GlG4mHo1jAz"
+
+PEXELS_API_KEY = _get_pexels_key()
 PEXELS_CACHE_DIR.mkdir(exist_ok=True, parents=True)
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 GAMEPLAY_PATH.mkdir(exist_ok=True, parents=True)
 VIRAL_GAMEPLAY_PATH.mkdir(exist_ok=True, parents=True)
 
 if os.name == 'posix':
-    change_settings({"IMAGEMAGICK_BINARY": "/opt/homebrew/bin/convert"})
+    convert_bin = shutil.which("convert") or "/opt/homebrew/bin/convert"
+    if convert_bin:
+        change_settings({"IMAGEMAGICK_BINARY": convert_bin})
 
 def get_local_background(lesson_title: str, video_type: str) -> Image.Image:
     """Fixed for modern Pillow (no more ANTIALIAS error)."""
@@ -123,44 +143,56 @@ def get_relevant_pexels_video(query: str, video_type: str) -> str:
         print(f"⚠️ Pexels error: {e}")
     return None
 
+def safe_json_parse(text: str) -> dict:
+    """Parse JSON tolerantly: strip trailing commas, control chars, BOM."""
+    text = text.strip().lstrip('\ufeff')
+    text = re.sub(r',\s*([}\]])', r'\1', text)
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    return json.loads(text)
+
+
 def ollama_generate(prompt: str, json_mode: bool = True) -> dict:
-    model = "qwen2.5-coder:3b"
     full_prompt = prompt
     if json_mode:
         full_prompt += "\n\nRespond with ONLY valid JSON. No explanations, no markdown, no extra text."
-    response = ollama.chat(
-        model=model,
-        messages=[{'role': 'user', 'content': full_prompt}],
-        options={
-            'temperature': 0.6,
-            'num_ctx': 4096,
-            'num_gpu': 1,
-            'num_thread': 8,
-            'repeat_penalty': 1.1
-        }
-    )
+
+    def _call():
+        return ollama.chat(
+            model=OLLAMA_MODEL,
+            messages=[{'role': 'user', 'content': full_prompt}],
+            options={
+                'temperature': 0.6,
+                'num_ctx': 4096,
+                'num_gpu': 1,
+                'num_thread': 8,
+                'repeat_penalty': 1.1
+            }
+        )
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(_call)
+            response = future.result(timeout=OLLAMA_TIMEOUT)
+    except concurrent.futures.TimeoutError:
+        print(f"⚠️ Ollama timed out after {OLLAMA_TIMEOUT}s — returning empty result.")
+        return {}
+    except Exception as e:
+        print(f"⚠️ Ollama error: {e}")
+        return {}
+
     text = response['message']['content'].strip()
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0]
     elif "```" in text:
         text = text.split("```")[1]
 
-    def _safe_json(s: str) -> dict:
-        """Parse JSON tolerantly: strip trailing commas, control chars, BOM."""
-        s = s.strip().lstrip('\ufeff')
-        # Remove trailing commas before ] or } — common Ollama output issue
-        s = re.sub(r',\s*([}\]])', r'\1', s)
-        # Strip control chars except tab/newline
-        s = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', s)
-        return json.loads(s)
-
     try:
-        return _safe_json(text)
+        return safe_json_parse(text)
     except Exception:
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             try:
-                return _safe_json(match.group(0))
+                return safe_json_parse(match.group(0))
             except Exception:
                 pass
         return {}
@@ -583,8 +615,11 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
                 final_clip = CompositeVideoClip([img_clip], size=target_size)
 
             final_clip = final_clip.set_audio(audio_clip)
-            audio_clip.close()
             image_clips.append(final_clip)
+            try:
+                audio_clip.close()
+            except Exception:
+                pass
 
         final_video = concatenate_videoclips(image_clips, method="compose")
 
@@ -606,7 +641,6 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
                 bg_music = bg_music.subclip(0, final_video.duration)
             composite = CompositeAudioClip([final_video.audio.volumex(1.2), bg_music])
             final_video = final_video.set_audio(composite)
-            bg_music.close()
 
         # Ultra-fast write settings for M1 8GB
         print(f"🎬 Encoding video → {Path(output_path).name}")
@@ -632,6 +666,10 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
                 bg_clip.close()
             except Exception:
                 pass
+        try:
+            bg_music.close()
+        except Exception:
+            pass
         gc.collect()
 
     except Exception as e:

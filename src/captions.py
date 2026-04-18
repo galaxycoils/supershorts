@@ -12,7 +12,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import ImageClip, CompositeVideoClip
 
-FONT_FILE = Path("assets/fonts/arial.ttf")
+from src.generator import PROJECT_ROOT
+FONT_FILE = PROJECT_ROOT / "assets" / "fonts" / "arial.ttf"
 
 SUBTITLE_H        = 160     # height of subtitle bar
 SAFE_BOTTOM_SHORT = 190     # px from bottom for 9:16 → bar starts y=1570
