@@ -1,0 +1,3 @@
+source: concurrent_futures
+kind: external
+purpose: Thread pool executor — timeboxed Ollama calls

@@ -1,0 +1,3 @@
+source: piper_tts
+kind: external
+purpose: Piper TTS subprocess — narration audio from script text

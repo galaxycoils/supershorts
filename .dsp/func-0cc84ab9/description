@@ -1,0 +1,3 @@
+source: src/learning.py#log_upload
+kind: function
+purpose: Append upload record to performance_log.json (deduped by video_id)

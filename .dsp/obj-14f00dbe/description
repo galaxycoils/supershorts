@@ -1,0 +1,3 @@
+source: yt_dlp
+kind: external
+purpose: YouTube downloader — fetches background video clips from URLs

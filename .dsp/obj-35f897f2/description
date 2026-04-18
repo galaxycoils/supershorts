@@ -1,0 +1,3 @@
+source: ollama
+kind: external
+purpose: Local LLM client — Qwen2.5-coder for script/content generation

@@ -1,0 +1,3 @@
+source: subprocess_mod
+kind: external
+purpose: OS subprocess — Piper TTS, ffprobe, venv python spawning

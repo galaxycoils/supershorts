@@ -1,0 +1,3 @@
+source: src/browser_uploader.py#upload_to_youtube_browser
+kind: function
+purpose: Selenium: upload mp4 to YouTube Studio via headless browser automation

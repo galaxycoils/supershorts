@@ -1,0 +1,3 @@
+source: menu.py
+kind: object
+purpose: Terminal UI — Rich-based menu display, content plan view, video count prompt

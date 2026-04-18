@@ -1,0 +1,3 @@
+source: src/learning.py#start_learning_mode
+kind: function
+purpose: Run Ollama analysis on recent uploads + print suggestions

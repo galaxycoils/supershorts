@@ -1,0 +1,3 @@
+source: src/generator.py#start_viral_gameplay_mode
+kind: function
+purpose: End-to-end viral gameplay video: Ollama script → TTS → gameplay bg → encode

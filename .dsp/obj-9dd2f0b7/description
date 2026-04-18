@@ -1,0 +1,3 @@
+source: main.py
+kind: object
+purpose: CLI entrypoint — orchestrates all 10 modes, curriculum flow, upload + cleanup lifecycle

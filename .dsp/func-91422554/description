@@ -1,0 +1,3 @@
+source: src/clipper_mode.py#run_video_clipper
+kind: function
+purpose: yt-dlp: download long video, extract + reformat best clips as vertical Shorts

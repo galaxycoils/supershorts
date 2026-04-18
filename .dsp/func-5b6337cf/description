@@ -1,0 +1,3 @@
+source: src/generator.py#generate_curriculum
+kind: function
+purpose: Ollama: generate structured lesson curriculum JSON (with optional previous titles for dedup)

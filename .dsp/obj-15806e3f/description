@@ -1,0 +1,3 @@
+source: pathlib
+kind: external
+purpose: Path manipulation — project-root relative file paths

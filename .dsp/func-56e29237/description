@@ -1,0 +1,3 @@
+source: src/generator.py#generate_visuals
+kind: function
+purpose: PIL: render slide image or thumbnail to disk

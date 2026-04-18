@@ -1,0 +1,3 @@
+source: src/clipper_mode.py
+kind: object
+purpose: Clipper mode — downloads long YouTube/podcast video with yt-dlp, extracts viral vertical short clips

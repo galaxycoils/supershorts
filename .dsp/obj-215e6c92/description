@@ -1,0 +1,3 @@
+source: pydub
+kind: external
+purpose: Audio manipulation — mixing background music, volume control

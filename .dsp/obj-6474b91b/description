@@ -1,0 +1,3 @@
+source: src/generator.py
+kind: object
+purpose: Core generator — Ollama content scripts, Piper TTS, PIL slides, MoviePy video composition (educational + tutorial + viral)

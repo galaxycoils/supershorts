@@ -1,0 +1,3 @@
+source: src/rotgen.py
+kind: object
+purpose: RotGen pipeline — ByteBot character mode, gameplay background, auto-subtitle overlay, batch encoding

@@ -1,0 +1,3 @@
+source: cleanup.py
+kind: object
+purpose: Cleanup utility — removes temp files, orphaned audio/slide artifacts from output/

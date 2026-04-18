@@ -1,0 +1,3 @@
+source: src/generator.py#generate_lesson_content
+kind: function
+purpose: Ollama: expand single lesson into slides, short highlight, hashtags

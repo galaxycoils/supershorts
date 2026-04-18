@@ -1,0 +1,3 @@
+source: src/captions.py
+kind: object
+purpose: Caption rendering — burns word-by-word subtitle overlays onto video frames

@@ -1,0 +1,3 @@
+source: src/generator.py#generate_youtube_content_package
+kind: function
+purpose: Expert AI topic → full script → 5-min video → upload bundle

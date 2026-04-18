@@ -1,0 +1,3 @@
+source: src/generator.py#compose_video
+kind: function
+purpose: MoviePy: stitch slides+audio into final mp4 with background + captions

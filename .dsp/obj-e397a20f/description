@@ -1,0 +1,3 @@
+source: src/__init__.py
+kind: object
+purpose: Package init — marks src/ as importable Python package

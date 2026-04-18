@@ -1,0 +1,3 @@
+source: rich
+kind: external
+purpose: Terminal UI — styled console output, prompts, progress bars

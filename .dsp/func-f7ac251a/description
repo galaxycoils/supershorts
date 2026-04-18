@@ -1,0 +1,3 @@
+source: src/generator.py#text_to_speech
+kind: function
+purpose: Piper TTS: convert text to WAV audio file

@@ -1,0 +1,3 @@
+source: requests
+kind: external
+purpose: HTTP client — downloading remote assets

@@ -1,0 +1,3 @@
+source: src/learning.py
+kind: object
+purpose: Passive learning — logs uploads to performance_log.json, Ollama analysis for improvement suggestions

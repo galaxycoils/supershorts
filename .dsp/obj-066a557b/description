@@ -1,0 +1,3 @@
+source: selenium
+kind: external
+purpose: Browser automation — YouTube Studio upload via headless Chrome

@@ -1,0 +1,3 @@
+source: json_stdlib
+kind: external
+purpose: JSON serialization — config/plan/log read+write

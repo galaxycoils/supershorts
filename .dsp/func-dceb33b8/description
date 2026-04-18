@@ -1,0 +1,3 @@
+source: src/brainrot.py#run_brainrot_pipeline
+kind: function
+purpose: Batch viral shorts pipeline: Ollama hooks → Piper TTS → background clips → MoviePy encode

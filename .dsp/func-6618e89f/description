@@ -1,0 +1,3 @@
+source: src/ideagenerator.py#start_idea_generator
+kind: function
+purpose: Ollama: query YT Studio Ideas, generate topic/thumbnail/script suggestions

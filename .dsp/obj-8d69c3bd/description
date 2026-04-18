@@ -1,0 +1,3 @@
+source: src/uploader.py
+kind: object
+purpose: YouTube API uploader — official YouTube Data API v3 upload (alternative to browser uploader)

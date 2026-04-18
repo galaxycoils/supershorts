@@ -1,0 +1,3 @@
+source: PIL
+kind: external
+purpose: Image creation and drawing — slide and thumbnail generation

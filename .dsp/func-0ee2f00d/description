@@ -1,0 +1,3 @@
+source: src/generator.py#start_tutorial_generation
+kind: function
+purpose: End-to-end tutorial: Ollama outline → TTS → slides → long+short mp4

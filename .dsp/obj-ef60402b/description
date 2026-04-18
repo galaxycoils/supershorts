@@ -1,0 +1,3 @@
+source: dashboard.py
+kind: object
+purpose: Flask web dashboard — runs modes as subprocesses, streams output via SSE, serves browser UI

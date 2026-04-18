@@ -1,0 +1,3 @@
+source: flask
+kind: external
+purpose: HTTP web framework — serves dashboard UI and REST/SSE API

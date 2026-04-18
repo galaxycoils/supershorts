@@ -1,0 +1,3 @@
+source: run_workflow.py
+kind: object
+purpose: Workflow runner — batch orchestration of multi-step generation pipelines

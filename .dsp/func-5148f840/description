@@ -1,0 +1,3 @@
+source: src/tcm_mode.py#run_tcm_mode
+kind: function
+purpose: TCM series: plan management + Ollama content + video generation for TCM topics

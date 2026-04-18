@@ -1,0 +1,3 @@
+source: src/browser_uploader.py
+kind: object
+purpose: YouTube uploader — Selenium browser automation to upload via YouTube Studio UI

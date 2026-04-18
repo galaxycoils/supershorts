@@ -1,0 +1,3 @@
+source: src/rotgen.py#run_rotgen_pipeline
+kind: function
+purpose: ByteBot character mode: Ollama script → TTS → gameplay bg → captions → encode

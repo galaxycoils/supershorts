@@ -1,0 +1,3 @@
+source: moviepy
+kind: external
+purpose: Video composition library
