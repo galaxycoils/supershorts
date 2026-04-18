@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Husky-compatible pre-push hook
+# Runs lint, typecheck, format checks, and coverage enforcement.
+# Install: copy to .husky/pre-push and chmod +x
+set -e
+
+echo "▶ Running pre-push checks..."
+
+# --- Coverage enforcement ---
+if [ -f .coverage-thresholds.json ]; then
+  echo "  ✓ Coverage enforcement (.coverage-thresholds.json found)"
+
+  # Try jq first, fall back to node
+  if command -v jq &>/dev/null; then
+    CMD=$(jq -r '.enforcement.command' .coverage-thresholds.json)
+  else
+    CMD=$(node -e "console.log(JSON.parse(require('fs').readFileSync('.coverage-thresholds.json','utf-8')).enforcement.command)")
+  fi
+
+  if [ -z "$CMD" ] || [ "$CMD" = "null" ]; then
+    echo "    ⚠ No enforcement.command in .coverage-thresholds.json — skipping"
+  else
+    echo "    Running: $CMD"
+    eval "$CMD"
+  fi
+else
+  echo "  · No .coverage-thresholds.json — skipping coverage enforcement"
+fi
+
+echo "▶ Pre-push checks passed."

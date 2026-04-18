@@ -3,6 +3,7 @@ import gc
 import json
 import random
 import datetime
+from functools import lru_cache
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -13,29 +14,24 @@ from moviepy.editor import (
 )
 from tqdm import tqdm
 
-from src.generator import (
-    ollama_generate,
-    text_to_speech,
-    strip_emojis,
-    _clamp_words,
-    get_local_gameplay,
-    get_local_viral_gameplay,
-    get_relevant_pexels_video,
-    get_local_background,
-    auto_scale_text,
-    draw_wrapped_text,
-    FONT_FILE,
-    ASSETS_PATH,
-    YOUR_NAME,
-    BACKGROUNDS_PATH,
-    GAMEPLAY_PATH,
-    BACKGROUND_MUSIC_PATH,
-    PEXELS_CACHE_DIR,
-    PROJECT_ROOT,
+from src.core.config import (
+    FONT_FILE, ASSETS_PATH, YOUR_NAME, BACKGROUNDS_PATH,
+    GAMEPLAY_PATH, BACKGROUND_MUSIC_PATH, PEXELS_CACHE_DIR, PROJECT_ROOT,
+    OLLAMA_MODEL, OLLAMA_TIMEOUT
 )
+from src.infrastructure.llm import ollama_generate
+from src.infrastructure.tts import text_to_speech
+from src.infrastructure.video import get_local_gameplay, get_local_viral_gameplay, get_relevant_pexels_video, get_local_background
+from src.engine.video_engine import auto_scale_text, draw_wrapped_text
+from src.utils.text import strip_emojis, _clamp_words
+from src.utils.json import safe_json_parse
 
 BRAINROT_PLAN_FILE = PROJECT_ROOT / "brainrot_plan.json"
 OUTPUT_DIR = PROJECT_ROOT / "output"
+
+
+from src.utils.cleanup import safe_close
+
 
 # Attention-grabbing color palettes
 BRAINROT_PALETTES = [
@@ -72,23 +68,15 @@ def generate_brainrot_topics(count=10, previous_topics=None):
 
     prompt = f"""You are a viral content strategist for AI/tech YouTube Shorts.
 {history}
-Generate {count} SHORT video topic ideas that are:
-- Sensationalized but factually grounded
-- Use curiosity gaps: "This AI can...", "Nobody talks about...", "Why X is secretly..."
-- Cover TRENDING AI: GPT models, open source LLMs, AI taking jobs, local AI, deepfakes, AI agents, AI coding, AI vs humans
-- Each topic works as a video under 60 seconds
-- Mix shocking facts, controversial takes, and mind-blowing reveals
+Generate {count} SHORT video topic ideas that are sensationally engaging but factually grounded.
+Focus on topics like: Multi-agent systems, deepseek, qwen, local LLMs, AI coding agents, and the future of development.
 
-Return ONLY valid JSON:
-{{
-  "topics": [
-    {{
-      "title": "short clickbait title",
-      "hook": "first 2 seconds — 1 shocking sentence",
-      "angle": "the specific take/angle to cover"
-    }}
-  ]
-}}"""
+Rules:
+- Use curiosity gaps: "Nobody is talking about...", "Why X is secretly better than Y", "The hidden cost of..."
+- Each topic must be achievable in under 60 seconds.
+- Mix controversy with mind-blowing reveals.
+
+Format the JSON with keys: "title", "hook", "angle"."""
     result = ollama_generate(prompt, json_mode=True)
     return result.get("topics", [])
 
@@ -111,18 +99,7 @@ Rules:
 - End with controversial statement OR "follow for more"
 - 4 slides total: hook, point 1, point 2, CTA
 
-Return ONLY valid JSON:
-{{
-  "slides": [
-    {{"text": "hook text — 1-2 sentences max", "duration_hint": "short"}},
-    {{"text": "main point 1 — 1-2 sentences", "duration_hint": "medium"}},
-    {{"text": "main point 2 — 1-2 sentences", "duration_hint": "medium"}},
-    {{"text": "CTA or mind-blow — 1 sentence", "duration_hint": "short"}}
-  ],
-  "full_script": "complete narration under 80 words",
-  "title": "YouTube title with emoji",
-  "hashtags": "#AI #Shorts #Tech"
-}}"""
+Format the JSON with keys: "slides" (list of 4 objects with "text" and "duration_hint"), "full_script", "title", "hashtags"."""
     result = ollama_generate(prompt, json_mode=True)
     # Validate minimal structure
     if not result.get("slides") or not result.get("full_script"):
@@ -143,6 +120,17 @@ Return ONLY valid JSON:
     return result
 
 
+# Cache for the gradient overlay to avoid re-calculating with numpy for every slide
+@lru_cache(maxsize=4)
+def get_gradient_overlay(width, height):
+    arr = np.zeros((height, width, 4), dtype=np.uint8)
+    ys = np.arange(height)
+    # Subtle vignette: darker at top/bottom, clearer in center
+    alpha_col = (120 * (np.abs(ys - height / 2) / (height / 2)) ** 1.5).clip(0, 255).astype(np.uint8)
+    arr[:, :, 3] = alpha_col[:, np.newaxis]   # broadcast across width
+    return Image.fromarray(arr, 'RGBA')
+
+
 def render_brainrot_slide(output_dir, text, slide_index, total_slides, palette=None):
     """Render a single brain rot slide — bold, centered, full-frame with text stroke."""
     output_dir = Path(output_dir)
@@ -152,16 +140,11 @@ def render_brainrot_slide(output_dir, text, slide_index, total_slides, palette=N
     if palette is None:
         palette = random.choice(BRAINROT_PALETTES)
 
-    # Background: dark gradient via solid + gradient layer
+    # Background: dark solid color
     img = Image.new('RGBA', (width, height), palette["bg"])
 
-    # Add subtle vignette / gradient overlay — numpy (285x faster than pixel loop)
-    arr = np.zeros((height, width, 4), dtype=np.uint8)
-    ys = np.arange(height)
-    alpha_col = (120 * (np.abs(ys - height / 2) / (height / 2)) ** 1.5).clip(0, 255).astype(np.uint8)
-    arr[:, :, 3] = alpha_col[:, np.newaxis]   # broadcast across width
-    gradient = Image.fromarray(arr, 'RGBA')
-
+    # Add subtle vignette / gradient overlay (cached)
+    gradient = get_gradient_overlay(width, height)
     img = Image.alpha_composite(img, gradient)
 
     # Accent bar at bottom (branding)
@@ -261,6 +244,9 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
     If `script` is provided, adds timed word-chunk subtitles in safe zone."""
     print(f"🎥 Creating brain rot video: {title}")
     bg_music = None
+    bg_clip = None
+    final = None
+    audio_clips_to_close = []
     try:
         if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
             raise ValueError("Slide/audio count mismatch")
@@ -275,8 +261,7 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
 
         _dur_clips = [AudioFileClip(str(a)) for a in audio_paths]
         total_duration = sum(c.duration for c in _dur_clips) + 0.3 * len(audio_paths)
-        for _c in _dur_clips:
-            _c.close()
+        safe_close(_dur_clips)
         del _dur_clips
 
         if bg_path:
@@ -352,33 +337,14 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
         )
         print(f"✅ Brain rot video saved: {Path(output_path).name}")
 
-        # M1 8GB RAM cleanup — close audio clips AFTER write
-        for _ac in audio_clips_to_close:
-            try:
-                _ac.close()
-            except Exception:
-                pass
-        try:
-            final.close()
-        except Exception:
-            pass
-        if bg_clip is not None:
-            try:
-                bg_clip.close()
-            except Exception:
-                pass
-        if bg_music is not None:
-            try:
-                bg_music.close()
-            except Exception:
-                pass
-        gc.collect()
-
     except Exception as e:
         print(f"❌ Brain rot video error: {e}")
         import traceback
         traceback.print_exc()
         raise
+    finally:
+        # M1 8GB RAM cleanup — close audio clips AFTER write
+        safe_close(audio_clips_to_close, final, bg_clip, bg_music)
 
 
 def run_brainrot_pipeline(shorts_per_run: int = 3):

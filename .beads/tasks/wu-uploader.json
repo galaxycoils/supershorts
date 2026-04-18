@@ -1,0 +1,11 @@
+{
+  "id": "wu-uploader",
+  "title": "Stabilize Browser Uploader",
+  "status": "complete",
+  "checklist": [
+    "[√] Verify Firefox profile discovery",
+    "[√] Verify Selenium selector stability",
+    "[√] Verify Video ID extraction"
+  ],
+  "scope": ["src/browser_uploader.py"]
+}

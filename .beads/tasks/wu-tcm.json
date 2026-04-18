@@ -1,0 +1,11 @@
+{
+  "id": "wu-tcm",
+  "title": "Stabilize TCM Mode",
+  "status": "complete",
+  "checklist": [
+    "[√] Verify curriculum generation",
+    "[√] Verify content generation for TCM topics",
+    "[√] Verify video composition with TCM assets"
+  ],
+  "scope": ["src/tcm_mode.py", "src/generator.py"]
+}

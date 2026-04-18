@@ -13,18 +13,18 @@ import ollama
 from pathlib import Path
 from tqdm import tqdm
 
-from src.generator import (
-    generate_visuals,
-    text_to_speech,
-    compose_video,
-    strip_emojis,
-    _clamp_words,
+from src.core.config import (
     OUTPUT_DIR,
     PROJECT_ROOT,
     OLLAMA_MODEL,
     OLLAMA_TIMEOUT,
-    safe_json_parse,
+    YOUR_NAME,
 )
+from src.infrastructure.llm import ollama_generate
+from src.infrastructure.tts import text_to_speech
+from src.engine.video_engine import generate_visuals, compose_video
+from src.utils.text import strip_emojis, _clamp_words
+from src.utils.json import safe_json_parse
 
 LOG_FILE    = PROJECT_ROOT / "performance_log.json"
 IDEAS_FILE  = PROJECT_ROOT / "youtube_studio_ideas.json"
@@ -139,27 +139,11 @@ DESCRIPTION: {desc}
 Write a punchy 35-45 second Short script on the same topic — punchier and more hooky.
 Rules: hook first 2 seconds, plain spoken language, address viewer as "you", end with CTA.
 IMPORTANT: dialogue MUST be exactly 99-127 words (35-45 seconds at 170 wpm). NO more, NO less.
-Return ONLY JSON:
-{{
-  "title": "clickbait title",
-  "hook": "first 2-second hook sentence",
-  "dialogue": "99-127 word spoken script here",
-  "thumbnail_prompt": "visual description for thumbnail"
-}}"""
+Format the JSON with keys: "title", "hook", "dialogue", "thumbnail_prompt"."""
     try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-            future = ex.submit(
-                lambda: ollama.chat(
-                    model=OLLAMA_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    options={"temperature": 0.75, "num_ctx": 2048},
-                )
-            )
-            resp = future.result(timeout=OLLAMA_TIMEOUT)
-        text = resp["message"]["content"]
-        if "```json" in text: text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:   text = text.split("```")[1]
-        result = safe_json_parse(text)
+        result = ollama_generate(prompt, json_mode=True)
+        if not result:
+            raise ValueError("Ollama returned empty result")
     except Exception as e:
         print(f"  Dialogue gen failed ({e}), using fallback.")
         result = {
@@ -196,27 +180,13 @@ Generate {num_ideas} YouTube Short ideas. Each object must have:
 - dialogue (35-45 second spoken script — exactly 99-127 words, NO more, NO less)
 - thumbnail_prompt (visual description)
 
-Return ONLY a valid JSON array of {num_ideas} objects."""
+Format as a JSON array of {num_ideas} objects."""
 
     print("  Asking Ollama for ideas...")
     try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-            future = ex.submit(
-                lambda: ollama.chat(
-                    model=OLLAMA_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    options={"temperature": 0.8, "num_ctx": 4096},
-                )
-            )
-            resp = future.result(timeout=OLLAMA_TIMEOUT)
-        text  = resp["message"]["content"]
-        if "```json" in text: text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:   text = text.split("```")[1]
-        try:
-            ideas = safe_json_parse(text)
-        except Exception:
-            match = re.search(r'\[.*\]', text, re.DOTALL)
-            ideas = json.loads(match.group(0)) if match else []
+        ideas = ollama_generate(prompt, json_mode=True)
+        if not ideas:
+            raise ValueError("Ollama returned empty result")
         if not isinstance(ideas, list):
             ideas = ideas.get("ideas", [ideas]) if isinstance(ideas, dict) else []
         # Enforce 35-45s duration on every idea

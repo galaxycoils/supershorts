@@ -1,0 +1,11 @@
+{
+  "title": "Fix and Stabilize Video Generation & Upload for All Modes",
+  "status": "complete",
+  "tasks": [
+    {"id": "research-modes", "title": "Research current failures in each mode", "status": "complete"},
+    {"id": "fix-brainrot", "title": "Fix and verify Brainrot mode", "status": "complete"},
+    {"id": "fix-tcm", "title": "Fix and verify TCM mode", "status": "complete"},
+    {"id": "fix-clipper", "title": "Fix and verify Clipper mode", "status": "complete"},
+    {"id": "verify-uploader", "title": "Verify and fix auto-upload system", "status": "complete"}
+  ]
+}

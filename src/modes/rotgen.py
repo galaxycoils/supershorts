@@ -23,20 +23,14 @@ from moviepy.editor import (
     vfx,
 )
 
-from src.generator import (
-    text_to_speech,
-    ollama_generate,
-    strip_emojis,
-    get_local_viral_gameplay,
-    get_local_gameplay,
-    get_relevant_pexels_video,
-    FONT_FILE,
-    ASSETS_PATH,
-    BACKGROUND_MUSIC_PATH,
-    OUTPUT_DIR,
-    YOUR_NAME,
-    PROJECT_ROOT,
+from src.core.config import (
+    FONT_FILE, ASSETS_PATH, BACKGROUND_MUSIC_PATH, OUTPUT_DIR, YOUR_NAME, PROJECT_ROOT,
+    OLLAMA_MODEL, OLLAMA_TIMEOUT
 )
+from src.infrastructure.llm import ollama_generate
+from src.infrastructure.tts import text_to_speech
+from src.infrastructure.video import get_local_viral_gameplay, get_local_gameplay, get_relevant_pexels_video
+from src.utils.text import strip_emojis
 
 # ─────────────────────────── constants ──────────────────────────────────────
 
@@ -85,6 +79,9 @@ ROTGEN_PEXELS_QUERIES = [
 def ensure_dirs() -> None:
     CHARACTERS_PATH.mkdir(exist_ok=True, parents=True)
     OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
+
+
+from src.utils.cleanup import safe_close
 
 
 def load_rotgen_plan() -> dict:
@@ -154,12 +151,7 @@ Rules:
 - Start with a shocking hook sentence
 - End with exactly: "Follow for more AI facts"
 
-Return ONLY valid JSON:
-{{
-  "script": "full narration text, exactly 90-110 words",
-  "title": "YouTube title for this short",
-  "hashtags": "#AI #Shorts #Tech"
-}}"""
+Format the JSON with keys: "script", "title", "hashtags"."""
     try:
         result = ollama_generate(prompt, json_mode=True)
         if result.get("script"):
@@ -290,14 +282,15 @@ def _draw_character_on_canvas(
 # ─────────────────────────── panel background ───────────────────────────────
 
 def _build_panel_background() -> np.ndarray:
-    """Dark gradient panel (1080×768). Returns (768, 1080, 3) uint8 numpy array."""
-    # Vertical gradient: near-black top → slightly lighter bottom
+    """Dark gradient panel (1080×768) with vectorized gradient generation."""
+    # Vertical gradient: near-black top → slightly lighter bottom (vectorized)
     arr = np.zeros((PANEL_H, PANEL_W, 3), dtype=np.uint8)
     top    = np.array([15, 15, 25],  dtype=np.float32)
     bottom = np.array([30, 30, 55],  dtype=np.float32)
-    for row in range(PANEL_H):
-        t = row / PANEL_H
-        arr[row, :] = (top * (1 - t) + bottom * t).astype(np.uint8)
+    
+    # Broadcast gradient across entire panel height
+    t = np.linspace(0, 1, PANEL_H)[:, np.newaxis, np.newaxis]
+    arr = (top * (1 - t) + bottom * t).astype(np.uint8)
 
     # Accent glow line at very bottom of panel (cyan)
     arr[762:768, :] = np.array([0, 200, 255], dtype=np.uint8)
@@ -510,57 +503,57 @@ def compose_rotgen_video(
     subtitle_clips: list,
     audio_clip,
     output_path: Path,
+    script: str = None
 ) -> None:
     """Layer order (bottom → top): gameplay | character panel | subtitle clips."""
     game_pos  = gameplay_clip.set_position((0, PANEL_H))            # y=768
     char_pos  = character_clip.set_position((0, 0))                 # y=0
-    # Safe zone: bar at y=1570 (190px safe margin from 1920 bottom)
-    # Overlays bottom of gameplay panel — standard caption style, no crop risk.
-    SUBTITLE_SAFE_Y = VIDEO_H - SUBTITLE_H - 190                    # = 1570
-    sub_clips = [sc.set_position((0, SUBTITLE_SAFE_Y))
-                 for sc in subtitle_clips]
-
-    all_clips = [game_pos, char_pos] + sub_clips
+    
+    all_clips = [game_pos, char_pos]
     composite = CompositeVideoClip(all_clips, size=(VIDEO_W, VIDEO_H))
 
+    # Add modular subtitles if script provided
+    if script:
+        from src.captions import add_subtitle_overlay
+        composite = add_subtitle_overlay(composite, script, 'short')
+
     # Audio mix: TTS loud + gentle bg music
-    if BACKGROUND_MUSIC_PATH.exists():
-        bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.22)
-        if bg_music.duration < composite.duration:
-            from moviepy.audio.fx.audio_loop import audio_loop
-            bg_music = audio_loop(bg_music, duration=composite.duration)
+    final_composite = None
+    bg_music = None
+    try:
+        if BACKGROUND_MUSIC_PATH.exists():
+            bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.22)
+            if bg_music.duration < composite.duration:
+                from moviepy.audio.fx.audio_loop import audio_loop
+                bg_music = audio_loop(bg_music, duration=composite.duration)
+            else:
+                bg_music = bg_music.subclip(0, composite.duration)
+            final_audio = CompositeAudioClip([audio_clip.volumex(1.3), bg_music])
         else:
-            bg_music = bg_music.subclip(0, composite.duration)
-        final_audio = CompositeAudioClip([audio_clip.volumex(1.3), bg_music])
-    else:
-        final_audio = audio_clip.volumex(1.3)
+            final_audio = audio_clip.volumex(1.3)
 
-    final_composite = composite.set_audio(final_audio)
+        final_composite = composite.set_audio(final_audio)
 
-    temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
-    final_composite.write_videofile(
-        str(output_path),
-        fps=FPS,
-        codec="libx264",
-        audio_codec="aac",
-        audio_bitrate="192k",
-        preset="ultrafast",
-        threads=3,
-        logger="bar",
-        temp_audiofile=temp_audio,
-    )
-    print(f"  Saved: {output_path.name}")
+        temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
+        final_composite.write_videofile(
+            str(output_path),
+            fps=FPS,
+            codec="libx264",
+            audio_codec="aac",
+            audio_bitrate="192k",
+            preset="ultrafast",
+            threads=3,
+            logger="bar",
+            temp_audiofile=temp_audio,
+        )
+        print(f"  Saved: {output_path.name}")
 
-    # M1 8GB RAM cleanup
-    try:
-        final_composite.close()
-    except Exception:
-        pass
-    try:
-        composite.close()
-    except Exception:
-        pass
-    gc.collect()
+    except Exception as e:
+        print(f"  Error during composition: {e}")
+        raise
+    finally:
+        # Exhaustive cleanup for 8GB RAM machines
+        safe_close(composite, final_composite, bg_music, game_pos, char_pos)
 
 
 # ─────────────────────────── main entry ─────────────────────────────────────
@@ -600,26 +593,19 @@ def _produce_one_rotgen(
     # Character animation
     char_clip = build_character_clip(True, total_dur, panel_bg, custom_img)
 
-    # Subtitles
-    sub_clips = build_subtitle_clips(
-        assign_subtitle_timings(chunk_script(script_text), total_dur)
-    )
-
     # Gameplay
     gameplay_clip = build_gameplay_clip(get_rotgen_gameplay(), total_dur)
 
-    # Compose
+    # Subtitles
+    from src.captions import add_subtitle_overlay
+    print(f"💬 Adding subtitles ({len(script_text.split())} words)...")
     output_path = OUTPUT_DIR / f"{unique_id}.mp4"
-    print(f"  Composing → {output_path.name}")
-    compose_rotgen_video(char_clip, gameplay_clip, sub_clips, audio_clip, output_path)
-
-    # Clip cleanup after composition
-    for _clip in [audio_clip, gameplay_clip, char_clip]:
-        try:
-            _clip.close()
-        except Exception:
-            pass
-    gc.collect()
+    
+    try:
+        compose_rotgen_video(char_clip, gameplay_clip, [], audio_clip, output_path, script=script_text)
+    finally:
+        # Clip cleanup after composition (now inside finally)
+        safe_close(audio_clip, gameplay_clip, char_clip)
 
     # Upload
     short_title = f"{title[:80]} #Shorts"

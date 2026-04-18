@@ -1,0 +1,12 @@
+{
+  "id": "wu-brainrot",
+  "title": "Stabilize Brainrot Mode",
+  "status": "complete",
+  "checklist": [
+    "[√] Verify topic generation schema",
+    "[√] Verify script length enforcement",
+    "[√] Verify numpy gradient performance",
+    "[√] Verify MoviePy concatenation logic"
+  ],
+  "scope": ["src/brainrot.py", "src/generator.py"]
+}

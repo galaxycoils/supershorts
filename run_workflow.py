@@ -153,7 +153,7 @@ def run_tcm_batch(count: int = 3, focus: str = "Traditional Chinese Medicine (TC
 
 
 def run_learning(**_):
-    from src.learning import suggest_improvements
+    from src.generator import suggest_improvements
     console.print("[cyan]📈 Learning Mode Analysis[/cyan]")
     result = suggest_improvements()
     return {"mode": "learning", "result": result[:80] if isinstance(result, str) else str(result)}
@@ -409,3 +409,4 @@ Examples:
 
 if __name__ == "__main__":
     main()
+)

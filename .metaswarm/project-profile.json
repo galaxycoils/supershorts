@@ -1,0 +1,31 @@
+{
+  "metaswarm_version": "1.0.0",
+  "distribution": "plugin",
+  "installed_at": "2026-04-18T12:00:00Z",
+  "updated_at": "2026-04-18T12:00:00Z",
+  "detection": {
+    "language": "Python",
+    "framework": "Flask",
+    "test_runner": "pytest",
+    "linter": null,
+    "formatter": null,
+    "package_manager": null,
+    "type_checker": null,
+    "ci": null,
+    "git_hooks": null
+  },
+  "choices": {
+    "coverage_threshold": 100,
+    "external_tools": false,
+    "visual_review": true,
+    "ci_pipeline": true,
+    "git_hooks": true
+  },
+  "commands": {
+    "test": "pytest",
+    "coverage": "pytest --cov --cov-fail-under=100",
+    "lint": null,
+    "typecheck": null,
+    "format_check": null
+  }
+}

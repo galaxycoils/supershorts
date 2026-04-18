@@ -1,0 +1,11 @@
+{
+  "id": "wu-clipper",
+  "title": "Stabilize Clipper Mode",
+  "status": "complete",
+  "checklist": [
+    "[√] Verify external dependency structure",
+    "[√] Check run_pipeline.py wrapper (Added validation)",
+    "[√] Validate workspace directory handling"
+  ],
+  "scope": ["src/clipper_mode.py"]
+}

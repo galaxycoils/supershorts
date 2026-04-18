@@ -19,14 +19,20 @@ from src.generator import (
     start_viral_gameplay_mode,
     start_tutorial_generation,
     generate_youtube_content_package,
+    run_brainrot_pipeline,
+    run_rotgen_pipeline,
+    run_tcm_mode,
+    run_video_clipper,
+    start_idea_generator,
+    log_upload,
+    PROJECT_ROOT
 )
-from src.brainrot import run_brainrot_pipeline as start_brainrot_generation
-from src.rotgen import run_rotgen_pipeline as start_rotgen_mode
-from src.learning import start_learning_mode, log_upload
-from src.ideagenerator import start_idea_generator
-from src.browser_uploader import upload_to_youtube_browser as upload_to_youtube
-from src.clipper_mode import run_video_clipper
-from src.tcm_mode import run_tcm_mode
+from src.core.learning import suggest_improvements # learning.py renamed
+
+# Alias for legacy main.py names
+start_brainrot_generation = run_brainrot_pipeline
+start_rotgen_mode = run_rotgen_pipeline
+upload_to_youtube = lambda *args, **kwargs: __import__('src.infrastructure.browser_uploader', fromlist=['upload_to_youtube_browser']).upload_to_youtube_browser(*args, **kwargs)
 import menu
 from menu import console
 

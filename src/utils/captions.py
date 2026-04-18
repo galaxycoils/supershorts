@@ -8,9 +8,11 @@
 
 import re
 import numpy as np
+import logging
+import bisect
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-from moviepy.editor import ImageClip, CompositeVideoClip
+from moviepy.editor import ImageClip, CompositeVideoClip, VideoClip
 
 from src.generator import PROJECT_ROOT
 FONT_FILE = PROJECT_ROOT / "assets" / "fonts" / "arial.ttf"
@@ -39,7 +41,7 @@ def assign_timings(chunks: list, total_dur: float) -> list:
     out = []
     for c in chunks:
         dur = (len(c.split()) / total_words) * total_dur
-        out.append((c, t, min(t + dur, total_dur)))
+        out.append({"text": c, "start": t, "end": min(t + dur, total_dur)})
         t += dur
     return out
 
@@ -115,8 +117,8 @@ def render_subtitle_frame(text: str, video_w: int, subtitle_h: int = SUBTITLE_H)
 
 def add_subtitle_overlay(base_clip, script: str, video_type: str):
     """
-    Wrap a MoviePy VideoClip with timed subtitle ImageClips.
-    Returns a CompositeVideoClip with subtitles positioned within safe zone.
+    Wrap a MoviePy VideoClip with a single generator-based VideoClip for subtitles.
+    This avoids memory spikes caused by hundreds of ImageClip objects.
 
     Args:
         base_clip: MoviePy clip with .w, .h, .duration
@@ -131,23 +133,41 @@ def add_subtitle_overlay(base_clip, script: str, video_type: str):
     sub_y = max(0, H - SUBTITLE_H - safe)
 
     chunks = chunk_script(script)
-    timed  = assign_timings(chunks, base_clip.duration)
-    if not timed:
+    timed_data = assign_timings(chunks, base_clip.duration)
+    if not timed_data:
         return base_clip
 
-    sub_clips = []
-    for text, start, end in timed:
-        dur = end - start
-        if dur <= 0:
-            continue
-        frame = render_subtitle_frame(text, W)
-        clip = (ImageClip(frame)
-                .set_start(start)
-                .set_duration(dur)
-                .set_position((0, sub_y)))
-        sub_clips.append(clip)
+    # Pre-render all unique frames to a dict to avoid redundant PIL work during make_frame
+    frame_cache = {}
+    for entry in timed_data:
+        if entry["text"] not in frame_cache:
+            frame_cache[entry["text"]] = render_subtitle_frame(entry["text"], W)
 
-    if not sub_clips:
-        return base_clip
+    # Optimization: pre-calculate sorted start times for binary search
+    start_times = [entry["start"] for entry in timed_data]
+    empty_frame = np.zeros((SUBTITLE_H, W, 3), dtype=np.uint8)
 
-    return CompositeVideoClip([base_clip] + sub_clips, size=(W, H))
+    def make_frame(t):
+        try:
+            # Find which text to show at time t using binary search (O(log N))
+            # bisect_right returns the first index where start_time > t
+            idx = bisect.bisect_right(start_times, t) - 1
+            if idx >= 0:
+                entry = timed_data[idx]
+                if entry["start"] <= t <= entry["end"]:
+                    # Return pre-rendered RGB array
+                    return frame_cache[entry["text"]][:, :, :3]
+            
+            # Return transparent/empty black frame if no text matches (copy to avoid shared mutation)
+            return empty_frame.copy()
+        except Exception as e:
+            # Prevent silent failures by logging exceptions that occur during frame generation
+            import logging
+            logging.error(f"Error in subtitle make_frame at t={t}: {e}", exc_info=True)
+            return empty_frame.copy()
+
+    # Create one VideoClip for all subtitles
+    sub_clip = VideoClip(make_frame, duration=base_clip.duration).set_position((0, sub_y))
+    
+    return CompositeVideoClip([base_clip, sub_clip], size=(W, H))
+

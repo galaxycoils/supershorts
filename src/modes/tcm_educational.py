@@ -3,6 +3,7 @@ import gc
 import json
 import datetime
 import time
+import random
 import concurrent.futures
 from pathlib import Path
 
@@ -13,7 +14,12 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich import box
 
-from src.generator import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT, safe_json_parse
+from src.core.config import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT, YOUR_NAME
+from src.infrastructure.llm import ollama_generate, safe_json_parse
+from src.infrastructure.tts import text_to_speech
+from src.engine.video_engine import generate_visuals, compose_video
+from src.utils.text import _clamp_words
+
 
 console = Console()
 
@@ -57,21 +63,7 @@ def _generate_tcm_curriculum(focus: str, extra: str, previous_titles=None) -> di
         "10 lessons. No markdown, no commentary."
     )
     try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-            future = ex.submit(
-                lambda: ollama.chat(
-                    model=OLLAMA_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    options={"temperature": 0.7},
-                )
-            )
-            resp = future.result(timeout=OLLAMA_TIMEOUT)
-        raw = resp["message"]["content"].strip()
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        return safe_json_parse(raw)
+        return ollama_generate(prompt, json_mode=True)
     except Exception as e:
         console.print(f"[yellow]⚠  Curriculum fallback ({e})[/yellow]")
         topics = [
@@ -207,7 +199,7 @@ def run_tcm_mode():
     console.print()
 
     # ── Generation loop ───────────────────────────────────────────
-    from src.generator import (
+    from src.core.config import (
         generate_lesson_content,
         text_to_speech,
         generate_visuals,
@@ -228,8 +220,19 @@ def run_tcm_mode():
             uid = f"{datetime.datetime.now().strftime('%Y%m%d')}_tcm_ch{lesson['chapter']}"
 
             # ── Content generation ────────────────────────────────
+            series_name = plan.get('curriculum_title', 'Traditional Chinese Medicine')
+            style_desc = (
+                "Assume the viewer is interested in Eastern wellness and holistic health. "
+                "Explain Traditional Chinese Medicine concepts (like Qi, Yin/Yang, herbs) "
+                "using simple analogies and practical wellness tips. Avoid overly complex terminology "
+                "without explaining it first."
+            )
             with console.status("[cyan]Generating lesson content via Ollama…[/cyan]"):
-                content = generate_lesson_content(lesson["title"])
+                content = generate_lesson_content(
+                    lesson["title"], 
+                    series_name=series_name, 
+                    style_description=style_desc
+                )
 
             # ── Short video ───────────────────────────────────────
             raw_short = content.get("short_form_highlight") or lesson["title"]
@@ -250,9 +253,12 @@ def run_tcm_mode():
             )
             short_path = OUTPUT_DIR / f"tcm_short_{uid}.mp4"
             console.print(f"[cyan]🎥 Composing short…[/cyan]")
+            
+            # Use random TCM background query
+            bg_query = random.choice(TCM_BG_KEYWORDS)
             compose_video(
                 [slide_path], [short_audio], short_path, "short",
-                lesson["title"], script=short_script,
+                lesson["title"], script=short_script, bg_query=bg_query
             )
 
             # Cleanup audio temp
