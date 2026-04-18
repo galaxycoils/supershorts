@@ -42,10 +42,11 @@ MODE_COMMANDS = {
     "clipper":     "from src.clipper_mode import run_video_clipper; run_video_clipper()",
 }
 
+# Stored as arg lists — avoids split() breaking on paths with spaces
 WORKFLOW_COMMANDS = {
-    "daily":         f"python3 {PROJECT_ROOT}/run_workflow.py {PROJECT_ROOT}/workflows/daily.workflow.json",
-    "tcm-weekly":    f"python3 {PROJECT_ROOT}/run_workflow.py {PROJECT_ROOT}/workflows/tcm-weekly.workflow.json",
-    "full-pipeline": f"python3 {PROJECT_ROOT}/run_workflow.py {PROJECT_ROOT}/workflows/full-pipeline.workflow.json",
+    "daily":         [str(PROJECT_ROOT / "run_workflow.py"), str(PROJECT_ROOT / "workflows/daily.workflow.json")],
+    "tcm-weekly":    [str(PROJECT_ROOT / "run_workflow.py"), str(PROJECT_ROOT / "workflows/tcm-weekly.workflow.json")],
+    "full-pipeline": [str(PROJECT_ROOT / "run_workflow.py"), str(PROJECT_ROOT / "workflows/full-pipeline.workflow.json")],
 }
 
 MODE_META = {
@@ -160,7 +161,10 @@ def api_health():
 def api_run(mode):
     if mode not in MODE_COMMANDS:
         return jsonify({"error": "unknown mode"}), 400
-    count = max(1, min(10, int((request.json or {}).get("count", 1))))
+    try:
+        count = max(1, min(10, int((request.json or {}).get("count", 1))))
+    except (ValueError, TypeError):
+        count = 1
     code  = MODE_COMMANDS[mode].format(count=count)
     cmd   = [PYTHON, "-c",
              f"import sys; sys.path.insert(0,'{PROJECT_ROOT}'); {code}"]
@@ -183,7 +187,7 @@ def api_run(mode):
 def api_workflow(name):
     if name not in WORKFLOW_COMMANDS:
         return jsonify({"error": "unknown workflow"}), 400
-    cmd  = [PYTHON] + WORKFLOW_COMMANDS[name].split()[1:]  # replace python3 with venv python
+    cmd  = [PYTHON] + WORKFLOW_COMMANDS[name]  # list already excludes interpreter
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             cwd=str(PROJECT_ROOT))
     job_id = str(uuid.uuid4())[:8]

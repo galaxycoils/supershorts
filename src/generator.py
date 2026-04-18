@@ -18,7 +18,6 @@ from moviepy.config import change_settings
 from pathlib import Path
 from pydub import AudioSegment
 from tqdm import tqdm
-import pyttsx3
 import gc
 import time
 import datetime
@@ -48,7 +47,7 @@ def _get_pexels_key() -> str:
             return json.loads(cfg.read_text()).get("pexels_api_key", "")
         except Exception:
             pass
-    return "jsVc9Hd2JnpHjPeY5347XU9UHDkz75QLtFkGKmxMS4o44GlG4mHo1jAz"
+    return ""  # Set PEXELS_API_KEY env var or add pexels_api_key to config.json
 
 PEXELS_API_KEY = _get_pexels_key()
 PEXELS_CACHE_DIR.mkdir(exist_ok=True, parents=True)
@@ -296,6 +295,7 @@ def text_to_speech(text: str, output_path: Path) -> Path:
         print(f"⚠️ macOS say failed ({e}), using pyttsx3...")
 
     # 3 — pyttsx3 last resort
+    import pyttsx3
     mp3_path = output_path.with_suffix('.mp3')
     engine = pyttsx3.init()
     engine.setProperty('rate', 170)
@@ -562,6 +562,7 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
     print(f"🎥 Creating {label} {video_type} video for: {lesson_title} (OPTIMIZED MODE)")
 
     STATIC_MODE = False  # Set to True only for super-fast testing
+    bg_music = None
 
     try:
         if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
@@ -597,10 +598,12 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
 
         # Build slides
         image_clips = []
+        audio_clips_to_close = []  # close only after write_videofile (keep handles alive)
         for i, (img_path, audio_path) in enumerate(tqdm(list(zip(slide_paths, audio_paths)),
                                                          desc="  Building slides", unit="slide",
                                                          bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
             audio_clip = AudioFileClip(str(audio_path))
+            audio_clips_to_close.append(audio_clip)
             duration = audio_clip.duration + 0.5
             img_clip = ImageClip(str(img_path)).set_duration(duration).fadein(0.5).fadeout(0.5)
 
@@ -636,8 +639,11 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
                 bg_music = audio_loop(bg_music, duration=final_video.duration)
             else:
                 bg_music = bg_music.subclip(0, final_video.duration)
-            composite = CompositeAudioClip([final_video.audio.volumex(1.2), bg_music])
-            final_video = final_video.set_audio(composite)
+            if final_video.audio is not None:
+                composite = CompositeAudioClip([final_video.audio.volumex(1.2), bg_music])
+                final_video = final_video.set_audio(composite)
+            else:
+                final_video = final_video.set_audio(bg_music)
 
         # Ultra-fast write settings for M1 8GB
         print(f"🎬 Encoding video → {Path(output_path).name}")
@@ -655,7 +661,12 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
         )
         print(f"✅ Video saved: {Path(output_path).name}")
 
-        # M1 8GB RAM cleanup
+        # M1 8GB RAM cleanup — close audio clips AFTER write
+        for _ac in audio_clips_to_close:
+            try:
+                _ac.close()
+            except Exception:
+                pass
         try:
             final_video.close()
         except Exception:
@@ -665,10 +676,11 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
                 bg_clip.close()
             except Exception:
                 pass
-        try:
-            bg_music.close()
-        except Exception:
-            pass
+        if bg_music is not None:
+            try:
+                bg_music.close()
+            except Exception:
+                pass
         gc.collect()
 
     except Exception as e:

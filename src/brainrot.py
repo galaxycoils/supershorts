@@ -19,6 +19,7 @@ from src.generator import (
     strip_emojis,
     _clamp_words,
     get_local_gameplay,
+    get_local_viral_gameplay,
     get_relevant_pexels_video,
     get_local_background,
     auto_scale_text,
@@ -259,12 +260,12 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
     """Compose brain rot video: fast pacing, dynamic bg, high music vol.
     If `script` is provided, adds timed word-chunk subtitles in safe zone."""
     print(f"🎥 Creating brain rot video: {title}")
+    bg_music = None
     try:
         if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
             raise ValueError("Slide/audio count mismatch")
 
         # Prefer viral gameplay, then normal gameplay, then Pexels
-        from src.generator import get_local_viral_gameplay
         bg_path = get_local_viral_gameplay() or get_local_gameplay('short')
         if not bg_path:
             for query in ["satisfying", "gaming", "coding", "technology"]:
@@ -330,8 +331,11 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
                 bg_music = audio_loop(bg_music, duration=final.duration)
             else:
                 bg_music = bg_music.subclip(0, final.duration)
-            composite_audio = CompositeAudioClip([final.audio.volumex(1.2), bg_music])
-            final = final.set_audio(composite_audio)
+            if final.audio is not None:
+                composite_audio = CompositeAudioClip([final.audio.volumex(1.2), bg_music])
+                final = final.set_audio(composite_audio)
+            else:
+                final = final.set_audio(bg_music)
 
         print(f"🎬 Encoding → {Path(output_path).name}")
         temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
@@ -363,10 +367,11 @@ def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=N
                 bg_clip.close()
             except Exception:
                 pass
-        try:
-            bg_music.close()
-        except Exception:
-            pass
+        if bg_music is not None:
+            try:
+                bg_music.close()
+            except Exception:
+                pass
         gc.collect()
 
     except Exception as e:
