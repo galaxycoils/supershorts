@@ -1,6 +1,6 @@
-# SuperShorts v2.7
+# SuperShorts v2.9
 
-**Fully local AI video factory — educational series, viral Shorts, RotGen character mode, TCM content, automated video clipping, and a workflow engine. Zero paid APIs.**
+**Fully local AI video factory — educational series, viral Shorts, RotGen character mode, TCM content, automated video clipping, web dashboard, and a workflow engine. Zero paid APIs.**
 
 <p align="center">
   <img src="assets/supershorts_poster.png" alt="SuperShorts" width="340"/>
@@ -10,6 +10,7 @@
 ![Ollama](https://img.shields.io/badge/LLM-Ollama%20local-orange)
 ![MoviePy](https://img.shields.io/badge/video-MoviePy%201.0.3-red)
 ![Rich](https://img.shields.io/badge/UI-Rich%20TUI-purple)
+![Flask](https://img.shields.io/badge/dashboard-Flask-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -18,7 +19,7 @@
 
 SuperShorts is a fully local, fully automated video production pipeline. Run `python main.py` on any Mac or Linux box and it writes scripts, narrates audio, edits videos, adds subtitles, and uploads to YouTube — entirely on-device with local Ollama LLM and no paid cloud services.
 
-**v2.7 adds:** Rich terminal UI, TCM Educational Mode, Automatic Video Clipper, a JSON-based Workflow Engine with built-in scheduling, and post-upload output cleanup.
+**v2.9 adds:** Cinematic web dashboard (Production Suite), output folder pruner (`cleanup.py`), and reliability fixes across all pipeline modules.
 
 ---
 
@@ -40,6 +41,33 @@ SuperShorts is a fully local, fully automated video production pipeline. Run `py
 ```
 
 Live stats bar shows lesson + brain rot progress on every menu render.
+
+---
+
+## Web Dashboard
+
+```bash
+python3 dashboard.py          # starts on http://localhost:5050
+PORT=8080 python3 dashboard.py  # custom port
+```
+
+The **Production Suite** dashboard (`dashboard.py`) gives you a browser UI to:
+- Monitor KPI cards (total uploads, educational progress, brain rot, RotGen counts)
+- View a 7-day upload heatmap
+- Launch any of the 10 production modes with a count selector and live SSE output terminal
+- Trigger the 3 built-in workflows (daily, tcm-weekly, full-pipeline) from the sidebar
+- Check Ollama connection status and disk usage in real time
+- Browse content plan, upload log, and mode breakdown
+
+---
+
+## Output Cleanup
+
+```bash
+python3 cleanup.py            # dry-run — shows what would be freed
+python3 cleanup.py --delete   # delete intermediate .wav files from output/
+python3 cleanup.py --days 7   # only prune dirs older than 7 days
+```
 
 ---
 
