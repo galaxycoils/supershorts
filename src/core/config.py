@@ -1,4 +1,5 @@
 import os
+import platform
 from pathlib import Path
 
 # Paths
@@ -16,11 +17,25 @@ PEXELS_CACHE_DIR = PROJECT_ROOT / "assets" / "pexels"
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 
 # LLM Config
-OLLAMA_MODEL = "deepseek-v3"
+OLLAMA_MODEL = "qwen2.5-coder:3b"
 OLLAMA_TIMEOUT = 120
 
 # User Info
 YOUR_NAME = os.environ.get("YOUR_NAME", "SuperShorts")
+
+# Video render tuning
+_default_low_memory = platform.system() == "Darwin" and platform.machine() == "arm64"
+LOW_MEMORY_MODE = os.environ.get("LOW_MEMORY_MODE", str(_default_low_memory)).lower() in {"1", "true", "yes", "on"}
+VIDEO_THREADS = max(1, int(os.environ.get("VIDEO_THREADS", "2")))
+VIDEO_FPS = max(12, int(os.environ.get("VIDEO_FPS", "24")))
+LONG_VIDEO_SIZE = (
+    1280 if LOW_MEMORY_MODE else 1920,
+    720 if LOW_MEMORY_MODE else 1080,
+)
+SHORT_VIDEO_SIZE = (
+    720 if LOW_MEMORY_MODE else 1080,
+    1280 if LOW_MEMORY_MODE else 1920,
+)
 
 # Topics
 TUTORIAL_TOPICS = [

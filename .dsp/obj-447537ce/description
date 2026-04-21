@@ -1,0 +1,3 @@
+source: tests/test_content_modes_dry_run.py
+kind: object
+purpose: Dry-run integration harness for content modes — executes real mode orchestration with mocked external systems and tiny media artifacts

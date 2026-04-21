@@ -1,0 +1,3 @@
+source: tests/test_uploader.py
+kind: object
+purpose: Uploader tests for Firefox profile discovery, video-id extraction, and browser bootstrap mocking

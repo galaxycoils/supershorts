@@ -22,9 +22,11 @@ def test_extract_video_id_elements():
     assert _extract_video_id(driver) == "dQw4w9WgXcQ"
 
 @patch('src.infrastructure.browser_uploader.webdriver.Firefox')
+@patch('src.infrastructure.browser_uploader._build_firefox_service')
 @patch('webdriver_manager.firefox.GeckoDriverManager.install')
-def test_get_browser_mock(mock_install, mock_firefox):
+def test_get_browser_mock(mock_install, mock_build_service, mock_firefox):
     from src.infrastructure.browser_uploader import get_browser
     mock_install.return_value = "/tmp/geckodriver"
+    mock_build_service.return_value = MagicMock()
     get_browser()
     assert mock_firefox.called

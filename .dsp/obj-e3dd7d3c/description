@@ -1,0 +1,3 @@
+source: src/modes/clipper.py
+kind: object
+purpose: Video clipper mode — splits long YouTube/podcast videos into vertical Shorts

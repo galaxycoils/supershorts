@@ -111,8 +111,8 @@ def run_video_clipper():
         console.print(f"[dim]📁 Vertical shorts → {output_dir}/[/dim]")
 
         # --- Automatic Upload and Logging ---
-        from src.browser_uploader import upload_to_youtube_browser
-        from src.learning import log_upload
+        from src.infrastructure.browser_uploader import upload_to_youtube_browser
+        from src.core.learning import log_upload
         
         # Find the produced mp4 files in outputs/
         shorts = list(output_dir.glob("*.mp4"))

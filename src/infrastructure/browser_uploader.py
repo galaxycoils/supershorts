@@ -69,6 +69,12 @@ def _find_firefox_profile() -> str:
 PROFILE_PATH = _find_firefox_profile()
 
 
+def _build_firefox_service():
+    """Build Selenium service separately so tests can patch Firefox without opening sockets."""
+    port = int(os.environ.get("GECKODRIVER_PORT", "4444"))
+    return Service(GeckoDriverManager().install(), port=port)
+
+
 def get_browser():
     options = Options()
     options.add_argument("--headless")
@@ -82,7 +88,7 @@ def get_browser():
         if os.path.exists(firefox_bin):
             options.binary_location = firefox_bin
 
-    service = Service(GeckoDriverManager().install())
+    service = _build_firefox_service()
     driver = webdriver.Firefox(service=service, options=options)
     return driver
 

@@ -1,0 +1,3 @@
+source: tests/test_main_menu_smoke.py
+kind: object
+purpose: Menu smoke tests — dry-run every interactive menu route through main.main with patched handlers

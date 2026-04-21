@@ -11,7 +11,8 @@ from moviepy.editor import (
 )
 
 from src.core.config import (
-    FONT_FILE, YOUR_NAME, BACKGROUND_MUSIC_PATH, OUTPUT_DIR
+    FONT_FILE, YOUR_NAME, BACKGROUND_MUSIC_PATH, OUTPUT_DIR,
+    LOW_MEMORY_MODE, VIDEO_THREADS, VIDEO_FPS, LONG_VIDEO_SIZE, SHORT_VIDEO_SIZE
 )
 from src.infrastructure.video import (
     get_local_background, get_local_gameplay, 
@@ -125,12 +126,17 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
     label = 'Tutorial' if is_tutorial else ('Viral' if force_viral_bg else 'Dynamic')
     print(f"🎥 Creating {label} {video_type} video for: {lesson_title}")
 
-    STATIC_MODE = False
+    target_size = LONG_VIDEO_SIZE if video_type == 'long' else SHORT_VIDEO_SIZE
+    low_memory_mode = LOW_MEMORY_MODE or len(slide_paths) > 3
+    static_mode = low_memory_mode and not force_viral_bg
+    slide_fade = 0.2 if low_memory_mode else 0.5
+
     bg_music = None
     bg_clip = None
     final_video = None
     audio_clips_to_close = []
     image_clips = []
+    temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
 
     try:
         if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
@@ -148,30 +154,38 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
         total_duration = sum(c.duration for c in _dur_clips) + 0.5 * len(audio_paths)
         safe_close(_dur_clips)
 
-        if bg_path and not STATIC_MODE:
+        if bg_path and not static_mode:
             bg_clip = VideoFileClip(bg_path)
             if bg_clip.duration < total_duration:
                 bg_clip = bg_clip.fx(vfx.loop, duration=total_duration)
             else:
                 bg_clip = bg_clip.subclip(0, total_duration)
             bg_clip = bg_clip.fx(vfx.colorx, 0.78)
-            bg_clip = bg_clip.resize(1.06).set_position(lambda t: (0 + (t * 2), 0 + (t * 1.2)))
+            bg_clip = bg_clip.resize(target_size)
 
         image_clips = []
+        bg_cursor = 0.0
         for i, (img_path, audio_path) in enumerate(zip(slide_paths, audio_paths)):
             audio_clip = AudioFileClip(str(audio_path))
             audio_clips_to_close.append(audio_clip)
             duration = audio_clip.duration + 0.5
-            img_clip = ImageClip(str(img_path)).set_duration(duration).fadein(0.5).fadeout(0.5)
+            img_clip = (
+                ImageClip(str(img_path))
+                .set_duration(duration)
+                .resize(height=target_size[1])
+                .fadein(slide_fade)
+                .fadeout(slide_fade)
+            )
 
-            target_size = (1920, 1080) if video_type == 'long' else (1080, 1920)
             if bg_clip:
+                segment_bg = bg_clip.subclip(bg_cursor, min(bg_cursor + duration, bg_clip.duration))
+                bg_cursor = min(bg_cursor + duration, bg_clip.duration)
                 final_clip = CompositeVideoClip([
-                    bg_clip.subclip(0, min(duration, bg_clip.duration)),
+                    segment_bg,
                     img_clip.set_opacity(0.93).set_position('center')
                 ], size=target_size)
             else:
-                final_clip = CompositeVideoClip([img_clip], size=target_size)
+                final_clip = CompositeVideoClip([img_clip.set_position('center')], size=target_size)
 
             final_clip = final_clip.set_audio(audio_clip)
             image_clips.append(final_clip)
@@ -180,7 +194,7 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
 
         if script:
             try:
-                from src.captions import add_subtitle_overlay
+                from src.utils.captions import add_subtitle_overlay
                 final_video = add_subtitle_overlay(final_video, script, video_type)
             except Exception as e:
                 print(f"⚠️ Subtitle overlay failed ({e})")
@@ -197,17 +211,17 @@ def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_titl
             else:
                 final_video = final_video.set_audio(bg_music)
 
-        temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
         final_video.write_videofile(
             str(output_path),
-            fps=24,
+            fps=VIDEO_FPS,
             codec="libx264",
             audio_codec="aac",
             audio_bitrate="192k",
             preset="ultrafast",
-            threads=3,
+            threads=VIDEO_THREADS,
             logger='bar',
             temp_audiofile=temp_audio,
+            ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],
         )
     finally:
         safe_close(audio_clips_to_close, image_clips, final_video, bg_clip, bg_music)
