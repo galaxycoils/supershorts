@@ -3,86 +3,187 @@ import sys
 import glob
 import time
 import datetime
+import re
+import concurrent.futures
+from typing import Optional, Union, Any, List
 from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.firefox import GeckoDriverManager
+from src.core.interfaces import IVideoUploader
+from src.infrastructure.adapters.browser_adapter import BrowserAdapter
 
 # Selectors from old project
 YOUTUBE_TEXTBOX_ID = "textbox"
 YOUTUBE_MADE_FOR_KIDS_NAME = "VIDEO_MADE_FOR_KIDS_MFK"
 YOUTUBE_NOT_MADE_FOR_KIDS_NAME = "VIDEO_MADE_FOR_KIDS_NOT_MFK"
 YOUTUBE_NEXT_BUTTON_ID = "next-button"
-YOUTUBE_RADIO_BUTTON_XPATH = "//*[@id=\"radioLabel\"]"
 YOUTUBE_DONE_BUTTON_ID = "done-button"
-
-# 0=Public, 1=Unlisted, 2=Private — override with YT_VISIBILITY env var
+YOUTUBE_FINISH_BUTTON_ID = "finish-button"
+YOUTUBE_RADIO_BUTTON_XPATH = "//*[@id=\"radioLabel\"]"
 VISIBILITY_INDEX = int(os.environ.get("YT_VISIBILITY", "1"))
+VIDEO_URL_PATTERNS = (
+    "youtu.be/",
+    "youtube.com/watch?v=",
+    "/watch?v=",
+)
+STUDIO_VIDEO_PATTERN = re.compile(r"/video/([A-Za-z0-9_-]{11})/")
+
+PROFILE_PATH = str(Path.home() / "Library/Application Support/Firefox/Profiles/youtube_uploader")
+FIREFOX_PROFILES_DIR = Path.home() / "Library/Application Support/Firefox/Profiles"
 
 
 def _find_firefox_profile() -> str:
-    """Auto-discover Firefox default-release profile across OS or use FIREFOX_PROFILE_PATH env var."""
-    env = os.environ.get("FIREFOX_PROFILE_PATH", "").strip()
-    if env and os.path.isdir(env):
-        return env
-    
-    # OS-specific search paths
-    if sys.platform == "darwin":
-        base = os.path.expanduser("~/Library/Application Support/Firefox/Profiles")
-    elif sys.platform == "win32":
-        base = os.path.expanduser("~/AppData/Roaming/Mozilla/Firefox/Profiles")
-    else: # Linux
-        # Try both standard and snap paths
-        bases = [
-            os.path.expanduser("~/.mozilla/firefox"),
-            os.path.expanduser("~/snap/firefox/common/.mozilla/firefox")
-        ]
-        base = next((b for b in bases if os.path.isdir(b)), bases[0])
+    env_path = os.environ.get("FIREFOX_PROFILE_PATH")
+    if env_path and os.path.isdir(env_path):
+        return env_path
+    if os.path.isdir(PROFILE_PATH):
+        return PROFILE_PATH
 
-    if not os.path.isdir(base):
-        raise RuntimeError(f"Firefox profile directory not found at {base}. Set FIREFOX_PROFILE_PATH.")
+    if FIREFOX_PROFILES_DIR.is_dir():
+        preferred = sorted(FIREFOX_PROFILES_DIR.glob("*.default-release"))
+        if preferred:
+            return str(preferred[0])
 
-    # Prioritize default-release
-    hits = glob.glob(f"{base}/*.default-release")
-    if hits:
-        return hits[0]
-    
-    # Fallback to any profile
-    hits = glob.glob(f"{base}/*")
-    for hit in hits:
-        if os.path.isdir(hit) and ("default" in hit or "release" in hit):
-            return hit
-            
-    if hits:
-        return hits[0]
+        fallback = sorted(FIREFOX_PROFILES_DIR.glob("*.default"))
+        if fallback:
+            return str(fallback[0])
 
-    raise RuntimeError(
-        "No Firefox profile found. Set FIREFOX_PROFILE_PATH env var to your profile directory."
-    )
+        any_profiles = sorted(p for p in FIREFOX_PROFILES_DIR.iterdir() if p.is_dir())
+        if any_profiles:
+            return str(any_profiles[0])
 
-
-PROFILE_PATH = _find_firefox_profile()
+    return PROFILE_PATH
 
 
 def _build_firefox_service():
-    """Build Selenium service separately so tests can patch Firefox without opening sockets."""
+    from selenium.webdriver.firefox.service import Service
     port = int(os.environ.get("GECKODRIVER_PORT", "4444"))
     return Service(GeckoDriverManager().install(), port=port)
 
 
-def get_browser():
-    options = Options()
-    options.add_argument("--headless")
-    # Using profile with -profile arg is more reliable than set_preference("profile")
-    options.add_argument("-profile")
-    options.add_argument(PROFILE_PATH)
+def _parse_video_id_from_text(text: str) -> Optional[str]:
+    if not text:
+        return None
 
-    # Check if Firefox exists in common locations
+    for pattern in VIDEO_URL_PATTERNS:
+        if pattern in text:
+            candidate = text.split(pattern)[-1].split("&")[0].split("?")[0].split('"')[0].strip()
+            if len(candidate) == 11:
+                return candidate
+
+    match = re.search(r"(?:v=|be/)([A-Za-z0-9_-]{11})", text)
+    if match:
+        return match.group(1)
+    match = STUDIO_VIDEO_PATTERN.search(text)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _extract_video_id(driver) -> Optional[str]:
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        try:
+            video_id = _parse_video_id_from_text(driver.current_url)
+            if video_id:
+                return video_id
+
+            link_els = driver.find_elements(
+                By.CSS_SELECTOR,
+                "a.style-scope.ytcp-video-share-config, span.video-url-wrapper a, a[href*='youtu.be'], a[href*='youtube.com/watch'], input[value*='youtu.be'], input[value*='youtube.com/watch']"
+            )
+            for el in link_els:
+                for attr in ("href", "value", "textContent", "innerText", "aria-label"):
+                    video_id = _parse_video_id_from_text(el.get_attribute(attr) or "")
+                    if video_id:
+                        return video_id
+
+            video_id = _parse_video_id_from_text(driver.page_source)
+            if video_id:
+                return video_id
+        except Exception:
+            pass
+        time.sleep(2)
+    return None
+
+
+def _set_visibility(driver) -> None:
+    print("👁️ Setting visibility...")
+    radios = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located((By.XPATH, YOUTUBE_RADIO_BUTTON_XPATH))
+    )
+    if len(radios) > VISIBILITY_INDEX:
+        driver.execute_script("arguments[0].click();", radios[VISIBILITY_INDEX])
+
+
+def _click_finalize_button(driver) -> None:
+    for button_id in (YOUTUBE_DONE_BUTTON_ID, YOUTUBE_FINISH_BUTTON_ID):
+        try:
+            button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.ID, button_id))
+            )
+            driver.execute_script("arguments[0].click();", button)
+            return
+        except Exception:
+            continue
+    raise TimeoutError("Could not click YouTube Studio finalize button")
+
+
+def _find_video_id_on_studio_page(driver, title: str) -> Optional[str]:
+    title_probe = title.strip().lower()[:80]
+    anchors = driver.find_elements(By.CSS_SELECTOR, "a[href*='/video/']")
+    for anchor in anchors:
+        text = " ".join(
+            filter(
+                None,
+                [
+                    (anchor.text or "").strip(),
+                    anchor.get_attribute("aria-label") or "",
+                    anchor.get_attribute("title") or "",
+                ],
+            )
+        ).lower()
+        href = anchor.get_attribute("href") or ""
+        if title_probe and title_probe in text:
+            return _parse_video_id_from_text(href)
+    return None
+
+
+def _wait_for_uploaded_video_id(driver, title: str) -> Optional[str]:
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        video_id = _extract_video_id(driver)
+        if video_id:
+            return video_id
+        try:
+            video_id = _find_video_id_on_studio_page(driver, title)
+            if video_id:
+                return video_id
+        except Exception:
+            pass
+        time.sleep(5)
+        try:
+            driver.refresh()
+        except Exception:
+            pass
+    return None
+
+
+def get_browser() -> webdriver.Firefox:
+    profile_path = _find_firefox_profile()
+    options = Options()
+    headless_override = os.environ.get("FIREFOX_HEADLESS")
+    headless = headless_override == "1" if headless_override is not None else sys.platform != "darwin"
+    if headless:
+        options.add_argument("--headless")
+    options.add_argument("-profile")
+    options.add_argument(profile_path)
+
     if sys.platform == "darwin":
         firefox_bin = "/Applications/Firefox.app/Contents/MacOS/firefox"
         if os.path.exists(firefox_bin):
@@ -93,77 +194,75 @@ def get_browser():
     return driver
 
 
-def _extract_video_id(driver) -> str | None:
-    """Poll up to 30s for a real 11-char YouTube video ID after Done is clicked."""
-    deadline = time.time() + 30
-    while time.time() < deadline:
-        # Check address bar redirect
-        try:
-            url = driver.current_url
-            for pattern in ("youtu.be/", "youtube.com/watch?v="):
-                if pattern in url:
-                    vid = url.split(pattern)[-1].split("&")[0].split("?")[0]
-                    if len(vid) == 11:
-                        return vid
+class YouTubeBrowserUploader(IVideoUploader):
+    def __init__(self, browser_adapter: BrowserAdapter = None):
+        self.browser = browser_adapter or BrowserAdapter()
 
-            # Check post-upload dialog link elements
-            link_els = driver.find_elements(
-                By.CSS_SELECTOR,
-                "a.style-scope.ytcp-video-share-config, span.video-url-wrapper a, a[href*='youtu.be'], a[href*='youtube.com/watch']"
-            )
-            for el in link_els:
-                href = el.get_attribute("href") or ""
-                for pattern in ("youtu.be/", "youtube.com/watch?v="):
-                    if pattern in href:
-                        vid = href.split(pattern)[-1].split("&")[0].split("?")[0]
-                        if len(vid) == 11:
-                            return vid
-        except Exception:
-            pass
+    def upload(self, video_path: Path, title: str, description: str, tags: List[str], thumbnail_path: Optional[Path] = None) -> Optional[str]:
+        """Uploads a video using the browser's background task queue."""
+        future = concurrent.futures.Future()
 
-        time.sleep(2)
-    return None
+        def task_fn():
+            try:
+                # We normalize tags here as the standalone function does it too, 
+                # but we'll pass the list/string as-is and let it handle it.
+                result = upload_to_youtube_browser(
+                    video_path=video_path,
+                    title=title,
+                    description=description,
+                    tags=tags,
+                    thumbnail_path=thumbnail_path
+                )
+                future.set_result(result)
+            except Exception as e:
+                print(f"❌ Task execution failed in browser worker: {e}")
+                future.set_result(None)
+
+        print(f"🕒 Queuing upload task for '{title}'...")
+        self.browser.push_task(task_fn)
+        
+        # Wait for the background worker to finish the task
+        return future.result()
 
 
-def upload_to_youtube_browser(video_path, title, description, tags, thumbnail_path=None):
+def upload_to_youtube_browser(video_path: Union[str, Path], title: str, description: str,
+                               tags: Union[str, List[str]],
+                               thumbnail_path: Optional[Union[str, Path]] = None) -> Optional[str]:
+    if isinstance(tags, list):
+        tags_str = ", ".join(tags)
+    else:
+        tags_str = ", ".join(t.strip() for t in str(tags).split(',') if t.strip())
     print(f"🌐 Uploading '{video_path}' using browser profile...")
     driver = None
     try:
         driver = get_browser()
-        wait = WebDriverWait(driver, 20)
         driver.get("https://www.youtube.com/upload")
-        
-        # Wait for page to load or check for login
-        time.sleep(5) 
+        time.sleep(5)
 
-        # Check if login is required
         if "login" in driver.current_url.lower() or "signin" in driver.current_url.lower():
-            print("❌ Browser profile is NOT logged in. Please log in manually in Firefox first.")
-            driver.quit()
+            print("❌ Browser profile is NOT logged in.")
             return None
 
-        # Set video file
         print("📤 Selecting video file...")
-        file_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']")))
+        file_input = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
+        )
         file_input.send_keys(str(Path(video_path).resolve()))
-        
-        # Wait for textboxes to appear (indicates file selection accepted)
-        print("📝 Setting title and description...")
-        wait.until(EC.presence_of_all_elements_located((By.ID, YOUTUBE_TEXTBOX_ID)))
-        
-        textboxes = driver.find_elements(By.ID, YOUTUBE_TEXTBOX_ID)
-        if len(textboxes) >= 2:
-            title_el = textboxes[0]
-            description_el = textboxes[1]
 
-            # OS-agnostic select-all key
+        print("📝 Setting title and description...")
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_all_elements_located((By.ID, YOUTUBE_TEXTBOX_ID))
+        )
+        textboxes = driver.find_elements(By.ID, YOUTUBE_TEXTBOX_ID)
+
+        if len(textboxes) >= 2:
+            title_el, description_el = textboxes[0], textboxes[1]
             select_all = Keys.COMMAND if sys.platform == "darwin" else Keys.CONTROL
-            
+
             driver.execute_script("arguments[0].scrollIntoView(true);", title_el)
             time.sleep(1)
             title_el.click()
             time.sleep(1)
-            # Use OS-agnostic key to clear and type
             title_el.send_keys(select_all + "a")
             title_el.send_keys(Keys.BACKSPACE)
             title_el.send_keys(title)
@@ -175,69 +274,55 @@ def upload_to_youtube_browser(video_path, title, description, tags, thumbnail_pa
             time.sleep(1)
             description_el.send_keys(select_all + "a")
             description_el.send_keys(Keys.BACKSPACE)
-            description_el.send_keys(f"{description}\n\nTags: {tags}")
+            description_el.send_keys(f"{description}\n\nTags: {tags_str}")
             description_el.send_keys(Keys.ESCAPE)
 
-        # Set `not made for kids`
         print("👶 Setting audience...")
         try:
-            not_for_kids = wait.until(EC.element_to_be_clickable((By.NAME, YOUTUBE_NOT_MADE_FOR_KIDS_NAME)))
+            not_for_kids = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.NAME, YOUTUBE_NOT_MADE_FOR_KIDS_NAME))
+            )
             driver.execute_script("arguments[0].click();", not_for_kids)
-        except Exception:
-            try:
-                el = driver.find_element(By.XPATH, "//*[contains(text(), 'No, it')]")
-                driver.execute_script("arguments[0].click();", el)
-            except Exception as e:
-                print(f"⚠️ Could not set audience: {e}")
+        except Exception as e:
+            print(f"⚠️ Could not set audience: {e}")
 
-        # Click next 3 times
         for i in range(3):
             print(f"➡️ Clicking Next ({i+1}/3)...")
             try:
-                next_btn = wait.until(EC.element_to_be_clickable((By.ID, YOUTUBE_NEXT_BUTTON_ID)))
+                next_btn = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, YOUTUBE_NEXT_BUTTON_ID))
+                )
                 driver.execute_script("arguments[0].click();", next_btn)
             except Exception:
-                print(f"⚠️ Could not click Next ({i+1}), trying generic Next...")
-                btns = driver.find_elements(By.XPATH, "//*[text()='Next']")
-                if btns:
-                    driver.execute_script("arguments[0].click();", btns[0])
+                time.sleep(2)
+                next_btn = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, YOUTUBE_NEXT_BUTTON_ID))
+                )
+                driver.execute_script("arguments[0].click();", next_btn)
             time.sleep(2)
 
-        # Set visibility
-        vis_labels = {0: "Public", 1: "Unlisted", 2: "Private"}
-        print(f"👁️ Setting visibility to {vis_labels.get(VISIBILITY_INDEX, 'Unlisted')}...")
         try:
-            # Re-fetch radios because they might be stale after 'Next' clicks
-            radios = wait.until(EC.presence_of_all_elements_located((By.XPATH, YOUTUBE_RADIO_BUTTON_XPATH)))
-            if len(radios) > VISIBILITY_INDEX:
-                driver.execute_script("arguments[0].click();", radios[VISIBILITY_INDEX])
+            _set_visibility(driver)
         except Exception as e:
             print(f"⚠️ Could not set visibility: {e}")
 
-        # Click Done
-        print("✅ Clicking Done...")
+        print("🏁 Clicking Done/Finish...")
         try:
-            done_btn = wait.until(EC.element_to_be_clickable((By.ID, YOUTUBE_DONE_BUTTON_ID)))
-            driver.execute_script("arguments[0].click();", done_btn)
-        except Exception:
-            done_btns = driver.find_elements(By.XPATH, "//*[text()='Done' or text()='Save' or text()='Publish']")
-            if done_btns:
-                driver.execute_script("arguments[0].click();", done_btns[0])
+            _click_finalize_button(driver)
+        except Exception as e:
+            print(f"⚠️ Could not click Done: {e}")
 
-        # Extract real video ID (poll up to 30s)
-        print("🔗 Waiting for video ID...")
-        video_id = _extract_video_id(driver)
-
+        time.sleep(5)
+        video_id = _wait_for_uploaded_video_id(driver, title)
         if video_id:
-            print(f"🎉 Uploaded! https://youtube.com/watch?v={video_id}")
+            print(f"✅ Upload successful! Video ID: {video_id}")
         else:
-            print("⚠️ Upload may have succeeded but video ID could not be extracted. Check YouTube Studio.")
-
-        driver.quit()
+            print(f"⚠️ Could not extract video ID. Final URL: {driver.current_url}")
         return video_id
 
     except Exception as e:
-        print(f"❌ Browser upload error: {e}")
+        print(f"❌ Browser upload failed: {e}")
+        return None
+    finally:
         if driver:
             driver.quit()
-        return None
