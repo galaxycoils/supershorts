@@ -69,9 +69,9 @@ def run_tcm_batch(count: int = 3, focus: str = "Traditional Chinese Medicine (TC
     """Run TCM mode non-interactively (no prompts)."""
     import ollama
     from src.modes.tcm_educational import (
-        TCM_PLAN_FILE, _generate_tcm_curriculum, _show_plan_status
+        TCM_PLAN_FILE, generate_tcm_curriculum, _show_plan_status
     )
-    from src.generator import generate_lesson_content, text_to_speech, generate_visuals, compose_video, _clamp_words
+    from src.generator import generate_lesson_content, text_to_speech, generate_visuals, compose_video, clamp_words
     from src.infrastructure.browser_uploader import upload_to_youtube_browser as upload_to_youtube
     from src.core.learning import log_upload
     from main import cleanup_after_upload
@@ -90,7 +90,7 @@ def run_tcm_batch(count: int = 3, focus: str = "Traditional Chinese Medicine (TC
 
     if plan is None:
         with console.status(f"[cyan]Generating {focus} curriculum…[/cyan]"):
-            plan = _generate_tcm_curriculum(focus, extra)
+            plan = generate_tcm_curriculum(focus, extra)
         TCM_PLAN_FILE.write_text(json.dumps(plan, indent=2))
 
     pending_lessons = [l for l in plan.get("lessons", []) if l.get("status") == "pending"]
@@ -111,7 +111,7 @@ def run_tcm_batch(count: int = 3, focus: str = "Traditional Chinese Medicine (TC
                 content = generate_lesson_content(lesson["title"])
 
             raw_short = content.get("short_form_highlight") or lesson["title"]
-            short_script = _clamp_words(raw_short, min_w=99, max_w=127)
+            short_script = clamp_words(raw_short, min_w=99, max_w=127)
             short_audio = text_to_speech(short_script, OUTPUT_DIR / f"tcm_audio_{uid}.mp3")
             slide_path = generate_visuals(
                 output_dir=OUTPUT_DIR / f"tcm_slides_{uid}",
@@ -120,8 +120,9 @@ def run_tcm_batch(count: int = 3, focus: str = "Traditional Chinese Medicine (TC
                 slide_number=1, total_slides=1,
             )
             short_path = OUTPUT_DIR / f"tcm_short_{uid}.mp4"
-            compose_video([slide_path], [short_audio], short_path, "short",
-                          lesson["title"], script=short_script)
+            compose_video([slide_path], [short_audio], short_path, VideoOptions(
+                video_type="short", lesson_title=lesson["title"], script=short_script
+            ))
             try:
                 Path(short_audio).unlink(missing_ok=True)
             except Exception:
@@ -409,3 +410,4 @@ Examples:
 
 if __name__ == "__main__":
     main()
+()

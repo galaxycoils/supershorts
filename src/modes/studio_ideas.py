@@ -18,11 +18,12 @@ from src.core.config import (
     OLLAMA_MODEL,
     OLLAMA_TIMEOUT,
     YOUR_NAME,
+    VideoOptions
 )
 from src.infrastructure.llm import ollama_generate
 from src.infrastructure.tts import text_to_speech
 from src.engine.video_engine import generate_visuals, compose_video
-from src.utils.text import strip_emojis, _clamp_words
+from src.utils.text import strip_emojis, clamp_words
 from src.utils.json import safe_json_parse
 
 LOG_FILE    = PROJECT_ROOT / "performance_log.json"
@@ -153,7 +154,7 @@ Format the JSON with keys: "title", "hook", "dialogue", "thumbnail_prompt"."""
         }
     # Enforce 35-45s duration (99-127 words)
     if result.get("dialogue"):
-        result["dialogue"] = _clamp_words(result["dialogue"], min_w=99, max_w=127)
+        result["dialogue"] = clamp_words(result["dialogue"], min_w=99, max_w=127)
     result["yt_thumbnail_url"] = video_data.get("thumbnail_url", "")
     result["yt_video_id"]      = video_data.get("video_id", "")
     result["yt_link"]          = video_data.get("yt_link", "")
@@ -191,7 +192,7 @@ Format as a JSON array of {num_ideas} objects."""
         # Enforce 35-45s duration on every idea
         for idea in ideas:
             if isinstance(idea, dict) and idea.get("dialogue"):
-                idea["dialogue"] = _clamp_words(idea["dialogue"], min_w=99, max_w=127)
+                idea["dialogue"] = clamp_words(idea["dialogue"], min_w=99, max_w=127)
     except Exception as e:
         print(f"  Ollama failed ({e}), using fallback ideas.")
         ideas = [
@@ -240,7 +241,7 @@ def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
         return {"status": "skipped", "title": title}
 
     # Enforce 35-45s duration before TTS
-    dialogue = _clamp_words(dialogue, min_w=99, max_w=127)
+    dialogue = clamp_words(dialogue, min_w=99, max_w=127)
 
     print(f"\n  ── Idea {index+1}/{total}: {title[:60]} ──")
 
@@ -266,7 +267,7 @@ def _produce_and_upload_idea(idea: dict, index: int, total: int) -> dict:
     # Compose Short with subtitle overlay
     video_path = OUTPUT_DIR / f"{uid}.mp4"
     print(f"  Composing → {video_path.name}")
-    compose_video([slide_path], [audio_path], video_path, "short", title, script=dialogue)
+    compose_video([slide_path], [audio_path], video_path, VideoOptions(video_type="short", lesson_title=title, script=dialogue))
 
     # Upload
     hashtags = "#AI #Shorts #Tech #Viral #AIFacts"

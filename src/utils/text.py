@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 _EMOJI_RE = re.compile(
     "[\U0001F600-\U0001F64F"   # emoticons
@@ -37,14 +38,20 @@ def strip_markdown(text: str) -> str:
     text = re.sub(r' {2,}', ' ', text)
     return text.strip()
 
-def _clamp_words(text: str, min_w: int = 99, max_w: int = 127) -> str:
+def clamp_words(text: str, min_w: int = 99, max_w: int = 127, pad_text: Optional[str] = None) -> str:
     """Pad/trim text to target word count range at sentence boundaries."""
-    pad = (
-        " Most people never think about this deeply enough. The science is clear. "
-        "Understanding this gives you an edge. Start today. Subscribe for more."
+    pad = pad_text or (
+        " Most people never stop to think about this carefully. The science is clear "
+        "and consistent on this topic. Understanding it gives you a real edge in today's "
+        "world. Consistent small actions compound into dramatic results over time. "
+        "The difference between those who succeed and those who struggle often comes down "
+        "to awareness, consistency, and execution. Once you understand this principle, you "
+        "cannot go back to ignoring it. Start applying it today and the results will "
+        "genuinely surprise you over the next few months. Stay focused, stay consistent, "
+        "and follow for more insights, tips, and advice like this every single week."
     )
     words = text.split()
-    while len(words) < min_w:
+    if len(words) < min_w:
         words += pad.split()
     if len(words) > max_w:
         words = words[:max_w]
@@ -57,16 +64,8 @@ def _clamp_words(text: str, min_w: int = 99, max_w: int = 127) -> str:
             break
     return result.strip()
 
-_SCRIPT_PAD = (
-    " This is something that affects every single person who wants to perform at a "
-    "higher level. Understanding this gives you an edge. "
-    "Small consistent actions compound into dramatic changes over time."
-)
-
-def _enforce_script_length(script: str, min_words: int = 1360, max_words: int = 1700) -> str:
-    """Pad script to min_words, trim at max_words."""
-    while len(script.split()) < min_words:
-        script += " " + _SCRIPT_PAD
+def enforce_script_length(script: str, max_words: int = 1700) -> str:
+    """Trim script at max_words. Minimum not enforced — avoids repetitive padding."""
     words = script.split()
     if len(words) > max_words:
         script = " ".join(words[:max_words])

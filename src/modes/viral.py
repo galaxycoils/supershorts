@@ -6,13 +6,13 @@ from tqdm import tqdm
 
 from src.core.config import (
     CONTENT_PACKAGE_TOPICS, YOUR_NAME, OUTPUT_DIR, VIRAL_GAMEPLAY_PATH,
-    OLLAMA_MODEL, OLLAMA_TIMEOUT
+    OLLAMA_MODEL, OLLAMA_TIMEOUT, VideoOptions
 )
 from src.infrastructure.llm import ollama_generate
 from src.infrastructure.tts import text_to_speech
 from src.infrastructure.video import get_local_background, get_local_gameplay, get_relevant_pexels_video
 from src.engine.video_engine import generate_visuals, compose_video
-from src.utils.text import strip_emojis, _enforce_script_length, _clamp_words
+from src.utils.text import strip_emojis, enforce_script_length, clamp_words
 from src.utils.json import safe_json_parse
 
 def generate_youtube_content_package() -> None:
@@ -62,7 +62,7 @@ Return ONLY valid JSON:
 
     title      = strip_emojis(result.get("selected_title", topic)[:80])
     script     = strip_emojis(result.get("full_script", ""))
-    script     = _enforce_script_length(script, min_words=1360)
+    script     = enforce_script_length(script)
     desc       = result.get("description", "") + "\n\n" + result.get("hashtags", "")
     pexels_kw  = result.get("pexels_keywords", "technology abstract")
 
@@ -79,7 +79,7 @@ Return ONLY valid JSON:
     )
 
     video_path = OUTPUT_DIR / f"{unique_id}_video.mp4"
-    compose_video([slide_path], [audio_path], video_path, "long", title, script=script)
+    compose_video([slide_path], [audio_path], video_path, VideoOptions(video_type="long", lesson_title=title, script=script))
 
     tags     = ",".join(dict.fromkeys((pexels_kw + ",YouTube,education").split(",")[:10]))
     print(f"  Uploading → {title[:60]}...")
@@ -126,9 +126,9 @@ def start_viral_gameplay_mode():
 
     video_path = OUTPUT_DIR / f"{unique_id}.mp4"
     viral_script = ' '.join(f"{s.get('title', '')}. {s.get('content', '')}" for s in slides_data)
-    viral_script = _clamp_words(viral_script, min_w=99, max_w=127)
-    compose_video(slide_paths, slide_audio_paths, video_path, 'short', topic,
-                  force_viral_bg=True, script=viral_script)
+    viral_script = clamp_words(viral_script, min_w=99, max_w=127)
+    compose_video(slide_paths, slide_audio_paths, video_path, 
+                  VideoOptions(video_type='short', lesson_title=topic, force_viral_bg=True, script=viral_script))
 
     thumb_path = generate_visuals(OUTPUT_DIR, 'short', thumbnail_title=topic)
 

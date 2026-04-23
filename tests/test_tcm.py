@@ -1,10 +1,11 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from src.generator import _generate_tcm_curriculum, _clamp_words
+from src.core.config import VideoOptions
+from src.generator import generate_tcm_curriculum, clamp_words, compose_video
 
 def test_clamp_words_tcm():
     text = "Short text"
-    clamped = _clamp_words(text, min_w=10, max_w=20)
+    clamped = clamp_words(text, min_w=10, max_w=20)
     assert len(clamped.split()) >= 10
     assert len(clamped.split()) <= 20
 
@@ -15,7 +16,7 @@ def test_generate_tcm_curriculum_mock(mock_ollama):
             'content': '{"curriculum_title": "Test TCM", "lessons": [{"chapter": 1, "part": 1, "title": "Lesson 1", "status": "pending", "youtube_id": null}]}'
         }
     }
-    result = _generate_tcm_curriculum("TCM", "")
+    result = generate_tcm_curriculum("TCM", "")
     assert result['curriculum_title'] == "Test TCM"
     assert len(result['lessons']) == 1
     assert result['lessons'][0]['title'] == "Lesson 1"
@@ -79,7 +80,9 @@ def test_compose_video_bg_query(mock_video, mock_concat, mock_image, mock_audio,
     with patch('src.engine.video_engine.CompositeVideoClip') as mock_composite:
         mock_composite.return_value.duration = 1.0
         mock_composite.return_value.set_audio.return_value = mock_composite.return_value
-        compose_video(["img.png"], ["audio.wav"], "out.mp4", "short", "Title", bg_query="TCM Herbs")
+        compose_video(["img.png"], ["audio.wav"], "out.mp4", VideoOptions(
+            video_type="short", lesson_title="Title", bg_query="TCM Herbs"
+        ))
     
     # Verify get_relevant_pexels_video was called with bg_query
     mock_pexels.assert_called_with("TCM Herbs", "short")

@@ -12,6 +12,7 @@ import datetime
 import subprocess
 import threading
 import shutil
+import re
 import requests as _req
 from pathlib import Path
 from flask import Flask, Response, jsonify, request, stream_with_context
@@ -31,9 +32,9 @@ JOBS: dict[str, dict] = {}
 
 MODE_COMMANDS = {
     "educational": "from main import main_flow; main_flow(lessons_per_run={count})",
-    "brainrot":    "from src.modes.brainrot import run_brainrot_pipeline; run_brainrot_pipeline({count})",
+    "brainrot":    "from src.modes.brainrot import run_brainrot_pipeline; run_brainrot_pipeline({count}, dry_run={dry_run}, voice='{voice}')",
     "rotgen":      "from src.modes.rotgen import run_rotgen_pipeline; run_rotgen_pipeline({count})",
-    "tcm":         "from src.modes.tcm_educational import run_tcm_mode; run_tcm_mode()",
+    "tcm":         "from src.modes.tcm_educational import run_tcm_mode; run_tcm_mode(dry_run={dry_run}, voice='{voice}')",
     "tutorial":    "from src.generator import start_tutorial_generation; start_tutorial_generation()",
     "viral":       "from src.generator import start_viral_gameplay_mode; start_viral_gameplay_mode()",
     "ideas":       "from src.modes.studio_ideas import start_idea_generator; start_idea_generator()",
@@ -76,6 +77,19 @@ def _dir_mb(p: Path) -> float:
     total = sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
     return round(total / 1_048_576, 1)
 
+def _ram_gb():
+    try:
+        if sys.platform == "darwin":
+            out = subprocess.check_output(["sysctl", "hw.memsize"]).decode()
+            total_b = int(out.split(":")[1].strip())
+            # Simple free memory estimation on macOS
+            vm = subprocess.check_output(["vm_stat"]).decode()
+            free_p = int(re.search(r"Pages free:\s+(\d+)", vm).group(1))
+            return round(total_b / 1073741824, 1), round(free_p * 4096 / 1073741824, 1)
+    except Exception:
+        pass
+    return 8.0, 4.0
+
 def _stats():
     plan     = _read_json(PROJECT_ROOT / "content_plan.json",    {"lessons": []})
     brainrot = _read_json(PROJECT_ROOT / "brainrot_plan.json",   {"topics": []})
@@ -109,6 +123,8 @@ def _stats():
         m = e.get("mode", "unknown")
         modes[m] = modes.get(m, 0) + 1
 
+    total_ram, free_ram = _ram_gb()
+
     return {
         "educational":    {"done": ed_done, "total": max(len(lessons), 20)},
         "brainrot":       {"done": br_done, "total": len(br_list)},
@@ -119,6 +135,7 @@ def _stats():
         "lessons":        lessons,
         "log_recent":     log[-20:],
         "heatmap":        heatmap,
+        "ram":            {"total": total_ram, "free": free_ram},
     }
 
 def _stream_job(job_id: str, proc: subprocess.Popen):
@@ -157,19 +174,87 @@ def api_health():
         pass
     return jsonify({"ollama": ollama_ok, "uptime_s": int(time.time() - START)})
 
+@app.route("/api/terminate/<job_id>", methods=["POST"])
+def api_terminate(job_id):
+    if job_id not in JOBS:
+        return jsonify({"error": "job not found"}), 404
+    job = JOBS[job_id]
+    if job["status"] == "running" and job["proc"]:
+        try:
+            job["proc"].terminate()
+            job["status"] = "terminated"
+            return jsonify({"status": "terminated"})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    return jsonify({"status": job["status"]})
+
+@app.route("/api/gallery")
+def api_gallery():
+    output_dir = PROJECT_ROOT / "output"
+    if not output_dir.exists():
+        return jsonify([])
+    videos = []
+    for p in sorted(output_dir.glob("*.mp4"), key=os.path.getmtime, reverse=True):
+        videos.append({
+            "name": p.name,
+            "size_mb": round(p.stat().st_size / 1_048_576, 1),
+            "created": datetime.datetime.fromtimestamp(p.stat().st_mtime).isoformat()
+        })
+    return jsonify(videos)
+
+@app.route("/api/workflow-info/<name>")
+def api_workflow_info(name):
+    if name not in WORKFLOW_COMMANDS:
+        return jsonify({"error": "unknown workflow"}), 404
+    path = Path(WORKFLOW_COMMANDS[name][1])
+    if path.exists():
+        return jsonify(json.loads(path.read_text()))
+    return jsonify({"error": "file not found"}), 404
+
+@app.route("/api/models")
+def api_models():
+    try:
+        r = _req.get("http://localhost:11434/api/tags", timeout=2)
+        if r.status_code == 200:
+            return jsonify([m["name"] for m in r.json().get("models", [])])
+    except: pass
+    return jsonify(["llama3", "mistral", "phi3"])
+
 @app.route("/api/run/<mode>", methods=["POST"])
 def api_run(mode):
     if mode not in MODE_COMMANDS:
         return jsonify({"error": "unknown mode"}), 400
     try:
-        count = max(1, min(10, int((request.json or {}).get("count", 1))))
+        data  = request.json or {}
+        count = max(1, min(10, int(data.get("count", 1))))
+        dry_run = "True" if data.get("dry_run") == "y" else "False"
+        voice   = data.get("voice", "en_US-ryan-high")
+        
+        # Advanced Params
+        llm_model = data.get("llm_model", "llama3")
+        hd_mode   = "True" if data.get("hd_mode") == "y" else "False"
+        author    = data.get("author_name", "SuperShorts")
+        
     except (ValueError, TypeError):
         count = 1
-    code  = MODE_COMMANDS[mode].format(count=count)
+        dry_run = "False"
+        voice   = "en_US-ryan-high"
+        llm_model = "llama3"
+        hd_mode = "False"
+        author = "SuperShorts"
+
+    # Injecting environment variable overrides for the subprocess
+    env = os.environ.copy()
+    env["OLLAMA_MODEL"] = llm_model
+    env["YOUR_NAME"] = author
+    if hd_mode == "True":
+        env["RENDER_HD"] = "1"
+
+    code  = MODE_COMMANDS[mode].format(count=count, dry_run=dry_run, voice=voice)
     cmd   = [PYTHON, "-c",
              f"import sys; sys.path.insert(0,'{PROJECT_ROOT}'); {code}"]
     proc  = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             stdin=subprocess.PIPE, cwd=str(PROJECT_ROOT))
+                             stdin=subprocess.PIPE, cwd=str(PROJECT_ROOT), env=env)
     # Feed stdin: explicit input from UI modal, or auto-accept defaults.
     stdin_input = (request.json or {}).get("stdin_input", None)
     try:
@@ -231,6 +316,10 @@ def api_jobs():
 def index():
     return DASHBOARD_HTML
 
+@app.route("/output/<filename>")
+def serve_output(filename):
+    return stream_with_context(open(PROJECT_ROOT / "output" / filename, "rb"))
+
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
 DASHBOARD_HTML = r"""<!DOCTYPE html>
@@ -244,29 +333,22 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:      #080808;
-  --bg2:     #0f0f0f;
-  --bg3:     #161616;
-  --bg4:     #1c1c1c;
+  --bg:      #0c111d; /* DESIGN.md primary-bg */
+  --bg2:     #121826;
+  --bg3:     #1b2231;
+  --bg4:     #242c3d;
+  --cyan:    #00c8ff; /* DESIGN.md accent-cyan */
+  --pink:    #ff1e50; /* DESIGN.md accent-pink */
   --coral:   #ff6b35;
-  --coral2:  #c84d1f;
-  --coral3:  rgba(255,107,53,.1);
-  --cream:   #e8ddd4;
-  --cream2:  #b8a89e;
   --mint:    #4ade80;
   --red:     #f87171;
-  --dim:     #524840;
-  --border:  #181410;
-  --border2: #242018;
-  --sidebar: 220px;
-  /* Border radius */
-  --r-sm: 2px; --r-md: 4px; --r-lg: 6px;
-  /* Shadows */
-  --shadow-card: 0 1px 4px rgba(0,0,0,.5);
-  --shadow-modal: 0 8px 32px rgba(0,0,0,.7);
-  /* Transitions */
-  --t-fast: 0.12s ease; --t-base: 0.18s ease; --t-slow: 0.3s ease;
-  /* Z-index stack */
+  --text:    #ffffff; /* DESIGN.md text-main */
+  --dim:     #667085;
+  --border:  #1e293b;
+  --border2: #334155;
+  --sidebar: 240px;
+  --r-sm: 4px; --r-md: 8px; --r-lg: 12px;
+  --t-fast: 0.1s ease; --t-base: 0.2s ease;
   --z-tooltip: 200; --z-topbar: 300; --z-modal: 500;
 }
 
@@ -280,14 +362,11 @@ html, body { height: 100%; }
 body {
   display: flex;
   background: var(--bg);
-  color: var(--cream);
+  color: var(--text);
   font-family: 'Fira Sans', system-ui, sans-serif;
-  font-size: 13px;
-  line-height: 1.5;
-  overflow-x: hidden;
+  font-size: 14px;
+  line-height: 1.6;
 }
-
-:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
 
 /* ── SIDEBAR ─────────────────────────────────────────────────────── */
 .sidebar {
@@ -303,51 +382,34 @@ body {
   overflow-y: auto;
 }
 
-.sidebar::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0px, transparent 8px,
-    var(--border2) 8px, var(--border2) 14px
-  );
-  pointer-events: none;
-}
-
 .sidebar-logo {
-  padding: 22px 16px 18px 18px;
+  padding: 30px 24px 20px;
   border-bottom: 1px solid var(--border);
 }
 
 .logo-mark {
   font-family: 'Fira Code', monospace;
-  font-weight: 600;
-  font-size: 16px;
-  letter-spacing: -0.5px;
-  color: var(--cream);
-  display: flex;
-  align-items: baseline;
-  gap: 1px;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -1px;
+  color: var(--text);
 }
-.logo-mark .accent { color: var(--coral); }
-.logo-mark .slash  { color: var(--dim); font-weight: 400; margin: 0 2px; }
+.logo-mark .accent { color: var(--cyan); }
+.logo-mark .slash  { color: var(--dim); margin: 0 2px; }
 
 .logo-sub {
-  font-size: 9px;
-  letter-spacing: 2.5px;
+  font-size: 10px;
+  letter-spacing: 2px;
   color: var(--dim);
   text-transform: uppercase;
-  margin-top: 5px;
-  font-weight: 500;
+  margin-top: 4px;
 }
 
-.nav-section { padding: 14px 0 6px; }
+.nav-section { padding: 20px 0 10px; }
 .nav-label {
-  padding: 0 14px 6px 18px;
-  font-size: 9px;
-  letter-spacing: 2.5px;
+  padding: 0 24px 10px;
+  font-size: 10px;
+  letter-spacing: 1.5px;
   color: var(--dim);
   text-transform: uppercase;
   font-weight: 600;
@@ -356,25 +418,19 @@ body {
 .nav-btn {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
   width: 100%;
-  padding: 7px 14px 7px 18px;
+  padding: 10px 24px;
   background: transparent;
   border: none;
-  border-left: 2px solid transparent;
-  color: var(--cream2);
-  font-family: 'Fira Sans', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
+  color: var(--dim);
+  font-size: 14px;
   cursor: pointer;
-  transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
+  transition: all var(--t-base);
   text-align: left;
 }
-.nav-btn svg { flex-shrink: 0; opacity: .55; transition: opacity var(--t-fast); }
-.nav-btn:hover { background: var(--bg3); color: var(--cream); border-left-color: var(--border2); }
-.nav-btn:hover svg { opacity: 1; }
-.nav-btn.active { color: var(--coral); border-left-color: var(--coral); background: var(--coral3); font-weight: 500; }
-.nav-btn.active svg { opacity: 1; stroke: var(--coral); }
+.nav-btn:hover { background: var(--bg3); color: var(--text); }
+.nav-btn.active { color: var(--cyan); background: rgba(0,200,255,0.08); border-right: 3px solid var(--cyan); }
 
 .wf-section { padding: 4px 10px 8px; }
 .wf-btn {
@@ -402,33 +458,32 @@ body {
 
 .sidebar-bottom {
   margin-top: auto;
-  padding: 12px 14px 16px 18px;
+  padding: 20px 24px;
   border-top: 1px solid var(--border);
+  background: var(--bg);
 }
 
 .ollama-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-size: 10px;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 11px;
   color: var(--dim);
   font-family: 'Fira Code', monospace;
 }
 .led {
-  width: 6px; height: 6px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--dim);
-  flex-shrink: 0;
-  transition: background var(--t-slow), box-shadow var(--t-slow);
 }
-.led.on  { background: var(--mint); box-shadow: 0 0 6px var(--mint); }
-.led.off { background: var(--red);  box-shadow: 0 0 5px rgba(248,113,113,.4); }
+.led.on  { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+.led.off { background: var(--red); }
 
-.disk-label { font-size: 9px; color: var(--dim); margin-bottom: 5px; letter-spacing: 1.5px; text-transform: uppercase; }
-.disk-bar   { height: 2px; background: var(--border2); overflow: hidden; }
-.disk-fill  { height: 100%; background: linear-gradient(90deg, var(--coral2), var(--coral)); transition: width .6s ease; }
-.disk-text  { font-size: 10px; color: var(--dim); margin-top: 4px; font-family: 'Fira Code', monospace; }
+.disk-label { font-size: 10px; color: var(--dim); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+.disk-bar   { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.disk-fill  { height: 100%; background: var(--cyan); transition: width .6s ease; }
+.disk-text  { font-size: 11px; color: var(--dim); margin-top: 6px; font-family: 'Fira Code', monospace; }
 
 /* ── MAIN ────────────────────────────────────────────────────────── */
 .main { flex: 1; overflow-y: auto; min-width: 0; }
@@ -437,41 +492,39 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 20px;
-  padding: 10px 28px;
+  gap: 24px;
+  padding: 12px 32px;
   border-bottom: 1px solid var(--border);
   background: var(--bg2);
   position: sticky;
   top: 0;
-  z-index: var(--z-topbar);
+  z-index: 100;
 }
 
 .producing-badge {
   display: none;
   align-items: center;
-  gap: 6px;
-  font-size: 9px;
-  letter-spacing: 2.5px;
-  color: var(--coral);
-  font-weight: 600;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--pink);
+  font-weight: 700;
   text-transform: uppercase;
-  font-family: 'Fira Code', monospace;
 }
 .producing-badge.active { display: flex; }
 .producing-dot {
-  width: 7px; height: 7px;
+  width: 6px; height: 6px;
   border-radius: 50%;
-  background: var(--coral);
-  box-shadow: 0 0 8px var(--coral);
-  animation: pulse .8s ease-in-out infinite;
+  background: var(--pink);
+  box-shadow: 0 0 10px var(--pink);
+  animation: pulse 1s ease infinite;
 }
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.85)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
 #clock {
   color: var(--dim);
-  font-size: 11px;
+  font-size: 12px;
   font-family: 'Fira Code', monospace;
-  letter-spacing: .5px;
 }
 
 .content { padding: 22px 28px; }
@@ -501,119 +554,75 @@ section { margin-bottom: 30px; }
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 30px;
+  gap: 16px;
+  margin-bottom: 32px;
 }
 
 .kpi {
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  box-shadow: var(--shadow-card);
-  padding: 18px 20px 14px;
+  border-radius: var(--r-md);
+  padding: 24px;
   position: relative;
-  overflow: hidden;
+  transition: transform var(--t-base), border-color var(--t-base);
 }
-
-.kpi::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--coral), transparent);
-  opacity: .3;
-}
+.kpi:hover { border-color: var(--cyan); transform: translateY(-2px); }
 
 .kpi-label {
-  font-size: 9px;
-  letter-spacing: 2.5px;
+  font-size: 10px;
+  letter-spacing: 1.5px;
   color: var(--dim);
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   font-weight: 600;
 }
 
 .kpi-value {
   font-family: 'Fira Code', monospace;
-  font-weight: 600;
-  font-size: 46px;
-  color: var(--coral);
+  font-weight: 700;
+  font-size: 40px;
+  color: var(--cyan);
   line-height: 1;
-  letter-spacing: -2px;
-  text-shadow: 0 0 28px rgba(255,107,53,.2);
 }
 
-.kpi-sub { font-size: 10px; color: var(--dim); margin-top: 8px; font-family: 'Fira Code', monospace; }
+.kpi-sub { font-size: 12px; color: var(--dim); margin-top: 8px; }
 
-.kpi-prog {
-  height: 1px;
-  background: var(--border2);
-  margin-top: 12px;
-  overflow: hidden;
-}
-.kpi-prog-fill {
-  height: 100%;
-  background: var(--coral);
-  opacity: .5;
-  transition: width .8s ease;
-}
-
-/* ── two-col ─────────────────────────────────────────────────────── */
-.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-
-/* ── production slates ───────────────────────────────────────────── */
+/* ── mode grid ───────────────────────────────────────────── */
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
 .slate {
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  box-shadow: var(--shadow-card);
-  padding: 13px 14px;
-  position: relative;
-  overflow: hidden;
+  border-radius: var(--r-md);
+  padding: 20px;
   cursor: pointer;
-  min-width: 0;
-  transition: border-color var(--t-fast), background var(--t-fast);
+  transition: all var(--t-base);
 }
-.slate:hover { border-color: var(--coral); background: var(--bg3); }
-
-.slate::after {
-  content: '';
-  position: absolute;
-  top: 0; right: 0;
-  border-style: solid;
-  border-width: 0 14px 14px 0;
-  border-color: transparent var(--border2) transparent transparent;
-  transition: border-color var(--t-fast);
-}
-.slate:hover::after { border-color: transparent var(--coral) transparent transparent; }
+.slate:hover { border-color: var(--cyan); background: var(--bg3); }
 
 .slate-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px; height: 26px;
-  background: var(--bg3);
-  border: 1px solid var(--border2);
-  margin-bottom: 8px;
+  width: 32px; height: 32px;
+  background: var(--bg4);
+  border-radius: var(--r-sm);
+  margin-bottom: 16px;
+  color: var(--cyan);
 }
-.slate-icon svg { stroke: var(--coral); }
 
 .slate-name {
-  font-family: 'Fira Sans', sans-serif;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--cream);
-  line-height: 1.1;
-  margin-bottom: 2px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 4px;
 }
 
-.slate-desc { font-size: 10px; color: var(--dim); margin-bottom: 10px; line-height: 1.4; }
+.slate-desc { font-size: 12px; color: var(--dim); margin-bottom: 16px; }
 
 .slate-controls { display: flex; align-items: center; gap: 6px; }
 
@@ -664,70 +673,51 @@ section { margin-bottom: 30px; }
   animation: blink .7s ease infinite;
 }
 
-/* ── terminal ────────────────────────────────────────────────────── */
-.term-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.term-clear {
-  background: transparent;
-  border: 1px solid var(--border2);
-  color: var(--dim);
-  font-family: 'Fira Code', monospace;
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  padding: 3px 8px;
-  cursor: pointer;
-  transition: border-color var(--t-fast), color var(--t-fast);
-  text-transform: uppercase;
-}
-.term-clear:hover { border-color: var(--coral); color: var(--coral); }
+/* ── two-col ─────────────────────────────────────────────────────── */
+.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 
+/* ── terminal ────────────────────────────────────────────────────── */
 .terminal {
-  background: #040404;
+  background: #04060b;
   border: 1px solid var(--border);
-  border-top: 2px solid var(--coral);
+  border-top: 3px solid var(--cyan);
   border-radius: var(--r-sm);
-  min-height: 280px;
-  max-height: 420px;
+  min-height: 320px;
+  max-height: 480px;
   overflow-y: auto;
-  padding: 12px 14px;
+  padding: 16px;
   font-family: 'Fira Code', monospace;
-  font-size: 11px;
-  line-height: 1.7;
+  font-size: 12px;
+  line-height: 1.8;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
 }
 
 .term-cursor {
   display: inline-block;
-  width: 6px; height: 12px;
-  background: var(--coral);
-  opacity: .7;
-  animation: cursor-blink 1.1s ease-in-out infinite;
-  vertical-align: middle;
-  margin-left: 1px;
+  width: 7px; height: 14px;
+  background: var(--cyan);
+  margin-left: 4px;
+  animation: cursor-blink 1s steps(2) infinite;
 }
-@keyframes cursor-blink { 0%,100%{opacity:.7} 50%{opacity:0} }  /* smooth ease via animation-timing-function on .term-cursor */
+@keyframes cursor-blink { 0% { opacity: 0; } 100% { opacity: 1; } }
 
-.tl { color: var(--cream2); }
 .tl.ok   { color: var(--mint); }
 .tl.err  { color: var(--red); }
-.tl.sys  { color: var(--dim); font-style: italic; }
-.tl.done { color: var(--coral); font-weight: 600; }
-.tl.prompt { color: var(--coral); }
+.tl.sys  { color: var(--dim); }
+.tl.done { color: var(--cyan); font-weight: 700; }
+.tl.prompt { color: var(--pink); font-weight: 700; }
 
 /* ── heatmap ─────────────────────────────────────────────────────── */
-.heatmap { display: flex; gap: 4px; align-items: flex-end; margin-bottom: 18px; }
-.hm-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.heatmap { display: flex; gap: 6px; align-items: flex-end; margin-bottom: 24px; }
+.hm-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .hm-block {
-  width: 34px; height: 34px;
+  width: 40px; height: 40px;
   background: var(--bg3);
   border: 1px solid var(--border);
-  transition: background .4s ease;
-  cursor: default;
-  position: relative;
+  border-radius: var(--r-sm);
+  transition: all var(--t-base);
 }
+.hm-block:hover { transform: scale(1.1); z-index: 10; border-color: var(--cyan); }
 .hm-block[data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute;
@@ -1010,6 +1000,14 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
       Upload Log
     </button>
+    <button class="nav-btn" onclick="navTo('#gallery',this);refreshGallery()" aria-label="Gallery">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      Gallery
+    </button>
+    <button class="nav-btn" onclick="navTo('#settings',this)" aria-label="Settings">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      Settings
+    </button>
   </nav>
 
   <div class="nav-section">
@@ -1030,12 +1028,16 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
     </div>
   </div>
 
-  <div class="sidebar-bottom">
+    <div class="sidebar-bottom">
     <div class="ollama-row">
       <div class="led" id="ollama-led" role="status" aria-label="Ollama connection status"></div>
       <span id="ollama-txt">ollama —</span>
     </div>
-    <div class="disk-label">Output Disk</div>
+    <div class="disk-label">System RAM</div>
+    <div class="disk-bar"><div class="disk-fill" id="ram-fill" style="width:0%; background:var(--pink)"></div></div>
+    <div class="disk-text" id="ram-text">— gb free</div>
+    
+    <div class="disk-label" style="margin-top:12px">Output Disk</div>
     <div class="disk-bar"><div class="disk-fill" id="disk-fill" style="width:0%"></div></div>
     <div class="disk-text" id="disk-text">— mb</div>
   </div>
@@ -1090,13 +1092,41 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
       <section>
         <div class="term-header">
           <h2>Live Output <small>sse</small></h2>
-          <button class="term-clear" onclick="termClear()" aria-label="Clear terminal">clr</button>
+          <div style="display:flex; gap:8px">
+            <button class="term-clear" id="stop-btn" onclick="terminateActiveJob()" style="display:none; border-color:var(--red); color:var(--red)">stop ■</button>
+            <button class="term-clear" onclick="termClear()" aria-label="Clear terminal">clr</button>
+          </div>
         </div>
         <div class="terminal" id="terminal" role="log" aria-live="polite">
           <div class="tl sys">awaiting production order<span class="term-cursor"></span></div>
         </div>
       </section>
     </div>
+
+    <section id="gallery">
+      <h2>Recent Productions <small>gallery</small></h2>
+      <div id="gallery-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:16px">
+        <div class="tl sys">Gallery loading...</div>
+      </div>
+    </section>
+
+    <section id="settings">
+      <h2>Global Settings <small>persistence</small></h2>
+      <div class="slate" style="max-width:400px; cursor:default">
+        <div class="field">
+          <label>Author Name</label>
+          <input type="text" id="global-author" value="SuperShorts" onchange="saveGlobalSettings()">
+        </div>
+        <div class="field">
+          <label>Ollama Model (Global)</label>
+          <select id="global-model" style="width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border2); padding:8px" onchange="saveGlobalSettings()">
+            <option value="llama3">llama3</option>
+            <option value="mistral">mistral</option>
+            <option value="phi3">phi3</option>
+          </select>
+        </div>
+      </div>
+    </section>
 
     <section id="plan">
       <h2>Content Plan <small>curriculum</small></h2>
@@ -1252,11 +1282,15 @@ async function runWorkflow(name) {
   }
 }
 
+let lastJobId = null;
+
 // ── SSE stream ────────────────────────────────────────────────────
 function openStream(job_id, onDone) {
+  lastJobId = job_id;
   termClear();
   termLine(`▶ job ${job_id} starting…`, 'prompt');
   document.getElementById('producing-badge').classList.add('active');
+  document.getElementById('stop-btn').style.display = 'block';
   activeJobs.add(job_id);
 
   if (currentEvt) currentEvt.close();
@@ -1267,11 +1301,7 @@ function openStream(job_id, onDone) {
     if (line.startsWith('[JOB')) {
       const ok = line.includes('DONE');
       termLine(line, ok ? 'done' : 'err');
-      currentEvt.close();
-      activeJobs.delete(job_id);
-      if (activeJobs.size === 0)
-        document.getElementById('producing-badge').classList.remove('active');
-      if (onDone) onDone();
+      finishJob(job_id, onDone);
     } else {
       const cls = (line.includes('❌')||line.includes('ERROR')) ? 'err'
                 : (line.includes('✅')||line.includes('✓')) ? 'ok'
@@ -1279,12 +1309,58 @@ function openStream(job_id, onDone) {
       termLine(line, cls);
     }
   };
-  currentEvt.onerror = () => {
+  currentEvt.onerror = () => finishJob(job_id, onDone);
+}
+
+function finishJob(job_id, onDone) {
+    if (currentEvt) currentEvt.close();
     activeJobs.delete(job_id);
-    if (activeJobs.size === 0)
-      document.getElementById('producing-badge').classList.remove('active');
+    if (activeJobs.size === 0) {
+        document.getElementById('producing-badge').classList.remove('active');
+        document.getElementById('stop-btn').style.display = 'none';
+    }
     if (onDone) onDone();
-  };
+    refreshGallery();
+}
+
+async function terminateActiveJob() {
+    if (!lastJobId) return;
+    termLine(`⏹ Terminating job ${lastJobId}...`, 'err');
+    await fetch(`/api/terminate/${lastJobId}`, {method:'POST'});
+}
+
+async function refreshGallery() {
+    const videos = await fetch('/api/gallery').then(r=>r.json()).catch(()=>[]);
+    const grid = document.getElementById('gallery-grid');
+    if (!videos.length) {
+        grid.innerHTML = '<div class="tl sys">No videos produced yet.</div>';
+        return;
+    }
+    grid.innerHTML = videos.map(v => `
+        <div class="slate" style="padding:12px; cursor:default">
+            <div style="font-family:'Fira Code',monospace; font-size:10px; margin-bottom:8px; color:var(--cyan)">${v.name}</div>
+            <div style="font-size:10px; color:var(--dim)">${v.size_mb} MB • ${v.created.slice(0,16).replace('T',' ')}</div>
+            <div style="margin-top:12px; display:flex; gap:8px">
+                <a href="/output/${v.name}" target="_blank" class="run-btn" style="text-decoration:none">play ▶</a>
+                <a href="/output/${v.name}" download class="run-btn" style="text-decoration:none; border-color:var(--dim)">dl ↓</a>
+            </div>
+        </div>
+    `).join('');
+}
+
+function saveGlobalSettings() {
+    const settings = {
+        author: document.getElementById('global-author').value,
+        model: document.getElementById('global-model').value
+    };
+    localStorage.setItem('supershorts_settings', JSON.stringify(settings));
+    termLine(`⚙️ Settings saved to local storage.`, 'ok');
+}
+
+function loadGlobalSettings() {
+    const s = JSON.parse(localStorage.getItem('supershorts_settings') || '{}');
+    if (s.author) document.getElementById('global-author').value = s.author;
+    if (s.model)  document.getElementById('global-model').value  = s.model;
 }
 
 function termClear() {
@@ -1335,6 +1411,13 @@ async function refreshStats() {
   document.getElementById('ks-br').textContent    = `${s.brainrot.total} tracked`;
   document.getElementById('ks-rg').textContent    = `${s.rotgen.total} tracked`;
   document.getElementById('kp-ed').style.width    = `${(s.educational.done/s.educational.total*100).toFixed(1)}%`;
+
+  // RAM
+  if (s.ram) {
+    const freePct = (s.ram.free / s.ram.total * 100);
+    document.getElementById('ram-fill').style.width = `${(100 - freePct).toFixed(1)}%`;
+    document.getElementById('ram-text').textContent = `${s.ram.free} GB / ${s.ram.total} GB free`;
+  }
 
   // heatmap
   const hmap = document.getElementById('heatmap');
@@ -1424,7 +1507,7 @@ let _modalMode = null;
 let _modalStdinFn = null;
 
 // Modes that need a config dialog before launching
-const NEEDS_CONFIG = new Set(['tcm','tutorial','viral','ideas','clipper']);
+const NEEDS_CONFIG = new Set(['tcm','brainrot','tutorial','viral','ideas','clipper']);
 
 function optCard(value, label, selected) {
   return `<div class="opt-card${selected?' selected':''}" onclick="selectOpt(this,'${value}')" tabindex="0"
@@ -1463,6 +1546,28 @@ async function openModal(mode) {
   const overlay = document.getElementById('modal-overlay');
   const title = document.getElementById('modal-title-el');
   const body = document.getElementById('modal-body');
+
+  const models = await fetch('/api/models').then(r=>r.json()).catch(()=>['llama3','mistral']);
+  const advHtml = `
+    <details style="margin-top:16px; cursor:pointer">
+      <summary style="font-size:10px; color:var(--cyan); letter-spacing:1px; text-transform:uppercase">Advanced Settings</summary>
+      <div style="padding-top:12px">
+        <div class="field">
+          <label>LLM Model</label>
+          <select id="modal-model" style="width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border2); padding:8px">
+            ${models.map(m => `<option value="${m}" ${m==='llama3'?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label>Resolution</label>
+          <div class="toggle-row">
+            <button class="toggle-btn selected" data-group="hd_mode" data-value="n" onclick="toggleBtn(this,'hd_mode')">720p (Draft)</button>
+            <button class="toggle-btn" data-group="hd_mode" data-value="y" onclick="toggleBtn(this,'hd_mode')">1080p (HD)</button>
+          </div>
+        </div>
+      </div>
+    </details>
+  `;
 
   if (mode === 'tcm') {
     title.innerHTML = '<span>TCM</span> Configure';
@@ -1508,6 +1613,22 @@ async function openModal(mode) {
         <input type="number" id="tcm-count" value="3" min="1" max="10">
         <div class="field-hint">1–10 · recommended ≤5 on 8 GB RAM</div>
       </div>
+      <div class="modal-section">
+        <div class="modal-section-label">Voice (Piper)</div>
+        <div class="opt-cards" data-key="voice" data-value="en_US-ryan-high">
+          ${optCard('en_US-ryan-high','Ryan (High Quality)',true)}
+          ${optCard('en_US-lessac-high','Lessac (High Quality)',false)}
+          ${optCard('en-us-lessac-medium','Lessac (Medium)',false)}
+        </div>
+      </div>
+      <div class="field">
+        <div class="modal-section-label">Pipeline Mode</div>
+        <div class="toggle-row">
+          <button class="toggle-btn selected" data-group="dry_run" data-value="n" onclick="toggleBtn(this,'dry_run')">Production (Full)</button>
+          <button class="toggle-btn" data-group="dry_run" data-value="y" onclick="toggleBtn(this,'dry_run')">Dry Run (Fast)</button>
+        </div>
+      </div>
+      ${advHtml}
     `;
     _modalStdinFn = () => {
       const hasPending2 = !!document.querySelector('[data-group="use_existing"]');
@@ -1515,7 +1636,6 @@ async function openModal(mode) {
         const useExisting = getToggleVal('use_existing');
         const count = document.getElementById('tcm-count').value || '3';
         if (useExisting === 'y') return `y\n${count}\n`;
-        // user chose new plan
         const topic = document.querySelector('.opt-cards[data-key="topic"]')?.dataset.value || '1';
         const custom = (document.getElementById('tcm-custom')?.value || '').replace(/[\n\r]/g, ' ');
         const extra  = (document.getElementById('tcm-extra')?.value || '').replace(/[\n\r]/g, ' ');
@@ -1529,7 +1649,27 @@ async function openModal(mode) {
       }
     };
 
-  } else if (mode === 'tutorial') {
+  } else if (mode === 'brainrot') {
+    title.innerHTML = '<span>Brainrot</span> Configure';
+    body.innerHTML = `
+      <div class="modal-section">
+        <div class="modal-section-label">Voice (Piper)</div>
+        <div class="opt-cards" data-key="voice" data-value="en_US-ryan-high">
+          ${optCard('en_US-ryan-high','Ryan (High Quality)',true)}
+          ${optCard('en_US-lessac-high','Lessac (High Quality)',false)}
+          ${optCard('en-us-lessac-medium','Lessac (Medium)',false)}
+        </div>
+      </div>
+      <div class="field">
+        <div class="modal-section-label">Pipeline Mode</div>
+        <div class="toggle-row">
+          <button class="toggle-btn selected" data-group="dry_run" data-value="n" onclick="toggleBtn(this,'dry_run')">Production (Full)</button>
+          <button class="toggle-btn" data-group="dry_run" data-value="y" onclick="toggleBtn(this,'dry_run')">Dry Run (Fast)</button>
+        </div>
+      </div>
+      ${advHtml}
+    `;
+    _modalStdinFn = () => "\n";
     title.innerHTML = '<span>Tutorial</span> Topic';
     body.innerHTML = `
       <div class="field">
@@ -1592,6 +1732,16 @@ async function launchFromModal() {
   const stdin_input = _modalStdinFn();
   if (stdin_input == null) { closeModal(); return; }
   const mode = _modalMode;
+  
+  // Extract custom fields from modal if present
+  const dryRunVal = getToggleVal('dry_run') || 'n';
+  const voiceVal  = document.querySelector('.opt-cards[data-key="voice"]')?.dataset.value || 'en_US-ryan-high';
+  
+  // Advanced
+  const llmModel = document.getElementById('modal-model')?.value || document.getElementById('global-model').value;
+  const hdMode   = getToggleVal('hd_mode') || 'n';
+  const author   = document.getElementById('global-author').value;
+
   closeModal();
 
   const btn = document.getElementById('rb-'+mode);
@@ -1599,7 +1749,15 @@ async function launchFromModal() {
 
   const res = await fetch(`/api/run/${mode}`, {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ count: counts[mode] || 1, stdin_input })
+    body: JSON.stringify({ 
+        count: counts[mode] || 1, 
+        stdin_input,
+        dry_run: dryRunVal,
+        voice: voiceVal,
+        llm_model: llmModel,
+        hd_mode: hdMode,
+        author_name: author
+    })
   });
   const {job_id} = await res.json();
 
@@ -1622,6 +1780,8 @@ buildModeGrid();
 refreshStats();
 refreshHealth();
 refreshDisk();
+loadGlobalSettings();
+refreshGallery();
 setInterval(refreshStats,  15000);
 setInterval(refreshHealth,  8000);
 setInterval(refreshDisk,   30000);

@@ -12,6 +12,7 @@ from src.generator import (
     generate_visuals,
     compose_video
 )
+from src.core.config import VideoOptions
 
 class TestBridgePipelineIntegrity:
     @pytest.fixture
@@ -112,8 +113,7 @@ class TestBridgePipelineIntegrity:
                 [slide_path], 
                 [str(final_audio)], 
                 video_output, 
-                "short", 
-                mock_env["lesson_title"]
+                VideoOptions(video_type="short", lesson_title=mock_env["lesson_title"])
             )
             
             # Verify orchestration: concatenate_videoclips should have been called

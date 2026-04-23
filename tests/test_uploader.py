@@ -1,7 +1,7 @@
 import pytest
 import os
 from unittest.mock import MagicMock, patch
-from src.infrastructure.browser_uploader import _find_firefox_profile, _extract_video_id
+from src.infrastructure.browser_uploader import _find_firefox_profile, _extract_video_id, _parse_video_id_from_text
 
 def test_find_firefox_profile_env():
     with patch.dict(os.environ, {"FIREFOX_PROFILE_PATH": "/tmp/fake_profile"}):
@@ -16,10 +16,24 @@ def test_extract_video_id_url():
 def test_extract_video_id_elements():
     driver = MagicMock()
     driver.current_url = "https://studio.youtube.com/video/123"
+    driver.page_source = ""
     mock_el = MagicMock()
     mock_el.get_attribute.return_value = "https://youtu.be/dQw4w9WgXcQ"
     driver.find_elements.return_value = [mock_el]
     assert _extract_video_id(driver) == "dQw4w9WgXcQ"
+
+def test_extract_video_id_page_source():
+    driver = MagicMock()
+    driver.current_url = "https://studio.youtube.com/channel/abc/videos/upload"
+    driver.find_elements.return_value = []
+    driver.page_source = '<div>Share link: https://www.youtube.com/watch?v=dQw4w9WgXcQ</div>'
+    assert _extract_video_id(driver) == "dQw4w9WgXcQ"
+
+def test_parse_video_id_from_text_plain_watch_url():
+    assert _parse_video_id_from_text("https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=share") == "dQw4w9WgXcQ"
+
+def test_parse_video_id_from_text_studio_edit_url():
+    assert _parse_video_id_from_text("https://studio.youtube.com/video/dQw4w9WgXcQ/edit") == "dQw4w9WgXcQ"
 
 @patch('src.infrastructure.browser_uploader.webdriver.Firefox')
 @patch('src.infrastructure.browser_uploader._build_firefox_service')

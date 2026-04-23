@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
-from src.generator import generate_brainrot_topics, generate_brainrot_script, render_brainrot_slide, create_brainrot_video, _generate_tcm_curriculum
+from src.generator import generate_brainrot_topics, generate_brainrot_script, render_brainrot_slide, create_brainrot_video, generate_tcm_curriculum
 
 @patch('src.modes.brainrot.ollama_generate')
 def test_generate_brainrot_topics_invalid_json(mock_ollama):
@@ -25,7 +25,7 @@ def test_generate_brainrot_script_missing_keys(mock_ollama):
 def test_generate_tcm_curriculum_api_error(mock_ollama):
     # Simulate API exception
     mock_ollama.side_effect = Exception("Ollama Down")
-    result = _generate_tcm_curriculum("TCM", "Extra")
+    result = generate_tcm_curriculum("TCM", "Extra")
     # Should use fallback curriculum
     assert result["curriculum_title"] == "TCM Essentials"
     assert len(result["lessons"]) == 10

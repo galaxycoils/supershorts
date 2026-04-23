@@ -1,6 +1,8 @@
 import os
 import platform
 from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Any, Union
 
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -74,3 +76,14 @@ CONTENT_PACKAGE_TOPICS = [
 # Ensure critical dirs exist
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 PEXELS_CACHE_DIR.mkdir(exist_ok=True, parents=True)
+
+@dataclass
+class VideoOptions:
+    video_type: str  # 'long' or 'short'
+    lesson_title: str
+    is_tutorial: bool = False
+    force_viral_bg: bool = False
+    script: Optional[str] = None
+    bg_query: Optional[str] = None
+    threads: int = VIDEO_THREADS
+    fps: int = VIDEO_FPS

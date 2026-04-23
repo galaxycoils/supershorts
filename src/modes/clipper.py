@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from src.core.config import PROJECT_ROOT
+from moviepy.editor import VideoFileClip
 
 console = Console()
 
@@ -32,6 +33,45 @@ def _check_setup() -> bool:
         ))
         return False
     return True
+
+
+def _run_builtin_fallback(input_path: Path, workspace: Path) -> Path:
+    """Create a single vertical short from the first 30 seconds of a local video."""
+    output_dir = workspace / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{input_path.stem}_short_01.mp4"
+
+    clip = None
+    final = None
+    try:
+        clip = VideoFileClip(str(input_path))
+        duration = min(30, max(1, int(clip.duration)))
+        final = clip.subclip(0, duration).resize(height=1920)
+        if final.w > 1080:
+            final = final.crop(x_center=final.w / 2, width=1080)
+        else:
+            final = final.resize(width=1080)
+        final.write_videofile(
+            str(output_path),
+            fps=24,
+            codec="libx264",
+            audio_codec="aac",
+            preset="ultrafast",
+            threads=2,
+            logger="bar",
+        )
+        return output_path
+    finally:
+        try:
+            if final:
+                final.close()
+        except Exception:
+            pass
+        try:
+            if clip:
+                clip.close()
+        except Exception:
+            pass
 
 
 def _verify_clipper_dependencies() -> bool:
@@ -70,9 +110,6 @@ def run_video_clipper():
     ))
     console.print()
 
-    if not _check_setup():
-        return
-    
     if not _verify_clipper_dependencies():
         return
 
@@ -88,26 +125,35 @@ def run_video_clipper():
     console.print(f"[dim]  Output: {WORKSPACE}[/dim]\n")
 
     try:
-        cmd = [
-            sys.executable, "run_pipeline.py",
-            "--url", url,
-            "--workspace", str(WORKSPACE.resolve()),
-        ]
-        with console.status("[cyan]Running clipper pipeline (this may take a while)…[/cyan]"):
-            result = subprocess.run(
-                cmd,
-                cwd=CLIPPER_DIR.resolve(),
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=600,
-            )
+        output_dir = WORKSPACE / "outputs"
+        if _check_setup():
+            cmd = [
+                sys.executable, "run_pipeline.py",
+                "--url", url,
+                "--workspace", str(WORKSPACE.resolve()),
+            ]
+            with console.status("[cyan]Running clipper pipeline (this may take a while)…[/cyan]"):
+                result = subprocess.run(
+                    cmd,
+                    cwd=CLIPPER_DIR.resolve(),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=600,
+                )
 
-        if result.stdout:
-            console.print(result.stdout)
+            if result.stdout:
+                console.print(result.stdout)
+        else:
+            local_path = Path(url).expanduser()
+            if not local_path.exists():
+                console.print("[red]❌ Built-in fallback clipper only supports an existing local video path.[/red]")
+                return
+            console.print("[yellow]⚠ External clipper pipeline missing. Using built-in fallback clipper.[/yellow]")
+            with console.status("[cyan]Creating fallback vertical short…[/cyan]"):
+                _run_builtin_fallback(local_path, WORKSPACE)
 
         console.print(f"[green]✅ Clipper finished![/green]")
-        output_dir = WORKSPACE / "outputs"
         console.print(f"[dim]📁 Vertical shorts → {output_dir}/[/dim]")
 
         # --- Automatic Upload and Logging ---

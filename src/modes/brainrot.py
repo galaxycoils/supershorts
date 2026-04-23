@@ -1,4 +1,4 @@
-"""src/brainrot.py - Brain Rot / High-Engagement Viral Shorts Generator"""
+"""src/modes/brainrot.py - Brain Rot / High-Engagement Viral Shorts Generator"""
 import gc
 import json
 import random
@@ -17,23 +17,22 @@ from tqdm import tqdm
 from src.core.config import (
     FONT_FILE, ASSETS_PATH, YOUR_NAME, BACKGROUNDS_PATH,
     GAMEPLAY_PATH, BACKGROUND_MUSIC_PATH, PEXELS_CACHE_DIR, PROJECT_ROOT,
-    OLLAMA_MODEL, OLLAMA_TIMEOUT
+    OLLAMA_MODEL, OLLAMA_TIMEOUT, VideoOptions
 )
-from src.infrastructure.llm import ollama_generate
-from src.infrastructure.tts import text_to_speech
+from src.core.interfaces import ILLMService, ITTSService, IVideoUploader
+from src.core.base_mode import BaseMode
+from src.infrastructure.llm import OllamaLLMService, ollama_generate
+from src.infrastructure.tts import StandardTTSService, text_to_speech
+from src.infrastructure.browser_uploader import YouTubeBrowserUploader
 from src.infrastructure.video import get_local_gameplay, get_local_viral_gameplay, get_relevant_pexels_video, get_local_background
 from src.engine.video_engine import auto_scale_text, draw_wrapped_text
-from src.utils.text import strip_emojis, _clamp_words
+from src.utils.text import strip_emojis, clamp_words
 from src.utils.json import safe_json_parse
+from src.utils.cleanup import safe_close
 
 BRAINROT_PLAN_FILE = PROJECT_ROOT / "brainrot_plan.json"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
-
-from src.utils.cleanup import safe_close
-
-
-# Attention-grabbing color palettes
 BRAINROT_PALETTES = [
     {"bg": (20, 20, 20),    "text": "white",   "accent": (255, 30, 80),   "bar": (255, 30, 80)},
     {"bg": (10, 10, 40),    "text": "white",   "accent": (0, 200, 255),   "bar": (0, 180, 220)},
@@ -42,403 +41,276 @@ BRAINROT_PALETTES = [
     {"bg": (0, 35, 20),     "text": "white",   "accent": (0, 220, 100),   "bar": (0, 180, 80)},
 ]
 
-
-def load_brainrot_plan():
-    if not BRAINROT_PLAN_FILE.exists():
-        return {"topics": []}
-    try:
-        with open(BRAINROT_PLAN_FILE) as f:
-            return json.load(f)
-    except Exception:
-        return {"topics": []}
-
-
-def save_brainrot_plan(plan):
-    with open(BRAINROT_PLAN_FILE, 'w') as f:
-        json.dump(plan, f, indent=2)
-
-
-def generate_brainrot_topics(count=10, previous_topics=None):
-    """Generate viral short-form AI topics with hooks and curiosity gaps."""
-    print("🧠 Generating brain rot topics...")
-    history = ""
-    if previous_topics:
-        formatted = "\n".join(f"- {t}" for t in previous_topics)
-        history = f"\nAlready created:\n{formatted}\n\nCreate NEW topics, don't repeat.\n"
-
-    prompt = f"""You are a viral content strategist for AI/tech YouTube Shorts.
-{history}
-Generate {count} SHORT video topic ideas that are sensationally engaging but factually grounded.
-Focus on topics like: Multi-agent systems, deepseek, qwen, local LLMs, AI coding agents, and the future of development.
-
-Rules:
-- Use curiosity gaps: "Nobody is talking about...", "Why X is secretly better than Y", "The hidden cost of..."
-- Each topic must be achievable in under 60 seconds.
-- Mix controversy with mind-blowing reveals.
-
-Format the JSON with keys: "title", "hook", "angle"."""
-    result = ollama_generate(prompt, json_mode=True)
-    return result.get("topics", [])
-
-
-def generate_brainrot_script(topic):
-    """Generate punchy meme-like script for a brain rot short."""
-    print(f"📝 Scripting: '{topic['title']}'...")
-    prompt = f"""You are writing a viral 30-45 second YouTube Short script about AI.
-
-Topic: {topic['title']}
-Hook: {topic['hook']}
-Angle: {topic['angle']}
-
-Rules:
-- Total script 100-120 words (35-42 seconds at normal speaking pace)
-- First sentence = the HOOK (instant curiosity, shocking)
-- Short punchy sentences. No academic language.
-- Use "you" and "your" to speak directly to viewer
-- Include 1 "wait, what?" moment
-- End with controversial statement OR "follow for more"
-- 4 slides total: hook, point 1, point 2, CTA
-
-Format the JSON with keys: "slides" (list of 4 objects with "text" and "duration_hint"), "full_script", "title", "hashtags"."""
-    result = ollama_generate(prompt, json_mode=True)
-    # Validate minimal structure
-    if not result.get("slides") or not result.get("full_script"):
-        result = {
-            "slides": [
-                {"text": topic["hook"], "duration_hint": "short"},
-                {"text": topic["angle"], "duration_hint": "medium"},
-                {"text": "AI is changing everything. Are you ready?", "duration_hint": "short"},
-                {"text": "Follow for more AI facts. 🔥", "duration_hint": "short"},
-            ],
-            "full_script": f"{topic['hook']} {topic['angle']} AI is changing everything. Follow for more.",
-            "title": f"{topic['title']} 🤯",
-            "hashtags": "#AI #Shorts #Tech #AIFacts",
-        }
-    # Enforce 35-45s duration (99-127 words) on the full narration
-    if result.get("full_script"):
-        result["full_script"] = _clamp_words(result["full_script"], min_w=99, max_w=127)
-    return result
-
-
-# Cache for the gradient overlay to avoid re-calculating with numpy for every slide
 @lru_cache(maxsize=4)
-def get_gradient_overlay(width, height):
-    arr = np.zeros((height, width, 4), dtype=np.uint8)
-    ys = np.arange(height)
-    # Subtle vignette: darker at top/bottom, clearer in center
-    alpha_col = (120 * (np.abs(ys - height / 2) / (height / 2)) ** 1.5).clip(0, 255).astype(np.uint8)
-    arr[:, :, 3] = alpha_col[:, np.newaxis]   # broadcast across width
-    return Image.fromarray(arr, 'RGBA')
+def get_gradient_overlay(width, height, palette_bg):
+    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    for y in range(height):
+        alpha = int(200 * (y / height)) 
+        draw.line([(0, y), (width, y)], fill=(palette_bg[0], palette_bg[1], palette_bg[2], alpha))
+    return overlay
 
-
-def render_brainrot_slide(output_dir, text, slide_index, total_slides, palette=None):
-    """Render a single brain rot slide — bold, centered, full-frame with text stroke."""
+def render_brainrot_slide(output_dir, text, slide_num, total_slides, palette=None):
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
     width, height = 1080, 1920
-
-    if palette is None:
-        palette = random.choice(BRAINROT_PALETTES)
-
-    # Background: dark solid color
-    img = Image.new('RGBA', (width, height), palette["bg"])
-
-    # Add subtle vignette / gradient overlay (cached)
-    gradient = get_gradient_overlay(width, height)
-    img = Image.alpha_composite(img, gradient)
-
-    # Accent bar at bottom (branding)
+    if not palette: palette = random.choice(BRAINROT_PALETTES)
+    
+    img = Image.new('RGB', (width, height), palette["bg"])
     draw = ImageDraw.Draw(img)
-    bar_h = 80
-    draw.rectangle([0, height - bar_h, width, height], fill=(*palette["accent"][:3], 220))
+    
+    # 1. Background image (blurred)
     try:
-        brand_font = ImageFont.truetype(str(FONT_FILE), 28)
-    except IOError:
-        brand_font = ImageFont.load_default()
-    brand_text = f"AI for Developers by {YOUR_NAME} • #{slide_index}/{total_slides}"
-    bw = draw.textlength(brand_text, font=brand_font)
-    draw.text(((width - bw) / 2, height - bar_h + 22), brand_text, fill="white", font=brand_font)
+        bg_files = list(BACKGROUNDS_PATH.glob("*.jpg")) + list(BACKGROUNDS_PATH.glob("*.png"))
+        if bg_files:
+            bg = Image.open(random.choice(bg_files)).convert('RGB')
+            bg = bg.resize((width, height), Image.Resampling.LANCZOS)
+            bg = bg.filter(ImageFilter.GaussianBlur(radius=15))
+            img.paste(bg, (0, 0))
+    except: pass
 
-    # Content box — center of frame, leaving room for brand bar
-    margin = 60
-    content_box = (margin, 100, width - margin, height - bar_h - 60)
+    # 2. Gradient overlay
+    overlay = get_gradient_overlay(width, height, palette["bg"])
+    img.paste(overlay, (0, 0), overlay)
 
-    # Text stroke effect: draw text in black at 8 offsets, then white on top
-    def draw_outlined_text(d, txt, font_path, start_size, box, text_color="white"):
-        box_left, box_top, box_right, box_bottom = box
-        max_w = (box_right - box_left) - 40
-        avail_h = (box_bottom - box_top) - 40
+    # 3. Text rendering
+    try:
+        font_main = ImageFont.truetype(str(FONT_FILE), 120)
+        font_sub  = ImageFont.truetype(str(FONT_FILE), 60)
+    except:
+        font_main = font_sub = ImageFont.load_default()
 
-        # Find fitting size
-        size = start_size
-        chosen_font = None
-        chosen_lines = None
-        while size >= 24:
-            try:
-                f = ImageFont.truetype(font_path, size)
-            except IOError:
-                f = ImageFont.load_default()
-            ls = int(size * 1.35)
-            lines = []
-            for para in txt.split('\n'):
-                words = para.split()
-                if not words:
-                    lines.append("")
-                    continue
-                line = ""
-                for word in words:
-                    tl = (line + " " + word).strip()
-                    if d.textlength(tl, font=f) <= max_w:
-                        line = tl
-                    else:
-                        if line:
-                            lines.append(line)
-                        if d.textlength(word, font=f) > max_w:
-                            chunk = ""
-                            for ch in word:
-                                if d.textlength(chunk + ch + "-", font=f) > max_w:
-                                    lines.append(chunk + "-")
-                                    chunk = ch
-                                else:
-                                    chunk += ch
-                            line = chunk
-                        else:
-                            line = word
-                if line:
-                    lines.append(line)
-            total_h = len(lines) * ls
-            if total_h <= avail_h:
-                chosen_font = f
-                chosen_lines = lines
-                break
-            size -= 4
+    # Progress bar at top
+    bar_w = int((slide_num / total_slides) * (width - 100))
+    draw.rectangle([50, 50, 50 + bar_w, 70], fill=palette["bar"])
+    
+    # Main text centered
+    text_box = (100, height//3, width-100, 2*height//3)
+    auto_scale_text(draw, text.upper(), str(FONT_FILE), 130, text_box, fill=palette["text"])
 
-        if not chosen_font:
-            chosen_font = ImageFont.truetype(font_path, 24) if Path(font_path).exists() else ImageFont.load_default()
-            chosen_lines = [txt[:60]]
-            ls = int(24 * 1.35)
+    # Branding
+    draw.text((width//2, height - 150), f"@{YOUR_NAME.upper()}", fill=palette["accent"], font=font_sub, anchor="mm")
 
-        total_h = len(chosen_lines) * ls
-        y_start = box_top + (avail_h - total_h) // 2 + 20
-
-        for line_txt in chosen_lines:
-            tw = d.textlength(line_txt, font=chosen_font)
-            x = box_left + ((box_right - box_left) - tw) / 2
-            # Stroke (outline)
-            for dx, dy in [(-3, -3), (-3, 3), (3, -3), (3, 3), (-3, 0), (3, 0), (0, -3), (0, 3)]:
-                d.text((x + dx, y_start + dy), line_txt, fill="black", font=chosen_font)
-            # Main text
-            d.text((x, y_start), line_txt, fill=text_color, font=chosen_font)
-            y_start += ls
-
-    draw_outlined_text(draw, text, str(FONT_FILE), 90, content_box, text_color=palette["text"])
-
-    path = output_dir / f"slide_{slide_index:02d}.png"
+    path = output_dir / f"slide_{slide_num:02d}.png"
     img.convert("RGB").save(path)
-    print(f"🎨 Brain rot slide saved: {path.name}")
-    return str(path)
+    return path
 
-
-def create_brainrot_video(slide_paths, audio_paths, output_path, title, script=None):
-    """Compose brain rot video: fast pacing, dynamic bg, high music vol.
-    If `script` is provided, adds timed word-chunk subtitles in safe zone."""
-    print(f"🎥 Creating brain rot video: {title}")
-    bg_music = None
-    bg_clip = None
-    final = None
+def create_brainrot_video(slide_images, audio_paths, output_path, title, script=None):
+    if len(slide_images) != len(audio_paths):
+        raise ValueError(f"Slide/audio count mismatch: {len(slide_images)} slides vs {len(audio_paths)} audio")
+    clips = []
     audio_clips_to_close = []
+    final = None
+    bg_clip = None
+    bg_music = None
+
     try:
-        if not slide_paths or not audio_paths or len(slide_paths) != len(audio_paths):
-            raise ValueError("Slide/audio count mismatch")
-
-        # Prefer viral gameplay, then normal gameplay, then Pexels
-        bg_path = get_local_viral_gameplay() or get_local_gameplay('short')
-        if not bg_path:
-            for query in ["satisfying", "gaming", "coding", "technology"]:
-                bg_path = get_relevant_pexels_video(query, 'short')
-                if bg_path:
-                    break
-
-        _dur_clips = [AudioFileClip(str(a)) for a in audio_paths]
-        total_duration = sum(c.duration for c in _dur_clips) + 0.3 * len(audio_paths)
-        safe_close(_dur_clips)
-        del _dur_clips
-
-        if bg_path:
-            print(f"🎮 Background: {Path(bg_path).name}")
-            bg_clip = VideoFileClip(bg_path)
-            if bg_clip.duration < total_duration:
-                bg_clip = bg_clip.fx(vfx.loop, duration=total_duration)
-            else:
-                bg_clip = bg_clip.subclip(0, total_duration)
-            bg_clip = bg_clip.fx(vfx.colorx, 0.6)
-        else:
-            bg_clip = None
-
-        clips = []
-        audio_clips_to_close = []  # close only after write_videofile
-        pairs = list(zip(slide_paths, audio_paths))
-        for i, (img_path, audio_path) in enumerate(tqdm(pairs, desc="  Building clips", unit="clip", leave=False,
-                                                         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
-            audio_clip = AudioFileClip(str(audio_path))
-            audio_clips_to_close.append(audio_clip)
-            duration = audio_clip.duration + 0.3
-            img_clip = ImageClip(str(img_path)).set_duration(duration).fadein(0.2).fadeout(0.2)
-
-            if bg_clip:
-                # subclip creates a new clip with correct duration — avoids mutating shared bg_clip
-                segment = CompositeVideoClip([
-                    bg_clip.subclip(0, min(duration, bg_clip.duration)),
-                    img_clip.set_opacity(0.88).set_position('center')
-                ], size=(1080, 1920))
-            else:
-                segment = img_clip
-
-            segment = segment.set_audio(audio_clip)
-            clips.append(segment)
+        for img_p, aud_p in zip(slide_images, audio_paths):
+            audio = AudioFileClip(str(aud_p))
+            audio_clips_to_close.append(audio)
+            
+            img_clip = ImageClip(str(img_p)).set_duration(audio.duration).set_audio(audio)
+            img_clip = img_clip.fadein(0.3).fadeout(0.3)
+            clips.append(img_clip)
 
         final = concatenate_videoclips(clips, method="compose")
+        total_duration = final.duration
 
-        # Universal subtitle overlay (timed word chunks in safe zone)
-        if script:
-            try:
-                from src.captions import add_subtitle_overlay
-                print(f"💬 Adding subtitles ({len(script.split())} words)...")
-                final = add_subtitle_overlay(final, script, 'short')
-            except Exception as e:
-                print(f"⚠️ Subtitle overlay failed ({e}) — continuing without captions.")
-
+        # Layered Background (Gameplay)
+        gameplay = get_local_viral_gameplay()
+        if gameplay and Path(gameplay).exists():
+            bg_clip = VideoFileClip(gameplay).subclip(0, total_duration).resize(height=1920)
+            if bg_clip.w > 1080:
+                bg_clip = bg_clip.crop(x_center=bg_clip.w/2, width=1080)
+            
+            # Subtitles only for gameplay-heavy parts
+            final = CompositeVideoClip([bg_clip.volumex(0), final.set_position("center").set_opacity(0.85)])
+        
+        # Background Music
         if BACKGROUND_MUSIC_PATH.exists():
-            print("🎵 Adding music...")
-            bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.25)
-            if bg_music.duration < final.duration:
-                from moviepy.audio.fx.audio_loop import audio_loop
-                bg_music = audio_loop(bg_music, duration=final.duration)
-            else:
-                bg_music = bg_music.subclip(0, final.duration)
+            bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.15).set_duration(total_duration)
             if final.audio is not None:
                 composite_audio = CompositeAudioClip([final.audio.volumex(1.2), bg_music])
                 final = final.set_audio(composite_audio)
             else:
                 final = final.set_audio(bg_music)
 
-        print(f"🎬 Encoding → {Path(output_path).name}")
         temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
         final.write_videofile(
             str(output_path),
             fps=24,
             codec="libx264",
             audio_codec="aac",
-            audio_bitrate="192k",
-            preset="ultrafast",
             threads=3,
+            preset="ultrafast",
             logger='bar',
             temp_audiofile=temp_audio,
         )
-        print(f"✅ Brain rot video saved: {Path(output_path).name}")
-
-    except Exception as e:
-        print(f"❌ Brain rot video error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
     finally:
-        # M1 8GB RAM cleanup — close audio clips AFTER write
         safe_close(audio_clips_to_close, final, bg_clip, bg_music)
+
+class BrainrotMode(BaseMode):
+    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None):
+        super().__init__(llm_service, tts_service, uploader_service)
+        self.dry_run = dry_run
+        self.voice = voice
+
+    def get_pending_topics(self) -> List[Dict[str, Any]]:
+        if not BRAINROT_PLAN_FILE.exists():
+            return []
         try:
-            Path(temp_audio).unlink(missing_ok=True)
+            with open(BRAINROT_PLAN_FILE) as f:
+                plan = json.load(f)
+                return [t for t in plan.get("topics", []) if t.get("status") == "pending"]
         except Exception:
-            pass
+            return []
 
-
-def run_brainrot_pipeline(shorts_per_run: int = 3):
-    """Main entry point: generate and upload brain rot shorts."""
-    print("🧠 Starting Brain Rot Shorts Pipeline...")
-    OUTPUT_DIR.mkdir(exist_ok=True)
-
-    plan = load_brainrot_plan()
-    pending = [t for t in plan["topics"] if t.get("status") == "pending"]
-
-    if not pending:
-        print("📋 No pending topics. Generating new batch...")
-        prev_titles = [t["title"] for t in plan["topics"]]
-        new_topics = generate_brainrot_topics(count=10, previous_topics=prev_titles if prev_titles else None)
-        for t in new_topics:
-            plan["topics"].append({
-                "title": t.get("title", "AI Fact"),
-                "hook": t.get("hook", ""),
-                "angle": t.get("angle", ""),
-                "status": "pending",
-                "youtube_id": None,
-                "created_at": datetime.date.today().isoformat(),
-            })
-        save_brainrot_plan(plan)
-        pending = [t for t in plan["topics"] if t.get("status") == "pending"]
-
-    from src.infrastructure.browser_uploader import upload_to_youtube_browser
-
-    batch = pending[:shorts_per_run]
-    processed = 0
-    for topic in tqdm(batch, desc="Brain Rot Shorts", unit="short",
-                      bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} shorts [{elapsed}<{remaining}]"):
+    def mark_complete(self, topic: Dict[str, Any], video_id: Optional[str]):
+        if self.dry_run:
+            print(f"DEBUG: Dry run complete for {topic['title']}")
+            return
+        if not BRAINROT_PLAN_FILE.exists(): return
         try:
-            print(f"\n▶️  Topic: '{topic['title']}'")
-            script = generate_brainrot_script(topic)
-
-            unique_id = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-            slide_dir = OUTPUT_DIR / f"brainrot_{unique_id}"
-            palette = random.choice(BRAINROT_PALETTES)
-            slides_data = script.get("slides", [])
-
-            full_script = strip_emojis(script.get("full_script", " ".join(s["text"] for s in slides_data)))
-
-            # Per-slide TTS + visuals with progress
-            slide_audio_paths = []
-            slide_image_paths = []
-            total_slides = len(slides_data)
-
-            for idx, slide in enumerate(tqdm(slides_data, desc="  Slides", unit="slide", leave=False,
-                                              bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
-                slide_text = strip_emojis(slide.get("text", ""))
-                s_audio_path = OUTPUT_DIR / f"brainrot_s{idx+1}_{unique_id}.mp3"
-                s_tts = text_to_speech(slide_text, s_audio_path)
-                slide_audio_paths.append(s_tts)
-
-                img_path = render_brainrot_slide(
-                    slide_dir, slide_text, idx + 1, total_slides, palette=palette
-                )
-                slide_image_paths.append(img_path)
-
-            video_path = OUTPUT_DIR / f"brainrot_video_{unique_id}.mp4"
-            create_brainrot_video(slide_image_paths, slide_audio_paths, video_path, topic["title"],
-                                  script=full_script)
-
-            # Upload
-            title = script.get("title", topic["title"])[:100]
-            hashtags = script.get("hashtags", "#AI #Shorts #Tech")
-            desc = f"{full_script}\n\n{hashtags}\n\nAI for Developers by {YOUR_NAME}"
-            tags = "AI,Shorts,Tech,BrainRot,AIFacts"
-
-            print(f"\n📤 Uploading: {title}")
-            video_id = upload_to_youtube_browser(video_path, title, desc, tags)
-            if video_id:
-                from src.core.learning import log_upload
-                log_upload(title, video_id, "brainrot")
-
-            # Mark complete
-            for t in plan["topics"]:
+            with open(BRAINROT_PLAN_FILE) as f:
+                plan = json.load(f)
+            for t in plan.get("topics", []):
                 if t["title"] == topic["title"]:
                     t["status"] = "complete"
                     t["youtube_id"] = video_id or "UPLOAD_ATTEMPTED"
                     break
-            save_brainrot_plan(plan)
-            print(f"✅ Done: {topic['title']}")
-            processed += 1
-            gc.collect()
-
+            with open(BRAINROT_PLAN_FILE, 'w') as f:
+                json.dump(plan, f, indent=2)
+            
+            if video_id:
+                from src.core.learning import log_upload
+                log_upload(topic["title"], video_id, "brainrot")
         except Exception as e:
-            print(f"❌ Failed topic '{topic['title']}': {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"⚠️ Error marking complete: {e}")
 
-    print(f"\n🏁 Brain Rot Pipeline complete. Processed {processed} shorts.")
+    def generate_script(self, topic: Dict[str, Any]) -> Dict[str, Any]:
+        if self.dry_run:
+            return {
+                "slides": [{"text": "Dry run hook", "duration_hint": "short"}, {"text": "Dry run angle", "duration_hint": "medium"}, {"text": "AI is changing everything. Ready?", "duration_hint": "short"}, {"text": "Follow for more. 🔥", "duration_hint": "short"}],
+                "full_script": "Dry run hook. Dry run angle. AI is changing everything. Follow for more.",
+                "title": f"{topic['title']} DRY",
+                "hashtags": "#DryRun",
+            }
+        print(f"📝 Scripting: '{topic['title']}'...")
+        prompt = f"""You are writing a viral 30-45 second YouTube Short script about AI.
+Topic: {topic['title']}
+Hook: {topic['hook']}
+Angle: {topic['angle']}
+Rules:
+- Total script 100-120 words (35-42 seconds)
+- 4 slides total: hook, point 1, point 2, CTA
+Format JSON: 'slides' (list of 4 with 'text', 'duration_hint'), 'full_script', 'title', 'hashtags'."""
+        
+        result = self.llm.generate(prompt, json_mode=True)
+        if not result.get("slides") or not result.get("full_script"):
+            result = {
+                "slides": [{"text": topic["hook"], "duration_hint": "short"}, {"text": topic["angle"], "duration_hint": "medium"}, {"text": "AI is changing everything. Ready?", "duration_hint": "short"}, {"text": "Follow for more. 🔥", "duration_hint": "short"}],
+                "full_script": f"{topic['hook']} {topic['angle']} AI is changing everything. Follow for more.",
+                "title": f"{topic['title']} 🤯",
+                "hashtags": "#AI #Shorts #Tech #AIFacts",
+            }
+        if result.get("full_script"):
+            result["full_script"] = clamp_words(result["full_script"], min_w=99, max_w=127)
+        return result
+
+    def generate_assets(self, content: Dict[str, Any], uid: str) -> Dict[str, List[Path]]:
+        slide_dir = self.output_dir / f"brainrot_{uid}"
+        palette = random.choice(BRAINROT_PALETTES)
+        slides_data = content.get("slides", [])
+        
+        audio_paths = []
+        image_paths = []
+        
+        for idx, slide in enumerate(slides_data):
+            text = strip_emojis(slide.get("text", ""))
+            a_path = self.output_dir / f"brainrot_s{idx+1}_{uid}.mp3"
+            
+            if self.dry_run:
+                audio_path = Path(f"dry_audio_{idx}_{uid}.wav")
+                audio_path.touch()
+                audio_paths.append(audio_path)
+                image_path = slide_dir / f"dry_slide_{idx}.png"
+                slide_dir.mkdir(exist_ok=True, parents=True)
+                image_path.touch()
+                image_paths.append(image_path)
+            else:
+                audio_paths.append(self.tts.text_to_speech(text, a_path, voice=self.voice))
+                image_paths.append(render_brainrot_slide(slide_dir, text, idx + 1, len(slides_data), palette=palette))
+            
+        return {"images": image_paths, "audio": audio_paths}
+
+    def compose(self, content: Dict[str, Any], assets: Dict[str, List[Path]], output_path: str) -> str:
+        if self.dry_run:
+            Path(output_path).touch()
+            return output_path
+        create_brainrot_video(assets["images"], assets["audio"], output_path, content["title"], script=content["full_script"])
+        return output_path
+
+    def upload(self, content: Dict[str, Any], video_path: str) -> Optional[str]:
+        title = content.get("title", "AI Fact")[:100]
+        hashtags = content.get("hashtags", "#AI #Shorts #Tech")
+        desc = f"{content['full_script']}\n\n{hashtags}\n\nAI for Developers by {YOUR_NAME}"
+        tags = ["AI", "Shorts", "Tech", "BrainRot", "AIFacts"]
+        return self.uploader.upload(Path(video_path), title, desc, tags)
+
+def generate_brainrot_topics(count: int = 10, previous_topics: Optional[List[str]] = None, llm_service: Optional[ILLMService] = None) -> List[dict]:
+    """Bridge for backward compatibility."""
+    llm = llm_service or OllamaLLMService(generate_fn=ollama_generate)
+    print("🧠 Generating brain rot topics...")
+    history = ""
+    if previous_topics:
+        formatted = "\n".join(f"- {t}" for t in previous_topics)
+        history = f"\nAlready created:\n{formatted}\n\nCreate NEW topics, don't repeat.\n"
+    prompt = f"You are a viral content strategist. Generate EXACTLY {count} topic ideas. Format JSON: 'topics' (list of 'title', 'hook', 'angle')."
+    result = llm.generate(prompt, json_mode=True)
+    topics = result.get("topics", [])
+    if topics:
+        return topics[:count] if count < len(topics) else topics
+    if result:
+        return []
+
+    fallback_topics = [
+        {"title": "Why AI Agents Are Suddenly Everywhere", "hook": "AI agents are exploding right now.", "angle": "What changed and why developers care."},
+        {"title": "The Hidden Cost of Bad Prompts", "hook": "Most people are wasting AI with weak prompts.", "angle": "Better prompting changes output quality fast."},
+        {"title": "Local LLMs Are Better Than You Think", "hook": "You do not need the cloud for everything.", "angle": "Why local models are becoming practical."},
+        {"title": "This AI Workflow Saves Hours", "hook": "One workflow can save your whole week.", "angle": "Automating repeated development tasks."},
+        {"title": "Why Developers Need AI Systems Thinking", "hook": "Using AI well is now a systems problem.", "angle": "The shift from toy prompts to real pipelines."},
+    ]
+    return fallback_topics[:count]
+
+def generate_brainrot_script(topic: dict, llm_service: Optional[ILLMService] = None) -> dict:
+    """Bridge for backward compatibility."""
+    llm = llm_service or OllamaLLMService(generate_fn=ollama_generate)
+    mode = BrainrotMode(llm_service=llm)
+    return mode.generate_script(topic)
+
+def run_brainrot_pipeline(shorts_per_run: int = 3, llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None):
+    mode = BrainrotMode(
+        llm_service or OllamaLLMService(generate_fn=ollama_generate),
+        tts_service,
+        uploader_service,
+        dry_run=dry_run,
+        voice=voice
+    )
+    pending = mode.get_pending_topics()
+
+    if not pending:
+        print("📋 No pending topics. Generating new batch...")
+        new_topics = generate_brainrot_topics(llm_service=mode.llm)
+        plan = {"topics": []}
+        for t in new_topics:
+            t["status"] = "pending"
+            plan["topics"].append(t)
+        with open(BRAINROT_PLAN_FILE, 'w') as f:
+            json.dump(plan, f, indent=2)
+        pending = new_topics
+
+    print(f"🚀 Brain Rot Pipeline: {len(pending)} topics available, producing {shorts_per_run}.")
+    for i, topic in enumerate(pending[:shorts_per_run]):
+        mode.produce_video(topic, i + 1, shorts_per_run)
+
+    print("✅ Pipeline finished.")

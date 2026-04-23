@@ -1,6 +1,7 @@
 import os
 import random
 from pathlib import Path
+from typing import Optional, List, Dict, Any, Union, Tuple
 from tqdm import tqdm
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -12,7 +13,8 @@ from moviepy.editor import (
 
 from src.core.config import (
     FONT_FILE, YOUR_NAME, BACKGROUND_MUSIC_PATH, OUTPUT_DIR,
-    LOW_MEMORY_MODE, VIDEO_THREADS, VIDEO_FPS, LONG_VIDEO_SIZE, SHORT_VIDEO_SIZE
+    LOW_MEMORY_MODE, VIDEO_THREADS, VIDEO_FPS, LONG_VIDEO_SIZE, SHORT_VIDEO_SIZE,
+    VideoOptions
 )
 from src.infrastructure.video import (
     get_local_background, get_local_gameplay, 
@@ -20,7 +22,7 @@ from src.infrastructure.video import (
 )
 from src.utils.cleanup import safe_close
 
-def auto_scale_text(draw, text, font_path, start_size, box, fill="white", min_size=24):
+def auto_scale_text(draw: ImageDraw.ImageDraw, text: str, font_path: str, start_size: int, box: Tuple[int, int, int, int], fill: str = "white", min_size: int = 24) -> None:
     """Draw text centered in box, scaling down until it fits."""
     box_left, box_top, box_right, box_bottom = box
     max_w = (box_right - box_left) - 40
@@ -67,7 +69,7 @@ def auto_scale_text(draw, text, font_path, start_size, box, fill="white", min_si
         draw.text((box_left + (max_w+40-tw)//2, y), line, fill=fill, font=font)
         y += line_h
 
-def draw_wrapped_text(draw, text, font, max_width, x, y, fill="white"):
+def draw_wrapped_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int, x: int, y: int, fill: str = "white") -> None:
     words = text.split()
     lines = []
     line = ""
@@ -82,9 +84,10 @@ def draw_wrapped_text(draw, text, font, max_width, x, y, fill="white"):
         draw.text((x, y), l, fill=fill, font=font)
         y += font.size + 10
 
-def generate_visuals(output_dir, video_type, slide_content=None,
-                    slide_number=1, total_slides=1, is_thumbnail=False, thumbnail_title=""):
+def generate_visuals(output_dir: Union[str, Path], video_type: str, slide_content: Optional[Dict[str, Any]] = None,
+                    slide_number: int = 1, total_slides: int = 1, is_thumbnail: bool = False, thumbnail_title: str = "") -> str:
     """PIL rendering logic moved from God Module."""
+    slide_content = slide_content or {}
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
     width, height = (1920, 1080) if video_type == 'long' else (1080, 1920)
@@ -120,9 +123,16 @@ def generate_visuals(output_dir, video_type, slide_content=None,
     final_bg.close()
     return str(path)
 
-def compose_video(slide_paths, audio_paths, output_path, video_type, lesson_title,
-                  is_tutorial=False, force_viral_bg=False, script=None, bg_query=None):
+def compose_video(slide_paths: List[Union[str, Path]], audio_paths: List[Union[str, Path]], output_path: Union[str, Path], 
+                  options: VideoOptions) -> str:
     """OPTIMIZED dynamic video composition logic."""
+    video_type = options.video_type
+    lesson_title = options.lesson_title
+    is_tutorial = options.is_tutorial
+    force_viral_bg = options.force_viral_bg
+    script = options.script
+    bg_query = options.bg_query
+
     label = 'Tutorial' if is_tutorial else ('Viral' if force_viral_bg else 'Dynamic')
     print(f"🎥 Creating {label} {video_type} video for: {lesson_title}")
 

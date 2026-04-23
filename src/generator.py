@@ -35,14 +35,14 @@ from moviepy.editor import (
 )
 
 # --- Utils Re-exports ---
-from src.utils.text import strip_emojis, strip_markdown, _clamp_words, _enforce_script_length
+from src.utils.text import strip_emojis, strip_markdown, clamp_words, enforce_script_length
 from src.utils.cleanup import safe_close
 
 # --- Mode Re-exports (Backward compatibility for main.py / run_workflow.py) ---
 from src.modes.tutorial import start_tutorial_generation, generate_tutorial_content
 from src.modes.viral import generate_youtube_content_package, start_viral_gameplay_mode
 from src.modes.brainrot import run_brainrot_pipeline, generate_brainrot_topics, generate_brainrot_script, render_brainrot_slide, create_brainrot_video
-from src.modes.tcm_educational import run_tcm_mode, _generate_tcm_curriculum
+from src.modes.tcm_educational import run_tcm_mode, generate_tcm_curriculum
 from src.modes.rotgen import run_rotgen_pipeline
 from src.modes.studio_ideas import start_idea_generator
 from src.modes.clipper import run_video_clipper
@@ -67,10 +67,64 @@ def generate_lesson_content(lesson_title, series_name=None, style_description=No
 Topic: '{lesson_title}'
 Style: {style_description}
 Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highlight, hashtags."""
-    
-    return ollama_generate(prompt, json_mode=True)
+    fallback_slides = [
+        {
+            "title": f"What {lesson_title} Means",
+            "content": f"{lesson_title} is an important concept for developers. This lesson explains the idea in simple terms, why it matters, and where it shows up in real projects.",
+        },
+        {
+            "title": "Why It Matters",
+            "content": f"If you understand {lesson_title}, you can make better technical decisions, debug faster, and build more reliable systems with fewer surprises.",
+        },
+        {
+            "title": "Real-World Example",
+            "content": f"In practice, {lesson_title} appears when teams move from simple prototypes to production systems. Clear fundamentals help avoid fragile designs and repeated mistakes.",
+        },
+        {
+            "title": "Common Mistakes",
+            "content": f"A common mistake is using {lesson_title} without understanding the tradeoffs. Good engineers compare simplicity, performance, and maintainability before choosing an approach.",
+        },
+        {
+            "title": "How To Apply It",
+            "content": f"The best way to use {lesson_title} is to start small, measure results, and improve the implementation step by step instead of overengineering from day one.",
+        },
+        {
+            "title": "Key Takeaway",
+            "content": f"The main takeaway is that {lesson_title} is most useful when paired with clear goals, practical constraints, and consistent iteration.",
+        },
+    ]
+    result = ollama_generate(prompt, json_mode=True)
+    if result:
+        if not result.get("long_form_slides"):
+            result["long_form_slides"] = fallback_slides
+        
+        # Coerce highlight to string if LLM returns a list
+        highlight = result.get("short_form_highlight")
+        if isinstance(highlight, list):
+            result["short_form_highlight"] = " ".join(highlight)
+        elif not highlight:
+            result["short_form_highlight"] = f"{lesson_title} matters more than most developers think. Learn the basics, avoid common mistakes, and apply it step by step for better results."
+        
+        if not result.get("hashtags"):
+            result["hashtags"] = "#AI #Developer #Programming #Tech"
+        return result
+
+    return {
+        "long_form_slides": fallback_slides,
+        "short_form_highlight": f"{lesson_title} matters more than most developers think. Learn the basics, avoid common mistakes, and apply it step by step for better results.",
+        "hashtags": "#AI #Developer #Programming #Tech",
+    }
 
 def generate_curriculum(focus: str, extra: str = "") -> dict:
     """Legacy bridge for curriculum generation."""
     prompt = f"Create a 10-lesson curriculum about {focus}. Extra info: {extra}"
-    return ollama_generate(prompt, json_mode=True)
+    result = ollama_generate(prompt, json_mode=True)
+    if result and result.get("lessons"):
+        return result
+    return {
+        "curriculum_title": f"{focus} Essentials",
+        "lessons": [
+            {"chapter": i + 1, "part": 1, "title": f"{focus} Lesson {i + 1}", "status": "pending", "youtube_id": None}
+            for i in range(10)
+        ],
+    }

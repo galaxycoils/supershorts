@@ -9,12 +9,14 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from pathlib import Path
+from typing import Optional, Any, List, Union
+from src.core.interfaces import IVideoUploader
 
 CLIENT_SECRETS_FILE = Path('client_secrets.json')
 CREDENTIALS_FILE = Path('credentials.json')
 YOUTUBE_UPLOAD_SCOPE = ["https://www.googleapis.com/auth/youtube.upload"]
 
-def get_authenticated_service():
+def get_authenticated_service() -> Any:
     credentials = None
     if CREDENTIALS_FILE.exists():
         print("INFO: Found existing credentials file.")
@@ -35,52 +37,60 @@ def get_authenticated_service():
         print(f"INFO: Credentials saved to {CREDENTIALS_FILE}")
     return build('youtube', 'v3', credentials=credentials)
 
-def upload_to_youtube(video_path, title, description, tags, thumbnail_path=None):
-    print(f"Uploading '{video_path}' to YouTube...")
-    try:
-        youtube = get_authenticated_service()
-        if not youtube:
-            print("YouTube service not available. Skipping upload.")
-            return None
-        request_body = {
-            'snippet': {
-                'title': title,
-                'description': description,
-                'tags': tags.split(','),
-                'categoryId': '28'
-            },
-            'status': {
-                'privacyStatus': 'public',
-                'selfDeclaredMadeForKids': False
+class YouTubeApiUploader(IVideoUploader):
+    def upload(self, video_path: Path, title: str, description: str, tags: List[str], thumbnail_path: Optional[Path] = None) -> Optional[str]:
+        print(f"Uploading '{video_path}' to YouTube via API...")
+        try:
+            youtube = get_authenticated_service()
+            if not youtube:
+                print("YouTube service not available. Skipping upload.")
+                return None
+            request_body = {
+                'snippet': {
+                    'title': title,
+                    'description': description,
+                    'tags': tags,
+                    'categoryId': '28'
+                },
+                'status': {
+                    'privacyStatus': 'public',
+                    'selfDeclaredMadeForKids': False
+                }
             }
-        }
-        media = MediaFileUpload(str(video_path), chunksize=-1, resumable=True)
-        request = youtube.videos().insert(
-            part=','.join(request_body.keys()),
-            body=request_body,
-            media_body=media
-        )
-        response = None
-        while response is None:
-            status, response = request.next_chunk()
-            if status:
-                print(f"Uploaded {int(status.progress() * 100)}%.")
-        video_id = response.get('id')
-        print(f"Video uploaded successfully! Video ID: {video_id}")
-        if thumbnail_path and os.path.exists(thumbnail_path):
-            print(f"Uploading thumbnail '{thumbnail_path}' for video ID: {video_id}...")
-            try:
-                thumbnail_media = MediaFileUpload(str(thumbnail_path))
-                youtube.thumbnails().set(
-                    videoId=video_id,
-                    media_body=thumbnail_media
-                ).execute()
-                print("Thumbnail uploaded successfully!")
-            except Exception as e:
-                print(f"ERROR: Failed to upload thumbnail: {e}")
-        else:
-            print("No thumbnail path provided or thumbnail file does not exist. Skipping thumbnail upload.")
-        return video_id
-    except Exception as e:
-        print(f"ERROR: Failed to upload to YouTube. {e}")
-        raise
+            media = MediaFileUpload(str(video_path), chunksize=-1, resumable=True)
+            request = youtube.videos().insert(
+                part=','.join(request_body.keys()),
+                body=request_body,
+                media_body=media
+            )
+            response = None
+            while response is None:
+                status, response = request.next_chunk()
+                if status:
+                    print(f"Uploaded {int(status.progress() * 100)}%.")
+            video_id = response.get('id')
+            print(f"Video uploaded successfully! Video ID: {video_id}")
+            if thumbnail_path and os.path.exists(thumbnail_path):
+                print(f"Uploading thumbnail '{thumbnail_path}' for video ID: {video_id}...")
+                try:
+                    thumbnail_media = MediaFileUpload(str(thumbnail_path))
+                    youtube.thumbnails().set(
+                        videoId=video_id,
+                        media_body=thumbnail_media
+                    ).execute()
+                    print("Thumbnail uploaded successfully!")
+                except Exception as e:
+                    print(f"ERROR: Failed to upload thumbnail: {e}")
+            else:
+                print("No thumbnail path provided or thumbnail file does not exist. Skipping thumbnail upload.")
+            return video_id
+        except Exception as e:
+            print(f"ERROR: Failed to upload to YouTube. {e}")
+            raise
+
+# Legacy function for backward compatibility
+def upload_to_youtube(video_path: Path, title: str, description: str, tags: Union[str, List[str]], thumbnail_path: Optional[Path] = None) -> Optional[str]:
+    uploader = YouTubeApiUploader()
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(',') if t.strip()]
+    return uploader.upload(video_path, title, description, tags, thumbnail_path)

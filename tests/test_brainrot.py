@@ -30,7 +30,7 @@ def test_generate_brainrot_script_enforcement(mock_ollama):
     topic = {"title": "Test", "hook": "Hook", "angle": "Angle"}
     result = generate_brainrot_script(topic)
     word_count = len(result['full_script'].split())
-    # _clamp_words uses max_w=127 by default
+    # clamp_words uses max_w=127 by default
     assert word_count <= 127
     assert word_count >= 99
 

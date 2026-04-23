@@ -30,7 +30,7 @@ from src.core.config import (
 from src.infrastructure.llm import ollama_generate
 from src.infrastructure.tts import text_to_speech
 from src.infrastructure.video import get_local_viral_gameplay, get_local_gameplay, get_relevant_pexels_video
-from src.utils.text import strip_emojis
+from src.utils.text import strip_emojis, clamp_words
 
 # ─────────────────────────── constants ──────────────────────────────────────
 
@@ -104,35 +104,20 @@ SCRIPT_MIN_WORDS = 99
 SCRIPT_MAX_WORDS = 127
 
 
+ROTGEN_PAD = (
+    " AI is reshaping every single industry on the planet right now at a speed nobody predicted."
+    " Companies are being built and destroyed overnight because of this technology."
+    " The workers who adapt will thrive. Those who ignore it will fall behind."
+    " This is not science fiction. This is happening today, this week, this year."
+    " Machine learning models are already writing code, generating art, and diagnosing disease."
+    " The next five years will change everything you know about work and business."
+    " Early adopters always win. The window to get ahead is closing fast."
+    " Stay informed, stay curious, and follow for more AI facts every single day."
+)
+
 def _enforce_word_count(text: str) -> str:
     """Trim script to SCRIPT_MAX_WORDS at a sentence boundary. Pad if too short."""
-    words = text.split()
-    if len(words) <= SCRIPT_MAX_WORDS:
-        if len(words) >= SCRIPT_MIN_WORDS:
-            return text  # already in range
-        # Too short — pad until we hit minimum word count
-        pad = (
-            " AI is reshaping every single industry on the planet right now at a speed nobody predicted."
-            " Companies are being built and destroyed overnight because of this technology."
-            " The workers who adapt will thrive. Those who ignore it will fall behind."
-            " This is not science fiction. This is happening today, this week, this year."
-            " Follow for more AI facts."
-        )
-        combined = text.rstrip()
-        while len(combined.split()) < SCRIPT_MIN_WORDS:
-            combined += pad
-        words = combined.split()
-
-    # Trim to max, ending on a sentence boundary where possible
-    trimmed = words[:SCRIPT_MAX_WORDS]
-    result  = " ".join(trimmed)
-    # Try to end at last sentence-ending punctuation
-    for sep in (". ", "! ", "? "):
-        idx = result.rfind(sep)
-        if idx > len(result) * 0.6:   # only trim if we keep >60% of content
-            result = result[:idx + 1]
-            break
-    return result.strip()
+    return clamp_words(text, min_w=SCRIPT_MIN_WORDS, max_w=SCRIPT_MAX_WORDS, pad_text=ROTGEN_PAD)
 
 
 def generate_rotgen_script(topic: str | None = None) -> dict:
@@ -519,7 +504,7 @@ def compose_rotgen_video(
 
     # Add modular subtitles if script provided
     if script:
-        from src.captions import add_subtitle_overlay
+        from src.utils.captions import add_subtitle_overlay
         composite = add_subtitle_overlay(composite, script, 'short')
 
     # Audio mix: TTS loud + gentle bg music
@@ -607,7 +592,7 @@ def _produce_one_rotgen(
     gameplay_clip = build_gameplay_clip(get_rotgen_gameplay(), total_dur)
 
     # Subtitles
-    from src.captions import add_subtitle_overlay
+    from src.utils.captions import add_subtitle_overlay
     print(f"💬 Adding subtitles ({len(script_text.split())} words)...")
     output_path = OUTPUT_DIR / f"{unique_id}.mp4"
     

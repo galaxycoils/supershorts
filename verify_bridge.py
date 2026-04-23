@@ -1,33 +1,42 @@
 import sys
 import os
 
-try:
-    from src.generator import (
-        generate_curriculum,
-        generate_lesson_content,
-        text_to_speech,
-        generate_visuals,
-        compose_video,
-        YOUR_NAME,
-        start_viral_gameplay_mode,
-        start_tutorial_generation,
-        generate_youtube_content_package,
-    )
-    print("✓ src.generator imports successful")
-except ImportError as e:
-    print(f"✗ src.generator imports failed: {e}")
+print("--- SuperShorts Architecture Bridge Verification ---")
 
-# Check other imports in main.py
+try:
+    from src import generator
+    print("✓ src.generator package import successful")
+    
+    # Check key orchestration re-exports
+    entry_points = [
+        'run_tcm_mode',
+        'run_brainrot_pipeline',
+        'run_rotgen_pipeline',
+        'start_tutorial_generation',
+        'run_video_clipper'
+    ]
+    for ep in entry_points:
+        if hasattr(generator, ep):
+            print(f"  ✓ {ep} re-exported")
+        else:
+            print(f"  ✗ {ep} MISSING from generator")
+            
+except ImportError as e:
+    print(f"✗ src.generator import failed: {e}")
+
+# Check internal modular structure
 modules_to_check = [
-    'src.brainrot',
-    'src.rotgen',
-    'src.learning',
-    'src.ideagenerator',
-    'src.browser_uploader',
-    'src.clipper_mode',
-    'src.tcm_mode'
+    'src.core.base_mode',
+    'src.infrastructure.llm',
+    'src.infrastructure.tts',
+    'src.infrastructure.browser_uploader',
+    'src.engine.video_engine',
+    'src.modes.tcm_educational',
+    'src.modes.brainrot',
+    'src.modes.tutorial'
 ]
 
+print("\n--- Modular Structure Check ---")
 for mod in modules_to_check:
     try:
         __import__(mod)
@@ -35,3 +44,4 @@ for mod in modules_to_check:
     except ImportError as e:
         print(f"✗ {mod} import failed: {e}")
 
+print("\nVerification Complete.")

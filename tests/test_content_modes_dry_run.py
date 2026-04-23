@@ -312,7 +312,7 @@ def test_tcm_mode_dry_run(tmp_path, monkeypatch, harness):
     monkeypatch.setattr(tcm, "TCM_PLAN_FILE", plan_path)
     monkeypatch.setattr(tcm, "OUTPUT_DIR", harness.output_dir)
     monkeypatch.setattr(tcm.Prompt, "ask", lambda *args, **kwargs: "y" if "Use it?" in str(args[0]) else "1")
-    monkeypatch.setattr(generator, "generate_lesson_content", _lesson_content_with_kwargs)
+    monkeypatch.setattr(tcm.OllamaLLMService, "generate", lambda *args, **kwargs: _lesson_content_with_kwargs("Dry Run TCM Lesson"))
     monkeypatch.setattr(tts, "text_to_speech", harness.fake_tts)
     monkeypatch.setattr(video_engine, "generate_visuals", harness.fake_visuals)
     monkeypatch.setattr(video_engine, "compose_video", harness.fake_compose)

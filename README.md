@@ -1,6 +1,6 @@
-# SuperShorts v2.9
+# SuperShorts v3.3
 
-**Fully local AI video factory — educational series, viral Shorts, RotGen character mode, TCM content, automated video clipping, web dashboard, and a workflow engine. Zero paid APIs.**
+**Fully local AI video factory — modular architecture, stateless rendering, sequential upload queuing, and a pro-grade Web Dashboard. Zero paid APIs.**
 
 <p align="center">
   <img src="assets/supershorts_poster.png" alt="SuperShorts" width="340"/>
@@ -9,55 +9,61 @@
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![Ollama](https://img.shields.io/badge/LLM-Ollama%20local-orange)
 ![MoviePy](https://img.shields.io/badge/video-MoviePy%201.0.3-red)
-![Rich](https://img.shields.io/badge/UI-Rich%20TUI-purple)
-![Flask](https://img.shields.io/badge/dashboard-Flask-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Architecture](https://img.shields.io/badge/architecture-modular-cyan)
+![Flask](https://img.shields.io/badge/dashboard-v4.0-pink)
 
 ---
 
 ## What It Does
 
-SuperShorts is a fully local, fully automated video production pipeline. Run `python main.py` on any Mac or Linux box and it writes scripts, narrates audio, edits videos, adds subtitles, and uploads to YouTube — entirely on-device with local Ollama LLM and no paid cloud services.
+SuperShorts is a fully local, automated video production pipeline. It handles scripting, narration, editing, and uploading — entirely on-device with zero paid cloud services.
 
-**v2.9 adds:** Cinematic web dashboard (Production Suite), output folder pruner (`cleanup.py`), and reliability fixes across all pipeline modules.
-
----
-
-## Menu — 12 Options
-
-```
-  [1]   📚  Educational Videos        Long-form + linked Short (curriculum-based)
-  [2]   🧠  Brain Rot Viral Shorts    Sensationalized AI shorts, 30–45 s
-  [3]   🎮  Viral Gameplay Mode       Subway Surfers-style background + AI narration
-  [4]   🎓  Tutorial Videos           ~10-min deep-dive + linked Short
-  [5]   📈  Learning Mode             Self-improvement analysis from past uploads
-  [6]   💡  YouTube Studio Ideas      Real YT suggestions, thumbnails & scripts
-  [7]   📋  View Content Plan         Browse lessons + brain rot topic tracker
-  [8]   🎭  RotGen Character Mode     ByteBot AI character + gameplay + auto-subtitles
-  [9]   📦  YouTube Content Package   Expert AI: topic → script → 5-min video → upload
-  [10]  ✂️  Automatic Video Clipper   Long YouTube/podcast → viral vertical Shorts
-  [11]  🌿  TCM Educational Mode      Traditional Chinese Medicine content series
-  [12]  🚪  Exit
-```
-
-Live stats bar shows lesson + brain rot progress on every menu render.
+**v3.3 adds:**
+- **Modular Architecture**: Clean separation of `Engine`, `Infrastructure`, and `Modes` using Dependency Injection.
+- **Stateless Captions**: High-performance, race-condition-free subtitle rendering.
+- **Sequential Upload Queue**: Solves browser profile locks during parallel production waves.
+- **Dashboard v4.0**: Real-time RAM/Disk monitoring, job management, and advanced mode configuration.
 
 ---
 
-## Web Dashboard
+## Web Dashboard (v4.0)
 
 ```bash
 python3 dashboard.py          # starts on http://localhost:5050
-PORT=8080 python3 dashboard.py  # custom port
 ```
 
-The **Production Suite** dashboard (`dashboard.py`) gives you a browser UI to:
-- Monitor KPI cards (total uploads, educational progress, brain rot, RotGen counts)
-- View a 7-day upload heatmap
-- Launch any of the 10 production modes with a count selector and live SSE output terminal
-- Trigger the 3 built-in workflows (daily, tcm-weekly, full-pipeline) from the sidebar
-- Check Ollama connection status and disk usage in real time
-- Browse content plan, upload log, and mode breakdown
+The **Production Suite** dashboard gives you a professional browser UI to:
+- **Control**: Real-time job monitoring with "Terminate" support for running tasks.
+- **Configure**: Per-run LLM model selection, voice choice (Piper neural), and HD vs Draft rendering.
+- **Analyze**: Live macOS RAM usage monitor and disk health visualization.
+- **Review**: Built-in Video Gallery to play and download produced content directly.
+- **Automate**: Trigger complex multi-mode workflows (Daily, Weekly, Full-Pipeline).
+
+---
+
+## Core Architecture
+
+The project has been refactored for high-volume automated production:
+
+| Component | Responsibility |
+|:--- | :--- |
+| **Modes** | High-level strategy (Brainrot, TCM, Tutorial) using the `BaseMode` template. |
+| **Engine** | PIL and MoviePy composition logic. Now fully stateless. |
+| **Infrastructure** | Clean adapters for Ollama (LLM), Piper (TTS), and Selenium (Uploader). |
+| **Queue** | Background task processing to prevent resource contention. |
+
+---
+
+## Quality Gates & Verification
+
+Every change is verified against strict engineering standards:
+- **8GB RAM Safety**: Optimized for M1/M2 Mac mini/Air base models.
+- **Thread Safety**: Race-condition-free rendering and serialized I/O.
+- **Full Test Suite**: 50+ automated tests covering orchestration, rendering, and logic.
+
+```bash
+PYTHONPATH=. pytest           # Run full verification suite
+```
 
 ---
 

@@ -8,6 +8,7 @@ import traceback
 from pathlib import Path
 from tqdm import tqdm
 from rich.prompt import Prompt
+from src.core.config import VideoOptions
 
 from src.generator import (
     generate_curriculum,
@@ -129,8 +130,9 @@ def produce_lesson_videos(lesson):
     long_video_path = OUTPUT_DIR / f"long_video_{unique_id}.mp4"
     console.print(f"[cyan]🎥 Creating long-form video: [dim]{long_video_path}[/dim][/cyan]")
     long_full_script = '\n'.join(slide_scripts)
-    compose_video(slide_paths, slide_audio_paths, long_video_path, 'long', lesson['title'],
-                  script=long_full_script)
+    compose_video(slide_paths, slide_audio_paths, long_video_path, VideoOptions(
+        video_type='long', lesson_title=lesson['title'], script=long_full_script
+    ))
 
     for _ap in slide_audio_paths:
         try:
@@ -145,10 +147,10 @@ def produce_lesson_videos(lesson):
     )
 
     console.print("\n[bold]── Short Video ──[/bold]")
-    from src.generator import _clamp_words
+    from src.generator import clamp_words
     raw_short = (f"{lesson_content['short_form_highlight']}\n\n"
                  f"Link to the full lesson is in the description below.")
-    short_script = _clamp_words(raw_short, min_w=99, max_w=127)
+    short_script = clamp_words(raw_short, min_w=99, max_w=127)
     short_audio_mp3_path = OUTPUT_DIR / f"short_audio_{unique_id}.mp3"
     short_audio_path = text_to_speech(short_script, short_audio_mp3_path)
     short_slide_dir = OUTPUT_DIR / f"slides_short_{unique_id}"
