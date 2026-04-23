@@ -138,7 +138,8 @@ def compose_video(slide_paths: List[Union[str, Path]], audio_paths: List[Union[s
 
     target_size = LONG_VIDEO_SIZE if video_type == 'long' else SHORT_VIDEO_SIZE
     low_memory_mode = LOW_MEMORY_MODE or len(slide_paths) > 3
-    static_mode = low_memory_mode and not force_viral_bg
+    # If custom_bg is provided, we override static_mode to ensure it's used
+    static_mode = low_memory_mode and not force_viral_bg and not options.custom_bg
     slide_fade = 0.2 if low_memory_mode else 0.5
 
     bg_music = None
@@ -168,7 +169,11 @@ def compose_video(slide_paths: List[Union[str, Path]], audio_paths: List[Union[s
         safe_close(_dur_clips)
 
         if bg_path and not static_mode:
-            bg_clip = VideoFileClip(bg_path)
+            if str(bg_path).lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                bg_clip = ImageClip(str(bg_path)).set_duration(total_duration)
+            else:
+                bg_clip = VideoFileClip(str(bg_path))
+            
             if bg_clip.duration < total_duration:
                 bg_clip = bg_clip.fx(vfx.loop, duration=total_duration)
             else:
@@ -212,8 +217,9 @@ def compose_video(slide_paths: List[Union[str, Path]], audio_paths: List[Union[s
             except Exception as e:
                 print(f"⚠️ Subtitle overlay failed ({e})")
 
-        if BACKGROUND_MUSIC_PATH.exists():
-            bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.15)
+        music_path = Path(options.custom_music) if options.custom_music and Path(options.custom_music).exists() else BACKGROUND_MUSIC_PATH
+        if music_path and music_path.exists():
+            bg_music = AudioFileClip(str(music_path)).volumex(0.15)
             if bg_music.duration < final_video.duration:
                 from moviepy.audio.fx.audio_loop import audio_loop
                 bg_music = audio_loop(bg_music, duration=final_video.duration)
@@ -226,12 +232,12 @@ def compose_video(slide_paths: List[Union[str, Path]], audio_paths: List[Union[s
 
         final_video.write_videofile(
             str(output_path),
-            fps=VIDEO_FPS,
+            fps=options.fps,
             codec="libx264",
             audio_codec="aac",
             audio_bitrate="192k",
             preset="ultrafast",
-            threads=VIDEO_THREADS,
+            threads=options.threads,
             logger='bar',
             temp_audiofile=temp_audio,
             ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],

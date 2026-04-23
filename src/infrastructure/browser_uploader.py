@@ -177,10 +177,8 @@ def _wait_for_uploaded_video_id(driver, title: str) -> Optional[str]:
 def get_browser() -> webdriver.Firefox:
     profile_path = _find_firefox_profile()
     options = Options()
-    headless_override = os.environ.get("FIREFOX_HEADLESS")
-    headless = headless_override == "1" if headless_override is not None else sys.platform != "darwin"
-    if headless:
-        options.add_argument("--headless")
+    # Force headless mode as requested by user
+    options.add_argument("--headless")
     options.add_argument("-profile")
     options.add_argument(profile_path)
 

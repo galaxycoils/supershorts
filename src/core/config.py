@@ -90,5 +90,6 @@ class VideoOptions:
     script: Optional[str] = None
     bg_query: Optional[str] = None
     custom_bg: Optional[str] = None
+    custom_music: Optional[str] = None
     threads: int = VIDEO_THREADS
     fps: int = VIDEO_FPS

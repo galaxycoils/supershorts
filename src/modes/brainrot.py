@@ -343,6 +343,7 @@ def generate_brainrot_script(topic: dict, llm_service: Optional[ILLMService] = N
     return mode.generate_script(topic)
 
 def run_brainrot_pipeline(shorts_per_run: int = 3, llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None):
+    from rich.prompt import Prompt
     mode = BrainrotMode(
         llm_service or OllamaLLMService(generate_fn=ollama_generate),
         tts_service or StandardTTSService(),
@@ -351,18 +352,30 @@ def run_brainrot_pipeline(shorts_per_run: int = 3, llm_service=None, tts_service
         voice=voice,
         custom_bg=os.environ.get("CUSTOM_BG")
     )
-    pending = mode.get_pending_topics()
-
-    if not pending:
-        print("📋 No pending topics. Generating new batch...")
-        new_topics = generate_brainrot_topics(llm_service=mode.llm)
-        plan = {"topics": []}
-        for t in new_topics:
-            t["status"] = "pending"
-            plan["topics"].append(t)
-        with open(BRAINROT_PLAN_FILE, 'w') as f:
-            json.dump(plan, f, indent=2)
-        pending = new_topics
+    
+    # Check for custom topic via stdin (from Dashboard)
+    custom_topic = Prompt.ask("Enter custom topic (or leave blank for auto)", default="")
+    
+    if custom_topic.strip():
+        print(f"🎯 Using custom topic: {custom_topic}")
+        pending = [{
+            "title": custom_topic,
+            "hook": f"Did you know about {custom_topic}?",
+            "angle": "Explaining the most interesting part of this topic.",
+            "status": "pending"
+        }]
+    else:
+        pending = mode.get_pending_topics()
+        if not pending:
+            print("📋 No pending topics. Generating new batch...")
+            new_topics = generate_brainrot_topics(llm_service=mode.llm)
+            plan = {"topics": []}
+            for t in new_topics:
+                t["status"] = "pending"
+                plan["topics"].append(t)
+            with open(BRAINROT_PLAN_FILE, 'w') as f:
+                json.dump(plan, f, indent=2)
+            pending = new_topics
 
     print(f"🚀 Brain Rot Pipeline: {len(pending)} topics available, producing {shorts_per_run}.")
     for i, topic in enumerate(pending[:shorts_per_run]):

@@ -68,25 +68,37 @@ def api_stats():
 
 @app.route("/api/health")
 def api_health():
+    import psutil
     ollama_ok = False
     try:
         r = _req.get("http://localhost:11434/api/tags", timeout=1)
         ollama_ok = r.status_code == 200
     except: pass
-    return jsonify({"ollama": ollama_ok, "uptime_s": int(time.time() - START)})
+    ram_gb = psutil.virtual_memory().available >> 30
+    return jsonify({"ollama": ollama_ok, "uptime_s": int(time.time() - START), "ram_gb": ram_gb})
 
-@app.route("/api/disk")
-def api_disk():
-    return jsonify({"output_mb": _dir_mb(PROJECT_ROOT / "output")})
+@app.route("/api/ram")
+def api_ram():
+    import psutil
+    v = psutil.virtual_memory()
+    return jsonify({"free": v.available >> 30, "total": v.total >> 30, "percent": v.percent})
 
 @app.route("/api/models")
 def api_models():
     try:
         r = _req.get("http://localhost:11434/api/tags", timeout=2)
         if r.status_code == 200:
-            return jsonify([m["name"] for m in r.json().get("models", [])])
+            models = [m["name"] for m in r.json().get("models", [])]
+            return jsonify({
+                "models": models,
+                "recommendations": {
+                    "scripting": "qwen2.5-coder:3b",
+                    "reasoning": "llama3.2:3b",
+                    "creative": "mistral"
+                }
+            })
     except: pass
-    return jsonify(["llama3", "mistral", "phi3"])
+    return jsonify({"models": ["llama3", "mistral"], "recommendations": {}})
 
 @app.route("/api/assets")
 def api_assets():

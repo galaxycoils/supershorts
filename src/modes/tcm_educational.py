@@ -78,12 +78,13 @@ def generate_tcm_curriculum(focus: str, extra: str, previous_titles=None, llm_se
         return {"curriculum_title": "TCM Essentials", "lessons": [{"chapter": i+1, "part": 1, "title": f"TCM Lesson {i+1}", "status": "pending", "youtube_id": None} for i in range(10)]}
 
 class TCMMode(BaseMode):
-    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, plan=None, dry_run=False, voice=None, custom_bg=None):
+    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, plan=None, dry_run=False, voice=None, custom_bg=None, custom_music=None):
         super().__init__(llm_service, tts_service, uploader_service)
         self.plan = plan
         self.dry_run = dry_run
         self.voice = voice
         self.custom_bg = custom_bg
+        self.custom_music = custom_music
 
     def get_pending_topics(self) -> List[Dict[str, Any]]:
         if not self.plan: return []
@@ -158,7 +159,7 @@ Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highli
         
         compose_video(assets["images"], assets["audio"], output_path,
                       VideoOptions(video_type="short", lesson_title=content.get("title", "TCM"),
-                                   script=assets["script"][0], bg_query=bg_query, custom_bg=bg_source))
+                                   script=assets["script"][0], bg_query=bg_query, custom_bg=bg_source, custom_music=self.custom_music))
         return output_path
 
     def upload(self, content: Dict[str, Any], video_path: str) -> Optional[str]:
@@ -192,5 +193,6 @@ def run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None, dry_
         TCM_PLAN_FILE.write_text(json.dumps(plan, indent=2))
 
     raw_count = Prompt.ask("How many videos to produce?", default="3")
-    mode = TCMMode(llm_service, tts_service, uploader_service, plan, dry_run=dry_run, voice=voice, custom_bg=os.environ.get("CUSTOM_BG"))
+    mode = TCMMode(llm_service, tts_service, uploader_service, plan, dry_run=dry_run, voice=voice, 
+                   custom_bg=os.environ.get("CUSTOM_BG"), custom_music=os.environ.get("CUSTOM_MUSIC"))
     mode.run_pipeline(int(raw_count))

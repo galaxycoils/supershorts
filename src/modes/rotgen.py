@@ -722,6 +722,7 @@ def run_rotgen_pipeline(shorts_per_run: int = 3, llm_service=None, tts_service=N
     from src.infrastructure.llm import OllamaLLMService, ollama_generate
     from src.infrastructure.tts import StandardTTSService
     from src.infrastructure.browser_uploader import YouTubeBrowserUploader
+    from rich.prompt import Prompt
 
     mode = RotgenMode(
         llm_service or OllamaLLMService(generate_fn=ollama_generate),
@@ -734,7 +735,16 @@ def run_rotgen_pipeline(shorts_per_run: int = 3, llm_service=None, tts_service=N
     )
     
     ensure_dirs()
-    pending = mode.get_pending_topics()
+    
+    # Check for custom topic via stdin (from Dashboard)
+    custom_topic = Prompt.ask("Enter custom topic (or leave blank for auto)", default="")
+    
+    if custom_topic.strip():
+        print(f"🎯 Using custom topic: {custom_topic}")
+        pending = [{"title": custom_topic, "topic": custom_topic}]
+    else:
+        pending = mode.get_pending_topics()
+
     print(f"🚀 RotGen Pipeline: {len(pending)} topics available, producing {shorts_per_run}.")
     
     for i, topic in enumerate(pending[:shorts_per_run]):

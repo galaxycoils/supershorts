@@ -167,8 +167,9 @@ def produce_lesson_videos(lesson):
     )
     short_video_path = OUTPUT_DIR / f"short_video_{unique_id}.mp4"
     console.print(f"[cyan]🎥 Creating short video: [dim]{short_video_path}[/dim][/cyan]")
-    compose_video([short_slide_path], [short_audio_path], short_video_path, 'short', lesson['title'],
-                  script=short_script)
+    compose_video([short_slide_path], [short_audio_path], short_video_path, VideoOptions(
+        video_type='short', lesson_title=lesson['title'], script=short_script
+    ))
 
     for _ap in [short_audio_path, str(short_audio_mp3_path)]:
         try:

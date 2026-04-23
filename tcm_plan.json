@@ -1,66 +1,73 @@
 {
-  "curriculum_title": "Understanding Traditional Chinese Medicine (TCM) for Anxiety Management",
+  "curriculum_title": "Introduction to Programming",
   "lessons": [
     {
       "chapter": 1,
       "part": 1,
-      "title": "Introduction to Traditional Chinese Medicine (TCM)",
+      "title": "Basics of Computer Science",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 1,
+      "part": 2,
+      "title": "Programming Fundamentals",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 1,
+      "part": 3,
+      "title": "Variables and Data Types",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 1,
+      "part": 4,
+      "title": "Control Structures: If-Else Statements",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 1,
+      "part": 5,
+      "title": "Loops and Iteration",
       "status": "pending",
       "youtube_id": null
     },
     {
       "chapter": 2,
       "part": 1,
-      "title": "Yin and Yang: Core Principles of TCM in Anxiety Management",
+      "title": "Functions and Subroutines",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 2,
+      "part": 2,
+      "title": "Arrays and Lists",
       "status": "pending",
       "youtube_id": null
     },
     {
       "chapter": 3,
       "part": 1,
-      "title": "Qi, Blood, and Essence in Managing Anxiety",
+      "title": "Object-Oriented Programming (OOP)",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 3,
+      "part": 2,
+      "title": "Inheritance and Polymorphism",
       "status": "pending",
       "youtube_id": null
     },
     {
       "chapter": 4,
       "part": 1,
-      "title": "Herbs and Tonic for Anxiety: A Comprehensive Overview",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 5,
-      "part": 1,
-      "title": "Anxiety Management Techniques in Traditional Chinese Medicine",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 6,
-      "part": 1,
-      "title": "Stress Management and TCM: A Practical Guide",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 7,
-      "part": 1,
-      "title": "Nutrition and Diet in the Context of Anxiety Management using TCM",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 8,
-      "part": 1,
-      "title": "Historical Context of Traditional Chinese Medicine: The Evolution of Anxiety Management",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 9,
-      "part": 1,
-      "title": "Case Studies and Real-World Examples in Anxiety Management with TCM",
+      "title": "Error Handling and Exception Management",
       "status": "pending",
       "youtube_id": null
     }

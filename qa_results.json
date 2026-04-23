@@ -1,0 +1,486 @@
+[
+  {
+    "mode": "tcm",
+    "error": "Console SEVERE: http://localhost:5050/favicon.ico - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tcm",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tcm",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tcm",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tcm",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tcm",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tcm",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tcm",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tcm",
+    "error": "Crash found: http://localhost:5050/static/js/main.js 273:58 Uncaught TypeError: Cannot read properties of null (reading 'value')"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "rotgen",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "tutorial",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "viral",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "clipper",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "ideas",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "package",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "learning",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/peter_finance.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/stewie.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/spongebob.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/squidward.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/patrick.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  },
+  {
+    "mode": "educational",
+    "error": "Console SEVERE: http://localhost:5050/static/img/trump.png - Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  }
+]
