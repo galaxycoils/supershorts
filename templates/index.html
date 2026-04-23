@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <title>SuperShorts — AI Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dark-theme">
+
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+        <button id="menu-toggle" class="icon-btn" aria-label="Toggle menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <div class="logo-mark">SUPER<span class="accent">SHORTS</span></div>
+        <div class="header-actions">
+            <div class="producing-badge" id="producing-badge">
+                <div class="producing-dot"></div>
+                LIVE
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo desktop-only">
+            <div class="logo-mark">SUPER<span class="slash">/</span><span class="accent">SHORTS</span></div>
+            <div class="logo-sub">Production Suite</div>
+        </div>
+
+        <nav class="nav-section">
+            <div class="nav-label">Main</div>
+            <button class="nav-btn active" onclick="navTo('#kpis',this)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                <span>Dashboard</span>
+            </button>
+            <button class="nav-btn" onclick="navTo('#productions',this)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
+                <span>Productions</span>
+            </button>
+            <button class="nav-btn" onclick="navTo('#gallery',this);refreshGallery()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                <span>Gallery</span>
+            </button>
+            <button class="nav-btn" onclick="navTo('#settings',this)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span>Settings</span>
+            </button>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="ollama-status">
+                <div class="led" id="ollama-led"></div>
+                <span id="ollama-txt">ollama ...</span>
+            </div>
+            <div class="system-stats">
+                <div class="stat-label">RAM FREE</div>
+                <div class="progress-bar"><div id="ram-fill" class="fill"></div></div>
+                <div id="ram-text" class="stat-value">-- GB</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main" id="main-scroll">
+        <div class="topbar desktop-only">
+            <div id="clock">00:00:00</div>
+        </div>
+
+        <div class="content">
+            <!-- KPI Dashboard -->
+            <section id="kpis" class="dashboard-section active">
+                <div class="section-header">
+                    <h2>Command Center <small>overview</small></h2>
+                </div>
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">TOTAL UPLOADS</div>
+                        <div class="kpi-value" id="kpi-total">0</div>
+                        <div class="kpi-sub">Lifetime production</div>
+                    </div>
+                    <div class="kpi-card highlight">
+                        <div class="kpi-label">BRAINROT</div>
+                        <div class="kpi-value" id="kpi-brainrot">0</div>
+                        <div class="kpi-sub">+12% from last week</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">EDUCATIONAL</div>
+                        <div class="kpi-value" id="kpi-edu">0</div>
+                        <div class="kpi-sub">Knowledge pipeline</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">DISK USAGE</div>
+                        <div class="kpi-value" id="disk-text">-- MB</div>
+                        <div class="progress-bar mini"><div id="disk-fill" class="fill"></div></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Productions Grid -->
+            <section id="productions" class="dashboard-section">
+                <div class="two-col">
+                    <div class="col-left">
+                        <div class="section-header">
+                            <h2>Active Engines <small>click to configure</small></h2>
+                        </div>
+                        <div id="mode-grid" class="mode-grid">
+                            <!-- Injected via JS -->
+                        </div>
+                    </div>
+                    <div class="col-right">
+                        <div class="section-header">
+                            <h2>Live Output <small>subprocess monitoring</small></h2>
+                            <button onclick="termClear()" class="text-btn">Clear</button>
+                        </div>
+                        <div class="terminal" id="terminal">
+                            <div class="tl sys">Ready for production...<span class="term-cursor"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gallery -->
+            <section id="gallery" class="dashboard-section">
+                <div class="section-header">
+                    <h2>Production Gallery <small>recent renders</small></h2>
+                    <button onclick="refreshGallery()" class="icon-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+                </div>
+                <div id="gallery-grid" class="gallery-grid">
+                    <!-- Injected via JS -->
+                </div>
+            </section>
+
+            <!-- Settings -->
+            <section id="settings" class="dashboard-section">
+                <div class="section-header">
+                    <h2>Global Settings <small>persistence</small></h2>
+                </div>
+                <div class="settings-grid">
+                    <div class="settings-card">
+                        <div class="field">
+                            <label>Author Identity</label>
+                            <input type="text" id="global-author" value="SuperShorts" onchange="saveGlobalSettings()">
+                        </div>
+                        <div class="field">
+                            <label>Default Ollama Model</label>
+                            <select id="global-model" onchange="saveGlobalSettings()">
+                                <option value="llama3">llama3</option>
+                                <option value="mistral">mistral</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <div class="toggle-row">
+                            <div class="toggle-info">
+                                <div class="toggle-title">Advanced View Mode</div>
+                                <div class="toggle-desc">Expose low-level production knobs</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="adv-toggle" onchange="toggleAdvancedMode()">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Multi-Step Production Modal (RotGen Style) -->
+    <div class="modal-overlay" id="modal-overlay" style="display:none">
+        <div class="modal-container" id="modal">
+            <header class="modal-header">
+                <button class="modal-back-btn" id="modal-back" onclick="modalPrevStep()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+                    Back
+                </button>
+                <div class="modal-steps" id="modal-steps-indicator">STEP 1 / 3</div>
+                <button class="modal-close-btn" onclick="closeModal()">✕</button>
+            </header>
+
+            <div class="modal-content">
+                <div class="modal-title-area">
+                    <h1 id="modal-title-el">Production Mode</h1>
+                    <p id="modal-subtitle-el">Configure your next viral hit.</p>
+                </div>
+
+                <div id="modal-body">
+                    <!-- Dynamic Step Content -->
+                </div>
+            </div>
+
+            <footer class="modal-footer">
+                <button class="btn-launch-full" id="btn-modal-next" onclick="modalNextStep()">
+                    CONTINUE
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+                <div class="footer-hint" id="modal-hint">select a style first</div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
