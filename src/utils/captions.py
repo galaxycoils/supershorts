@@ -137,15 +137,8 @@ def add_subtitle_overlay(base_clip, script: str, video_type: str):
     if not timed_data:
         return base_clip
 
-    # Pre-render all unique frames to a dict to avoid redundant PIL work during make_frame
-    frame_cache = {}
-    for entry in timed_data:
-        if entry["text"] not in frame_cache:
-            frame_cache[entry["text"]] = render_subtitle_frame(entry["text"], W)
-
     # Optimization: pre-calculate sorted start times for binary search
     start_times = [entry["start"] for entry in timed_data]
-    empty_frame = np.zeros((SUBTITLE_H, W, 3), dtype=np.uint8)
 
     def make_frame(t):
         try:
@@ -155,16 +148,17 @@ def add_subtitle_overlay(base_clip, script: str, video_type: str):
             if idx >= 0:
                 entry = timed_data[idx]
                 if entry["start"] <= t <= entry["end"]:
-                    # Return pre-rendered RGB array
-                    return frame_cache[entry["text"]][:, :, :3]
+                    # Render RGB array on the fly to avoid shared state/caching issues
+                    # We take only first 3 channels (RGB) from the RGBA result
+                    return render_subtitle_frame(entry["text"], W)[:, :, :3]
             
-            # Return transparent/empty black frame if no text matches (copy to avoid shared mutation)
-            return empty_frame.copy()
+            # Return transparent/empty black frame if no text matches
+            return np.zeros((SUBTITLE_H, W, 3), dtype=np.uint8)
         except Exception as e:
             # Prevent silent failures by logging exceptions that occur during frame generation
             import logging
             logging.error(f"Error in subtitle make_frame at t={t}: {e}", exc_info=True)
-            return empty_frame.copy()
+            return np.zeros((SUBTITLE_H, W, 3), dtype=np.uint8)
 
     # Create one VideoClip for all subtitles
     sub_clip = VideoClip(make_frame, duration=base_clip.duration).set_position((0, sub_y))
