@@ -1,0 +1,3 @@
+source: main.py
+kind: object
+purpose: Root entrypoint — interactive CLI loop dispatching to all video generation modes via menu

@@ -1,0 +1,3 @@
+source: src/core/learning.py
+kind: object
+purpose: Learning engine — upload logging, self-improvement analysis, curriculum suggestions

@@ -1,8 +1,10 @@
 """src/modes/brainrot.py - Brain Rot / High-Engagement Viral Shorts Generator"""
 import gc
 import json
+import os
 import random
 import datetime
+from typing import List, Dict, Any, Optional
 from functools import lru_cache
 from pathlib import Path
 import numpy as np
@@ -150,10 +152,11 @@ def create_brainrot_video(slide_images, audio_paths, output_path, title, script=
         safe_close(audio_clips_to_close, final, bg_clip, bg_music)
 
 class BrainrotMode(BaseMode):
-    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None):
+    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None, custom_bg=None):
         super().__init__(llm_service, tts_service, uploader_service)
         self.dry_run = dry_run
         self.voice = voice
+        self.custom_bg = custom_bg
 
     def get_pending_topics(self) -> List[Dict[str, Any]]:
         if not BRAINROT_PLAN_FILE.exists():
@@ -247,7 +250,58 @@ Format JSON: 'slides' (list of 4 with 'text', 'duration_hint'), 'full_script', '
         if self.dry_run:
             Path(output_path).touch()
             return output_path
-        create_brainrot_video(assets["images"], assets["audio"], output_path, content["title"], script=content["full_script"])
+            
+        if len(assets["images"]) != len(assets["audio"]):
+            raise ValueError(f"Slide/audio count mismatch")
+            
+        clips = []
+        audio_clips_to_close = []
+        final = None
+        bg_clip = None
+        bg_music = None
+
+        try:
+            for img_p, aud_p in zip(assets["images"], assets["audio"]):
+                audio = AudioFileClip(str(aud_p))
+                audio_clips_to_close.append(audio)
+                img_clip = ImageClip(str(img_p)).set_duration(audio.duration).set_audio(audio)
+                img_clip = img_clip.fadein(0.3).fadeout(0.3)
+                clips.append(img_clip)
+
+            final = concatenate_videoclips(clips, method="compose")
+            total_duration = final.duration
+
+            # Layered Background
+            bg_source = self.custom_bg if (self.custom_bg and Path(self.custom_bg).exists()) else get_local_viral_gameplay()
+            
+            if bg_source and Path(bg_source).exists():
+                bg_clip = VideoFileClip(str(bg_source)).subclip(0, total_duration).resize(height=1920)
+                if bg_clip.w > 1080:
+                    bg_clip = bg_clip.crop(x_center=bg_clip.w/2, width=1080)
+                final = CompositeVideoClip([bg_clip.volumex(0), final.set_position("center").set_opacity(0.85)])
+            
+            # Background Music
+            if BACKGROUND_MUSIC_PATH.exists():
+                bg_music = AudioFileClip(str(BACKGROUND_MUSIC_PATH)).volumex(0.15).set_duration(total_duration)
+                if final.audio is not None:
+                    composite_audio = CompositeAudioClip([final.audio.volumex(1.2), bg_music])
+                    final = final.set_audio(composite_audio)
+                else:
+                    final = final.set_audio(bg_music)
+
+            temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
+            final.write_videofile(
+                str(output_path),
+                fps=24,
+                codec="libx264",
+                audio_codec="aac",
+                threads=3,
+                preset="ultrafast",
+                logger='bar',
+                temp_audiofile=temp_audio,
+            )
+        finally:
+            safe_close(audio_clips_to_close, final, bg_clip, bg_music)
         return output_path
 
     def upload(self, content: Dict[str, Any], video_path: str) -> Optional[str]:
@@ -291,10 +345,11 @@ def generate_brainrot_script(topic: dict, llm_service: Optional[ILLMService] = N
 def run_brainrot_pipeline(shorts_per_run: int = 3, llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None):
     mode = BrainrotMode(
         llm_service or OllamaLLMService(generate_fn=ollama_generate),
-        tts_service,
-        uploader_service,
+        tts_service or StandardTTSService(),
+        uploader_service or YouTubeBrowserUploader(),
         dry_run=dry_run,
-        voice=voice
+        voice=voice,
+        custom_bg=os.environ.get("CUSTOM_BG")
     )
     pending = mode.get_pending_topics()
 

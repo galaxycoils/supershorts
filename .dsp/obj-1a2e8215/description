@@ -1,0 +1,3 @@
+source: src/generator.py
+kind: object
+purpose: Backward-compatibility bridge — re-exports all symbols from modular src/ for main.py and run_workflow.py

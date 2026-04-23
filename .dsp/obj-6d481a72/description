@@ -1,0 +1,3 @@
+source: src/engine/video_engine.py
+kind: object
+purpose: Video rendering engine — slide generation, video composition, text/captions overlay

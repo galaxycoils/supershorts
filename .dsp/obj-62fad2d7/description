@@ -1,0 +1,3 @@
+source: src/modes/rotgen.py
+kind: object
+purpose: RotGen character mode — ByteBot AI character videos with gameplay + auto-subtitles

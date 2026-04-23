@@ -1,0 +1,3 @@
+source: src/infrastructure/browser_uploader.py
+kind: object
+purpose: YouTube browser uploader — alternate browser-based upload path

@@ -1,0 +1,3 @@
+source: src/modes/tcm_educational.py
+kind: object
+purpose: TCM Educational mode — Traditional Chinese Medicine content series generator

@@ -33,7 +33,7 @@ JOBS: dict[str, dict] = {}
 MODE_COMMANDS = {
     "educational": "from main import main_flow; main_flow(lessons_per_run={count})",
     "brainrot":    "from src.modes.brainrot import run_brainrot_pipeline; run_brainrot_pipeline({count}, dry_run={dry_run}, voice='{voice}')",
-    "rotgen":      "from src.modes.rotgen import run_rotgen_pipeline; run_rotgen_pipeline({count})",
+    "rotgen":      "from src.modes.rotgen import run_rotgen_pipeline; run_rotgen_pipeline({count}, dry_run={dry_run}, voice='{voice}')",
     "tcm":         "from src.modes.tcm_educational import run_tcm_mode; run_tcm_mode(dry_run={dry_run}, voice='{voice}')",
     "tutorial":    "from src.generator import start_tutorial_generation; start_tutorial_generation()",
     "viral":       "from src.generator import start_viral_gameplay_mode; start_viral_gameplay_mode()",
@@ -220,6 +220,28 @@ def api_models():
     except: pass
     return jsonify(["llama3", "mistral", "phi3"])
 
+@app.route("/api/assets")
+def api_assets():
+    """List available backgrounds, characters, and music."""
+    assets = {
+        "backgrounds": [],
+        "characters": [],
+        "music": []
+    }
+    bg_dir = PROJECT_ROOT / "assets" / "backgrounds"
+    if bg_dir.exists():
+        assets["backgrounds"] = [f.name for f in bg_dir.glob("*") if f.is_file() and f.suffix.lower() in ('.jpg', '.jpeg', '.png', '.webp')]
+    
+    char_dir = PROJECT_ROOT / "assets" / "characters"
+    if char_dir.exists():
+        assets["characters"] = [f.name for f in char_dir.glob("*") if f.is_file() and f.suffix.lower() in ('.png', '.webp')]
+
+    music_dir = PROJECT_ROOT / "assets" / "music"
+    if music_dir.exists():
+        assets["music"] = [f.name for f in music_dir.glob("*") if f.is_file() and f.suffix.lower() in ('.mp3', '.wav', '.m4a')]
+    
+    return jsonify(assets)
+
 @app.route("/api/run/<mode>", methods=["POST"])
 def api_run(mode):
     if mode not in MODE_COMMANDS:
@@ -235,6 +257,12 @@ def api_run(mode):
         hd_mode   = "True" if data.get("hd_mode") == "y" else "False"
         author    = data.get("author_name", "SuperShorts")
         
+        # New Params
+        bg_asset   = data.get("background", "")
+        char_asset = data.get("character", "")
+        music_asset = data.get("music", "")
+        temp       = data.get("temperature", "0.7")
+        
     except (ValueError, TypeError):
         count = 1
         dry_run = "False"
@@ -242,13 +270,27 @@ def api_run(mode):
         llm_model = "llama3"
         hd_mode = "False"
         author = "SuperShorts"
+        bg_asset = ""
+        char_asset = ""
+        music_asset = ""
+        temp = "0.7"
 
     # Injecting environment variable overrides for the subprocess
     env = os.environ.copy()
     env["OLLAMA_MODEL"] = llm_model
     env["YOUR_NAME"] = author
+    env["LLM_TEMPERATURE"] = str(temp)
     if hd_mode == "True":
         env["RENDER_HD"] = "1"
+    if bg_asset:
+        env["CUSTOM_BG"] = str(PROJECT_ROOT / "assets" / "backgrounds" / bg_asset)
+    if char_asset:
+        env["CUSTOM_CHAR"] = str(PROJECT_ROOT / "assets" / "characters" / char_asset)
+    if music_asset:
+        env["CUSTOM_MUSIC"] = str(PROJECT_ROOT / "assets" / "music" / music_asset)
+
+    print(f"🚀 Launching {mode} with params: count={count}, dry_run={dry_run}, voice={voice}")
+    print(f"   Env overrides: CUSTOM_BG={env.get('CUSTOM_BG')}, CUSTOM_CHAR={env.get('CUSTOM_CHAR')}, LLM_TEMP={env.get('LLM_TEMPERATURE')}")
 
     code  = MODE_COMMANDS[mode].format(count=count, dry_run=dry_run, voice=voice)
     cmd   = [PYTHON, "-c",
@@ -330,30 +372,36 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <title>SuperShorts — Production Suite</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:      #0c111d; /* DESIGN.md primary-bg */
-  --bg2:     #121826;
-  --bg3:     #1b2231;
-  --bg4:     #242c3d;
-  --cyan:    #00c8ff; /* DESIGN.md accent-cyan */
-  --pink:    #ff1e50; /* DESIGN.md accent-pink */
-  --coral:   #ff6b35;
-  --mint:    #4ade80;
-  --red:     #f87171;
-  --text:    #ffffff; /* DESIGN.md text-main */
-  --dim:     #667085;
-  --border:  #1e293b;
-  --border2: #334155;
-  --sidebar: 240px;
-  --r-sm: 4px; --r-md: 8px; --r-lg: 12px;
-  --t-fast: 0.1s ease; --t-base: 0.2s ease;
+  --bg:      #050505;
+  --bg2:     #0a0a0a;
+  --bg3:     #121212;
+  --bg4:     #1e1e1e;
+  --cyan:    #3B82F6; /* RotGen Blue */
+  --pink:    #8B5CF6; /* RotGen Purple */
+  --coral:   #8B5CF6;
+  --mint:    #10B981;
+  --red:     #EF4444;
+  --text:    #ffffff;
+  --dim:     #A1A1AA;
+  --border:  #27272A;
+  --border2: #3F3F46;
+  --sidebar: 260px;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+  --t-fast: 0.15s ease; --t-base: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --z-tooltip: 200; --z-topbar: 300; --z-modal: 500;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --glass: rgba(18, 18, 18, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --accent-gradient: linear-gradient(135deg, #8B5CF6, #3B82F6);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+html, body { height: 100%; -webkit-font-smoothing: antialiased; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -362,11 +410,19 @@ html, body { height: 100%; }
 body {
   display: flex;
   background: var(--bg);
+  background-image: radial-gradient(circle at 50% -20%, rgba(59,130,246,0.05) 0%, var(--bg) 70%);
   color: var(--text);
-  font-family: 'Fira Sans', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.6;
+  overflow: hidden;
 }
+
+/* ── ADVANCED MODE TOGGLE ────────────────────────────────────────── */
+.advanced-only { display: none !important; }
+body.advanced-mode-active .advanced-only { display: block !important; }
+body.advanced-mode-active .advanced-only-inline { display: inline-block !important; }
+body.advanced-mode-active .advanced-only-flex { display: flex !important; }
 
 /* ── SIDEBAR ─────────────────────────────────────────────────────── */
 .sidebar {
@@ -380,47 +436,52 @@ body {
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  backdrop-filter: blur(12px);
 }
 
 .sidebar-logo {
-  padding: 30px 24px 20px;
+  padding: 32px 24px 24px;
   border-bottom: 1px solid var(--border);
 }
 
 .logo-mark {
   font-family: 'Fira Code', monospace;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 20px;
   letter-spacing: -1px;
   color: var(--text);
 }
-.logo-mark .accent { color: var(--cyan); }
+.logo-mark .accent { 
+    color: var(--cyan);
+    text-shadow: 0 0 15px rgba(0,200,255,0.4);
+}
 .logo-mark .slash  { color: var(--dim); margin: 0 2px; }
 
 .logo-sub {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--dim);
+  text-transform: uppercase;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.nav-section { padding: 24px 0 12px; }
+.nav-label {
+  padding: 0 24px 12px;
   font-size: 10px;
   letter-spacing: 2px;
   color: var(--dim);
   text-transform: uppercase;
-  margin-top: 4px;
-}
-
-.nav-section { padding: 20px 0 10px; }
-.nav-label {
-  padding: 0 24px 10px;
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  color: var(--dim);
-  text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .nav-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  padding: 10px 24px;
+  padding: 12px 24px;
   background: transparent;
   border: none;
   color: var(--dim);
@@ -429,61 +490,77 @@ body {
   transition: all var(--t-base);
   text-align: left;
 }
+.nav-btn svg { transition: transform var(--t-base); }
 .nav-btn:hover { background: var(--bg3); color: var(--text); }
-.nav-btn.active { color: var(--cyan); background: rgba(0,200,255,0.08); border-right: 3px solid var(--cyan); }
+.nav-btn:hover svg { transform: translateX(2px); }
+.nav-btn.active { 
+    color: var(--cyan); 
+    background: linear-gradient(90deg, rgba(0,200,255,0.1) 0%, transparent 100%); 
+    border-right: 3px solid var(--cyan); 
+}
 
-.wf-section { padding: 4px 10px 8px; }
+.wf-section { padding: 4px 12px 8px; }
 .wf-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 8px 10px;
-  margin-bottom: 4px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
   background: var(--bg3);
-  border: 1px solid var(--border2);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  color: var(--cream2);
+  color: var(--text);
   font-family: 'Fira Code', monospace;
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
-  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+  transition: all var(--t-base);
   text-align: left;
 }
-.wf-btn svg { flex-shrink: 0; opacity: .6; transition: opacity var(--t-fast); }
-.wf-btn:hover { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
-.wf-btn:hover svg { stroke: var(--coral); opacity: 1; }
-.wf-btn.running { border-color: var(--coral); color: var(--coral); background: var(--coral3); animation: blink .9s ease infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.45} }
+.wf-btn svg { flex-shrink: 0; opacity: .6; transition: all var(--t-base); }
+.wf-btn:hover { border-color: var(--coral); background: var(--bg4); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.wf-btn:hover svg { stroke: var(--coral); opacity: 1; transform: rotate(15deg); }
+.wf-btn.running { 
+    border-color: var(--coral); 
+    color: var(--coral); 
+    background: rgba(255,107,53,0.1); 
+    animation: pulse-border 1.5s ease infinite; 
+}
+@keyframes pulse-border {
+    0% { border-color: var(--coral); box-shadow: 0 0 0 0 rgba(255,107,53,0.4); }
+    70% { border-color: var(--coral); box-shadow: 0 0 0 10px rgba(255,107,53,0); }
+    100% { border-color: var(--coral); box-shadow: 0 0 0 0 rgba(255,107,53,0); }
+}
 
 .sidebar-bottom {
   margin-top: auto;
-  padding: 20px 24px;
+  padding: 24px;
   border-top: 1px solid var(--border);
-  background: var(--bg);
+  background: rgba(8, 11, 20, 0.5);
 }
 
 .ollama-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   font-size: 11px;
   color: var(--dim);
   font-family: 'Fira Code', monospace;
 }
 .led {
-  width: 8px; height: 8px;
+  width: 10px; height: 10px;
   border-radius: 50%;
   background: var(--dim);
+  transition: all 0.5s ease;
 }
-.led.on  { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
-.led.off { background: var(--red); }
+.led.on  { background: var(--mint); box-shadow: 0 0 12px var(--mint); }
+.led.off { background: var(--red); box-shadow: 0 0 12px var(--red); }
 
-.disk-label { font-size: 10px; color: var(--dim); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
-.disk-bar   { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
-.disk-fill  { height: 100%; background: var(--cyan); transition: width .6s ease; }
-.disk-text  { font-size: 11px; color: var(--dim); margin-top: 6px; font-family: 'Fira Code', monospace; }
+.disk-label { font-size: 10px; color: var(--dim); margin-bottom: 8px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
+.disk-bar   { height: 6px; background: var(--bg4); border-radius: 3px; overflow: hidden; border: 1px solid var(--glass-border); }
+.disk-fill  { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--mint)); transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+.disk-text  { font-size: 11px; color: var(--dim); margin-top: 8px; font-family: 'Fira Code', monospace; }
 
 /* ── MAIN ────────────────────────────────────────────────────────── */
 .main { flex: 1; overflow-y: auto; min-width: 0; }
@@ -493,9 +570,10 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 24px;
-  padding: 12px 32px;
+  padding: 16px 32px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg2);
+  background: rgba(12, 17, 29, 0.8);
+  backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -504,39 +582,48 @@ body {
 .producing-badge {
   display: none;
   align-items: center;
-  gap: 8px;
-  font-size: 10px;
-  letter-spacing: 1.5px;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 2px;
   color: var(--pink);
   font-weight: 700;
   text-transform: uppercase;
+  background: rgba(255, 30, 80, 0.1);
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 30, 80, 0.2);
 }
-.producing-badge.active { display: flex; }
+.producing-badge.active { display: flex; animation: fade-in-scale 0.3s ease; }
+@keyframes fade-in-scale { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+
 .producing-dot {
-  width: 6px; height: 6px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--pink);
-  box-shadow: 0 0 10px var(--pink);
-  animation: pulse 1s ease infinite;
+  box-shadow: 0 0 12px var(--pink);
+  animation: pulse-glow 1.2s ease infinite;
 }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+@keyframes pulse-glow { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.2)} }
 
 #clock {
   color: var(--dim);
-  font-size: 12px;
+  font-size: 13px;
   font-family: 'Fira Code', monospace;
+  font-weight: 500;
 }
 
-.content { padding: 22px 28px; }
+.content { padding: 32px 40px; max-width: 1400px; margin: 0 auto; }
 
 h2 {
   font-family: 'Fira Sans', sans-serif;
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--cream);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text);
   letter-spacing: 2px;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
 }
 h2 small {
   font-family: 'Fira Code', monospace;
@@ -544,137 +631,151 @@ h2 small {
   color: var(--dim);
   font-weight: 400;
   letter-spacing: 1px;
-  margin-left: 10px;
+  margin-left: 12px;
   text-transform: none;
 }
 
-section { margin-bottom: 30px; }
+section { margin-bottom: 48px; }
 
 /* ── KPI row ─────────────────────────────────────────────────────── */
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 32px;
+  gap: 20px;
+  margin-bottom: 40px;
 }
 
 .kpi {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 24px;
+  padding: 28px;
   position: relative;
-  transition: transform var(--t-base), border-color var(--t-base);
+  transition: all var(--t-base);
+  overflow: hidden;
 }
-.kpi:hover { border-color: var(--cyan); transform: translateY(-2px); }
+.kpi::before {
+    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0; transition: opacity var(--t-base);
+}
+.kpi:hover { border-color: var(--cyan); transform: translateY(-4px); box-shadow: 0 20px 40px -20px rgba(0,200,255,0.2); }
+.kpi:hover::before { opacity: 1; }
 
 .kpi-label {
   font-size: 10px;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
   color: var(--dim);
   text-transform: uppercase;
-  margin-bottom: 12px;
-  font-weight: 600;
+  margin-bottom: 16px;
+  font-weight: 700;
 }
 
 .kpi-value {
   font-family: 'Fira Code', monospace;
   font-weight: 700;
-  font-size: 40px;
-  color: var(--cyan);
+  font-size: 44px;
+  color: var(--text);
   line-height: 1;
+  letter-spacing: -2px;
 }
 
-.kpi-sub { font-size: 12px; color: var(--dim); margin-top: 8px; }
+.kpi-sub { font-size: 12px; color: var(--dim); margin-top: 12px; font-weight: 500; }
+
+.kpi-prog { height: 3px; background: var(--bg4); margin-top: 16px; border-radius: 2px; overflow: hidden; }
+.kpi-prog-fill { height: 100%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1); }
 
 /* ── mode grid ───────────────────────────────────────────── */
 .mode-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 16px;
 }
 
 .slate {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 20px;
+  padding: 24px;
   cursor: pointer;
   transition: all var(--t-base);
+  display: flex;
+  flex-direction: column;
 }
-.slate:hover { border-color: var(--cyan); background: var(--bg3); }
+.slate:hover { 
+    border-color: var(--cyan); 
+    background: var(--bg3); 
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -12px rgba(0,0,0,0.5);
+}
 
 .slate-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px; height: 32px;
+  width: 40px; height: 40px;
   background: var(--bg4);
   border-radius: var(--r-sm);
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   color: var(--cyan);
+  border: 1px solid var(--glass-border);
+  transition: all var(--t-base);
 }
+.slate:hover .slate-icon { background: var(--cyan); color: var(--bg); transform: scale(1.1); }
 
 .slate-name {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
-.slate-desc { font-size: 12px; color: var(--dim); margin-bottom: 16px; }
+.slate-desc { font-size: 13px; color: var(--dim); margin-bottom: 20px; flex-grow: 1; }
 
-.slate-controls { display: flex; align-items: center; gap: 6px; }
+.slate-controls { display: flex; align-items: center; gap: 8px; }
 
 .cnt-btn {
-  background: var(--bg3);
+  background: var(--bg4);
   border: 1px solid var(--border2);
   border-radius: var(--r-sm);
-  color: var(--cream2);
-  width: 28px; height: 28px;
-  font-size: 14px;
+  color: var(--text);
+  width: 32px; height: 32px;
+  font-size: 16px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  transition: all var(--t-fast);
   flex-shrink: 0;
   font-family: 'Fira Code', monospace;
 }
-.cnt-btn:hover { background: var(--coral); border-color: var(--coral); color: #000; }
+.cnt-btn:hover { background: var(--coral); border-color: var(--coral); color: var(--bg); }
 
 .cnt-val {
   font-family: 'Fira Code', monospace;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--coral);
-  width: 22px;
+  width: 28px;
   text-align: center;
   line-height: 1;
 }
 
 .run-btn {
   margin-left: auto;
-  background: transparent;
+  background: var(--bg4);
   border: 1px solid var(--border2);
   border-radius: var(--r-sm);
-  color: var(--cream2);
+  color: var(--text);
   font-family: 'Fira Code', monospace;
-  font-size: 9px;
+  font-size: 10px;
+  font-weight: 600;
   letter-spacing: 1.5px;
-  padding: 4px 10px;
+  padding: 6px 14px;
   cursor: pointer;
-  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+  transition: all var(--t-fast);
   text-transform: uppercase;
 }
-.run-btn:hover  { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
+.run-btn:hover  { border-color: var(--mint); color: var(--mint); background: rgba(74,222,128,0.1); }
 .run-btn:disabled { opacity: .3; cursor: default; }
-.run-btn.active {
-  border-color: var(--coral); color: var(--coral);
-  background: var(--coral3);
-  animation: blink .7s ease infinite;
-}
-
-/* ── two-col ─────────────────────────────────────────────────────── */
-.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 
 /* ── terminal ────────────────────────────────────────────────────── */
 .terminal {
@@ -682,295 +783,362 @@ section { margin-bottom: 30px; }
   border: 1px solid var(--border);
   border-top: 3px solid var(--cyan);
   border-radius: var(--r-sm);
-  min-height: 320px;
-  max-height: 480px;
+  min-height: 380px;
+  max-height: 520px;
   overflow-y: auto;
-  padding: 16px;
+  padding: 20px;
   font-family: 'Fira Code', monospace;
   font-size: 12px;
   line-height: 1.8;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.6);
 }
 
-.term-cursor {
-  display: inline-block;
-  width: 7px; height: 14px;
-  background: var(--cyan);
-  margin-left: 4px;
-  animation: cursor-blink 1s steps(2) infinite;
+.term-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;
 }
-@keyframes cursor-blink { 0% { opacity: 0; } 100% { opacity: 1; } }
 
-.tl.ok   { color: var(--mint); }
-.tl.err  { color: var(--red); }
-.tl.sys  { color: var(--dim); }
-.tl.done { color: var(--cyan); font-weight: 700; }
-.tl.prompt { color: var(--pink); font-weight: 700; }
-
-/* ── heatmap ─────────────────────────────────────────────────────── */
-.heatmap { display: flex; gap: 6px; align-items: flex-end; margin-bottom: 24px; }
-.hm-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.hm-block {
-  width: 40px; height: 40px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  transition: all var(--t-base);
-}
-.hm-block:hover { transform: scale(1.1); z-index: 10; border-color: var(--cyan); }
-.hm-block[data-tip]:hover::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: 40px; left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg4);
+.term-clear {
+  background: transparent;
   border: 1px solid var(--border2);
-  color: var(--cream);
-  font-size: 10px;
-  font-family: 'Fira Code', monospace;
-  padding: 3px 8px;
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: var(--z-tooltip);
-}
-.hm-date { font-size: 9px; color: var(--dim); font-family: 'Fira Code', monospace; }
-
-/* ── tables ──────────────────────────────────────────────────────── */
-.table-wrap { max-height: 300px; overflow-y: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-th {
-  text-align: left;
-  padding: 6px 10px;
+  border-radius: 4px;
   color: var(--dim);
-  letter-spacing: 2px;
-  font-size: 9px;
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
-  text-transform: uppercase;
-  position: sticky; top: 0;
-  background: var(--bg2);
   font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: all var(--t-fast);
 }
-td {
-  padding: 7px 10px;
-  border-bottom: 1px solid rgba(24,20,16,.9);
-  color: var(--cream2);
-  vertical-align: middle;
-}
-tr:hover td { background: var(--bg3); color: var(--cream); }
+.term-clear:hover { border-color: var(--text); color: var(--text); }
 
-.pill {
+/* ── gallery ─────────────────────────────────────────────────────── */
+.gallery-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 16px;
+    transition: all var(--t-base);
+    position: relative;
+    overflow: hidden;
+}
+.gallery-item:hover { 
+    transform: translateY(-4px); 
+    border-color: var(--cyan);
+    box-shadow: 0 10px 20px -10px rgba(0,200,255,0.3);
+}
+
+/* ── toggle switch ───────────────────────────────────────────────── */
+.switch {
+  position: relative;
   display: inline-block;
-  padding: 2px 7px;
-  font-size: 9px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  font-family: 'Fira Code', monospace;
+  width: 44px;
+  height: 22px;
 }
-.pill-done { background: rgba(74,222,128,.07); color: var(--mint); border: 1px solid rgba(74,222,128,.15); }
-.pill-pend { background: rgba(82,72,64,.1); color: var(--dim); border: 1px solid var(--border); }
-.pill-mode { background: var(--coral3); color: var(--coral); border: 1px solid rgba(255,107,53,.15); }
-
-.yt-link { color: var(--coral); text-decoration: none; font-size: 10px; font-family: 'Fira Code', monospace; }
-.yt-link:hover { text-decoration: underline; }
-
-.breakdown { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
-.bd-row { display: flex; align-items: center; gap: 10px; }
-.bd-label { width: 86px; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Fira Code', monospace; }
-.bd-bar { flex: 1; height: 2px; background: var(--border2); overflow: hidden; }
-.bd-fill { height: 100%; background: var(--coral); opacity: .6; transition: width .6s ease; }
-.bd-cnt { font-size: 10px; color: var(--coral); width: 24px; text-align: right; font-family: 'Fira Code', monospace; }
-
-::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border2); }
-::-webkit-scrollbar-thumb:hover { background: var(--coral); }
-
-@media (max-width: 960px) {
-  .kpi-row { grid-template-columns: repeat(2, 1fr); }
-  .two-col  { grid-template-columns: 1fr; }
-  .sidebar  { width: 180px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--bg4);
+  transition: .4s;
+  border-radius: 22px;
+  border: 1px solid var(--border2);
 }
-
-@media (max-width: 768px) {
-  .sidebar { width: 0; overflow: hidden; border: none; }
-  .main { margin-left: 0; }
-  .kpi-row { grid-template-columns: 1fr 1fr; }
-  .mode-grid { grid-template-columns: 1fr; }
-  .modal { width: calc(100vw - 24px); }
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--dim);
+  transition: .4s;
+  border-radius: 50%;
 }
+input:checked + .slider { background-color: rgba(0,200,255,0.2); border-color: var(--cyan); }
+input:checked + .slider:before { transform: translateX(22px); background-color: var(--cyan); }
 
 /* ── MODAL ────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,.75);
+  background: rgba(0,0,0,.8);
+  backdrop-filter: blur(4px);
   z-index: var(--z-modal);
   display: flex; align-items: center; justify-content: center;
-  animation: fade-in .15s ease;
+  animation: fade-in .2s ease;
 }
 @keyframes fade-in { from{opacity:0} to{opacity:1} }
 
 .modal {
   background: var(--bg2);
   border: 1px solid var(--border2);
-  border-top: 2px solid var(--coral);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-modal);
-  width: 480px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  width: 900px;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 80px);
   overflow-y: auto;
-  padding: 22px 24px 20px;
-  animation: slide-up .18s ease;
+  padding: 0;
+  animation: slide-up .2s ease;
+  display: flex;
+  flex-direction: column;
 }
-@keyframes slide-up { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
+@keyframes slide-up { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
 
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
 }
 .modal-title {
-  font-family: 'Fira Sans', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--cream);
+  color: var(--text);
 }
-.modal-title span { color: var(--coral); margin-right: 6px; }
+.modal-title span { color: var(--coral); margin-right: 8px; }
 .modal-close {
   background: transparent;
   border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
   color: var(--dim);
-  width: 24px; height: 24px;
+  width: 28px; height: 28px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px;
+  font-size: 14px;
   font-family: 'Fira Code', monospace;
-  transition: border-color var(--t-fast), color var(--t-fast);
+  transition: all var(--t-fast);
 }
-.modal-close:hover { border-color: var(--red); color: var(--red); }
+.modal-close:hover { border-color: var(--red); color: var(--red); background: rgba(239, 68, 68, 0.1); }
+
+.kpi {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 28px;
+  position: relative;
+  transition: all var(--t-base);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+.kpi:hover { border-color: var(--cyan); transform: translateY(-4px); box-shadow: 0 20px 40px -20px rgba(59,130,246,0.3); }
+
+.slate {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  cursor: pointer;
+  transition: all var(--t-base);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-md);
+}
+.slate:hover { 
+    border-color: var(--cyan); 
+    background: var(--bg4); 
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -12px rgba(0,0,0,0.5);
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+/* ── MODAL ────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.85);
+  backdrop-filter: blur(8px);
+  z-index: var(--z-modal);
+  display: flex; align-items: center; justify-content: center;
+  animation: fade-in .2s ease;
+}
+
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-lg);
+  box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8);
+  width: 1000px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  padding: 0;
+  animation: slide-up .25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+#modal-body {
+  padding: 0;
+  display: flex;
+  overflow-x: auto;
+}
+
+.modal-pane {
+  flex: 1;
+  min-width: 300px;
+  padding: 24px;
+  border-right: 1px solid var(--border);
+  background: var(--bg2);
+}
+.modal-pane:last-child { border-right: none; background: var(--bg); }
+
+.modal-header {
 
 .modal-section { margin-bottom: 18px; }
 .modal-section-label {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   color: var(--dim);
   text-transform: uppercase;
-  font-weight: 600;
-  margin-bottom: 8px;
+  font-weight: 700;
+  margin-bottom: 10px;
   font-family: 'Fira Code', monospace;
 }
 
 /* Clickable option cards */
-.opt-cards { display: flex; flex-direction: column; gap: 4px; }
+.opt-cards { display: flex; flex-direction: column; gap: 6px; }
 .opt-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: 12px;
+  padding: 10px 14px;
   border: 1px solid var(--border);
+  border-radius: var(--r-sm);
   background: var(--bg3);
   cursor: pointer;
-  transition: border-color var(--t-fast), background var(--t-fast);
+  transition: all var(--t-fast);
   user-select: none;
 }
-.opt-card:hover { border-color: var(--border2); }
-.opt-card.selected { border-color: var(--coral); background: var(--coral3); }
+.opt-card:hover { border-color: var(--cyan); transform: translateY(-1px); }
+.opt-card.selected { border-color: var(--cyan); background: rgba(59, 130, 246, 0.1); box-shadow: 0 0 10px rgba(59,130,246,0.2); }
 .opt-dot {
-  width: 10px; height: 10px;
+  width: 12px; height: 12px;
   border-radius: 50%;
-  border: 1.5px solid var(--dim);
+  border: 2px solid var(--dim);
   flex-shrink: 0;
-  transition: border-color var(--t-fast), background var(--t-fast);
+  transition: all var(--t-fast);
 }
-.opt-card.selected .opt-dot { border-color: var(--coral); background: var(--coral); }
-.opt-label { font-size: 12px; color: var(--cream2); font-family: 'Fira Sans', sans-serif; }
-.opt-card.selected .opt-label { color: var(--cream); }
+.opt-card.selected .opt-dot { border-color: var(--cyan); background: var(--cyan); }
+.opt-label { font-size: 13px; color: var(--text); font-family: 'Inter', sans-serif; }
 
 /* Text / number fields */
-.field { margin-bottom: 14px; }
+.field { margin-bottom: 16px; }
 .field label {
   display: block;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   color: var(--dim);
   text-transform: uppercase;
-  font-weight: 600;
-  margin-bottom: 6px;
+  font-weight: 700;
+  margin-bottom: 8px;
   font-family: 'Fira Code', monospace;
 }
 .field input[type=text], .field input[type=number], .field input[type=url] {
   width: 100%;
   background: var(--bg3);
   border: 1px solid var(--border2);
-  border-bottom: 2px solid var(--border2);
-  color: var(--cream);
+  border-radius: var(--r-sm);
+  color: var(--text);
   font-family: 'Fira Code', monospace;
-  font-size: 12px;
-  padding: 8px 10px;
+  font-size: 13px;
+  padding: 10px 12px;
   outline: none;
-  transition: border-color var(--t-fast);
+  transition: all var(--t-fast);
 }
-.field input:focus { border-color: var(--coral); border-bottom-color: var(--coral); }
+.field input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
 .field input::placeholder { color: var(--dim); }
-.field input[type=number] { width: 80px; }
-.field-hint { font-size: 10px; color: var(--dim); margin-top: 4px; font-family: 'Fira Code', monospace; }
+.field input[type=number] { width: 100px; }
+.field-hint { font-size: 11px; color: var(--dim); margin-top: 6px; font-family: 'Fira Code', monospace; }
 
 /* Toggle row (yes/no) */
-.toggle-row { display: flex; gap: 6px; }
+.toggle-row { display: flex; gap: 8px; }
 .toggle-btn {
   flex: 1;
-  padding: 8px;
+  padding: 10px;
   background: var(--bg3);
   border: 1px solid var(--border);
-  color: var(--cream2);
+  border-radius: var(--r-sm);
+  color: var(--text);
   font-family: 'Fira Code', monospace;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   text-align: center;
-  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+  transition: all var(--t-fast);
 }
-.toggle-btn:hover { border-color: var(--border2); }
-.toggle-btn.selected { border-color: var(--coral); color: var(--coral); background: var(--coral3); }
+.toggle-btn:hover { border-color: var(--cyan); }
+.toggle-btn.selected { border-color: var(--cyan); color: var(--text); background: var(--accent-gradient); box-shadow: 0 4px 10px rgba(59,130,246,0.3); }
 
 .modal-footer {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   justify-content: flex-end;
-  margin-top: 22px;
-  padding-top: 16px;
+  padding: 20px 24px;
   border-top: 1px solid var(--border);
+  background: var(--bg3);
 }
 .btn-cancel {
   background: transparent;
   border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
   color: var(--dim);
   font-family: 'Fira Code', monospace;
-  font-size: 10px;
-  letter-spacing: 1px;
-  padding: 7px 16px;
-  cursor: pointer;
-  transition: border-color var(--t-fast), color var(--t-fast);
-}
-.btn-cancel:hover { border-color: var(--cream2); color: var(--cream2); }
-.btn-launch {
-  background: var(--coral);
-  border: none;
-  color: #080808;
-  font-family: 'Fira Code', monospace;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 1.5px;
-  padding: 7px 22px;
+  letter-spacing: 1px;
+  padding: 8px 20px;
   cursor: pointer;
-  transition: opacity var(--t-fast);
+  transition: all var(--t-fast);
   text-transform: uppercase;
 }
-.btn-launch:hover { opacity: .88; }
-.btn-launch:disabled { opacity: .35; cursor: default; }
+.btn-cancel:hover { border-color: var(--text); color: var(--text); }
+.btn-launch {
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: var(--r-sm);
+  color: #fff;
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 8px 24px;
+  cursor: pointer;
+  transition: all var(--t-fast);
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+.btn-launch:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 15px rgba(139, 92, 246, 0.6); }
+.btn-launch:disabled { opacity: .35; cursor: default; transform: none; box-shadow: none; }
+
+/* ── RESPONSIVENESS ────────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .sidebar { width: 80px; }
+  .nav-btn { padding: 12px; justify-content: center; }
+  .nav-btn span, .logo-sub, .nav-label, .sidebar-bottom, .logo-mark span:not(.accent) { display: none; }
+  .logo-mark { font-size: 24px; text-align: center; }
+  .main { margin-left: 0; }
+}
+
+@media (max-width: 900px) {
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .two-col { grid-template-columns: 1fr; }
+  .modal { width: 95%; max-height: 90vh; }
+  #modal-body { display: grid; grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .kpi-row { grid-template-columns: 1fr; }
+  .topbar { padding: 12px 20px; }
+  .content { padding: 20px; }
+}
 </style>
 </head>
 <body>
@@ -1112,18 +1280,43 @@ tr:hover td { background: var(--bg3); color: var(--cream); }
 
     <section id="settings">
       <h2>Global Settings <small>persistence</small></h2>
-      <div class="slate" style="max-width:400px; cursor:default">
-        <div class="field">
-          <label>Author Name</label>
-          <input type="text" id="global-author" value="SuperShorts" onchange="saveGlobalSettings()">
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px">
+        <div class="slate" style="cursor:default">
+          <div class="field">
+            <label>Author Name</label>
+            <input type="text" id="global-author" value="SuperShorts" onchange="saveGlobalSettings()">
+          </div>
+          <div class="field">
+            <label>Ollama Model (Global)</label>
+            <select id="global-model" style="width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border2); padding:10px; border-radius:var(--r-sm)" onchange="saveGlobalSettings()">
+              <option value="llama3">llama3</option>
+              <option value="mistral">mistral</option>
+              <option value="phi3">phi3</option>
+            </select>
+          </div>
         </div>
-        <div class="field">
-          <label>Ollama Model (Global)</label>
-          <select id="global-model" style="width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border2); padding:8px" onchange="saveGlobalSettings()">
-            <option value="llama3">llama3</option>
-            <option value="mistral">mistral</option>
-            <option value="phi3">phi3</option>
-          </select>
+        
+        <div class="slate" style="cursor:default">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
+            <div>
+                <div style="font-weight:700; font-size:14px; color:var(--text)">Advanced View Mode</div>
+                <div style="font-size:11px; color:var(--dim)">Expose additional knobs and parameters</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="adv-toggle" onchange="toggleAdvancedMode()">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between">
+            <div>
+                <div style="font-weight:700; font-size:14px; color:var(--text)">Auto-Refresh Stats</div>
+                <div style="font-size:11px; color:var(--dim)">Update dashboard KPIs every 15s</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" checked disabled>
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
       </div>
     </section>
@@ -1337,12 +1530,16 @@ async function refreshGallery() {
         return;
     }
     grid.innerHTML = videos.map(v => `
-        <div class="slate" style="padding:12px; cursor:default">
-            <div style="font-family:'Fira Code',monospace; font-size:10px; margin-bottom:8px; color:var(--cyan)">${v.name}</div>
-            <div style="font-size:10px; color:var(--dim)">${v.size_mb} MB • ${v.created.slice(0,16).replace('T',' ')}</div>
-            <div style="margin-top:12px; display:flex; gap:8px">
-                <a href="/output/${v.name}" target="_blank" class="run-btn" style="text-decoration:none">play ▶</a>
-                <a href="/output/${v.name}" download class="run-btn" style="text-decoration:none; border-color:var(--dim)">dl ↓</a>
+        <div class="gallery-item">
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span class="badge" style="background:var(--accent-gradient); color:#fff; padding:2px 8px; font-size:9px; border-radius:12px; font-weight:700;">MP4</span>
+                <span style="font-size:10px; color:var(--dim);">${v.size_mb} MB</span>
+            </div>
+            <div style="font-family:'Inter',sans-serif; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--text); word-break:break-all;">${v.name}</div>
+            <div style="font-size:10px; color:var(--dim); font-family:'Fira Code',monospace; margin-bottom:16px;">${v.created.slice(0,16).replace('T',' ')}</div>
+            <div style="display:flex; gap:8px;">
+                <a href="/output/${v.name}" target="_blank" class="run-btn" style="flex:1; text-align:center; text-decoration:none; background:rgba(59,130,246,0.1); border-color:var(--cyan); color:var(--cyan);">Play ▶</a>
+                <a href="/output/${v.name}" download class="run-btn" style="text-decoration:none; border-color:var(--border2); color:var(--dim);">DL ↓</a>
             </div>
         </div>
     `).join('');
@@ -1351,7 +1548,8 @@ async function refreshGallery() {
 function saveGlobalSettings() {
     const settings = {
         author: document.getElementById('global-author').value,
-        model: document.getElementById('global-model').value
+        model: document.getElementById('global-model').value,
+        advanced: document.getElementById('adv-toggle').checked
     };
     localStorage.setItem('supershorts_settings', JSON.stringify(settings));
     termLine(`⚙️ Settings saved to local storage.`, 'ok');
@@ -1361,6 +1559,22 @@ function loadGlobalSettings() {
     const s = JSON.parse(localStorage.getItem('supershorts_settings') || '{}');
     if (s.author) document.getElementById('global-author').value = s.author;
     if (s.model)  document.getElementById('global-model').value  = s.model;
+    if (s.advanced) {
+        document.getElementById('adv-toggle').checked = true;
+        document.body.classList.add('advanced-mode-active');
+    }
+}
+
+function toggleAdvancedMode() {
+    const isAdv = document.getElementById('adv-toggle').checked;
+    if (isAdv) {
+        document.body.classList.add('advanced-mode-active');
+        termLine('🚀 Advanced View Mode enabled.', 'done');
+    } else {
+        document.body.classList.remove('advanced-mode-active');
+        termLine('🛡️ Standard View Mode restored.', 'sys');
+    }
+    saveGlobalSettings();
 }
 
 function termClear() {
@@ -1506,8 +1720,17 @@ function tick() {
 let _modalMode = null;
 let _modalStdinFn = null;
 
-// Modes that need a config dialog before launching
-const NEEDS_CONFIG = new Set(['tcm','brainrot','tutorial','viral','ideas','clipper']);
+const PIPER_VOICES = [
+  { id: 'en_US-ryan-high', name: 'Adam (English - US)', category: 'US' },
+  { id: 'en_US-lessac-high', name: 'Antoni (English - US)', category: 'US' },
+  { id: 'en_US-amy-medium', name: 'Amy (English - US)', category: 'US' },
+  { id: 'en_GB-alan-medium', name: 'Arnold (English - UK)', category: 'UK' },
+  { id: 'en_US-hfc_female-medium', name: 'Rachel (English - US)', category: 'US' },
+  { id: 'en_US-joe-medium', name: 'Joe (English - US)', category: 'US' },
+  { id: 'en_US-kristin-medium', name: 'Kristin (English - US)', category: 'US' },
+  { id: 'en_GB-northern_english_male-medium', name: 'Callum (English - UK)', category: 'UK' },
+  { id: 'en_US-libritts-high', name: 'Josh (English - US)', category: 'US' }
+];
 
 function optCard(value, label, selected) {
   return `<div class="opt-card${selected?' selected':''}" onclick="selectOpt(this,'${value}')" tabindex="0"
@@ -1541,20 +1764,38 @@ function getToggleVal(group) {
   return el ? el.dataset.value : null;
 }
 
+// Modes that need a config dialog before launching
+const NEEDS_CONFIG = new Set(['tcm','brainrot','tutorial','viral','ideas','clipper','rotgen']);
+
 async function openModal(mode) {
   _modalMode = mode;
   const overlay = document.getElementById('modal-overlay');
   const title = document.getElementById('modal-title-el');
   const body = document.getElementById('modal-body');
 
-  const models = await fetch('/api/models').then(r=>r.json()).catch(()=>['llama3','mistral']);
-  const advHtml = `
-    <details style="margin-top:16px; cursor:pointer">
-      <summary style="font-size:10px; color:var(--cyan); letter-spacing:1px; text-transform:uppercase">Advanced Settings</summary>
-      <div style="padding-top:12px">
+  // Fetch dynamic assets
+  const [models, assets, ps] = await Promise.all([
+    fetch('/api/models').then(r=>r.json()).catch(()=>['llama3','mistral']),
+    fetch('/api/assets').then(r=>r.json()).catch(()=>({backgrounds:[],characters:[],music:[]})),
+    mode === 'tcm' ? fetch('/api/plan-status').then(r=>r.json()).catch(()=>({tcm_pending:0})) : Promise.resolve({tcm_pending:0})
+  ]);
+  const hasPending = ps.tcm_pending > 0;
+
+  const voiceOptions = PIPER_VOICES.map(v => optCard(v.id, v.name, v.id === 'en_US-ryan-high')).join('');
+  const bgOptions = [optCard('', 'Random/Default', true), ...assets.backgrounds.map(b => optCard(b, b, false))].join('');
+  const charOptions = [optCard('', 'Default', true), ...assets.characters.map(c => optCard(c, c, false))].join('');
+
+  const advFields = `
+    <div class="advanced-only" style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border2)">
+        <div class="modal-section-label" style="color:var(--cyan)">Advanced Parameters</div>
         <div class="field">
-          <label>LLM Model</label>
-          <select id="modal-model" style="width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border2); padding:8px">
+          <label>LLM Temperature</label>
+          <input type="range" id="modal-temp" min="0" max="1" step="0.1" value="0.7" oninput="this.nextElementSibling.textContent = this.value">
+          <span class="cnt-val" style="display:inline-block; vertical-align:middle; margin-left:10px">0.7</span>
+        </div>
+        <div class="field">
+          <label>LLM Model Override</label>
+          <select id="modal-model" style="width:100%; background:var(--bg3); color:var(--text); border:1px solid var(--border2); padding:10px; border-radius:var(--r-sm)">
             ${models.map(m => `<option value="${m}" ${m==='llama3'?'selected':''}>${m}</option>`).join('')}
           </select>
         </div>
@@ -1565,76 +1806,103 @@ async function openModal(mode) {
             <button class="toggle-btn" data-group="hd_mode" data-value="y" onclick="toggleBtn(this,'hd_mode')">1080p (HD)</button>
           </div>
         </div>
-      </div>
-    </details>
+    </div>
   `;
+
+  const visualSection = `
+    <div class="modal-section">
+      <div class="modal-section-label">Background Asset</div>
+      <div class="opt-cards" data-key="background" data-value="" style="max-height:120px; overflow-y:auto">
+        ${bgOptions}
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Character Asset</div>
+      <div class="opt-cards" data-key="character" data-value="" style="max-height:100px; overflow-y:auto">
+        ${charOptions}
+      </div>
+    </div>
+  `;
+
+  const pane1 = `
+    <div class="modal-pane">
+      <div class="modal-section-label">Config & Content</div>
+      ${mode === 'tcm' ? `
+        ${hasPending ? `
+        <div class="modal-section">
+          <div class="modal-section-label">Existing Plan · ${ps.tcm_pending} pending</div>
+          <div class="toggle-row">
+            <button class="toggle-btn selected" data-group="use_existing" data-value="y" onclick="toggleBtn(this,'use_existing');toggleTcmSections()">continue</button>
+            <button class="toggle-btn" data-group="use_existing" data-value="n" onclick="toggleBtn(this,'use_existing');toggleTcmSections()">new plan</button>
+          </div>
+        </div>` : ''}
+        <div id="tcm-topic-section" ${hasPending?'style="display:none"':''}>
+          <div class="modal-section">
+            <div class="opt-cards" data-key="topic" data-value="1">
+              ${optCard('1','Traditional Chinese Medicine',true)}
+              ${optCard('2','Eastern Medicine',false)}
+              ${optCard('3','Ayurvedic Medicine',false)}
+              ${optCard('4','Holistic Wellness',false)}
+              ${optCard('5','Custom…',false)}
+            </div>
+          </div>
+          <div class="field" data-show-if="topic=5" style="display:none"><input type="text" id="tcm-custom" placeholder="Custom topic..."></div>
+          <div class="field"><label>Sub-topics</label><input type="text" id="tcm-extra" placeholder="Details (anxiety, sleep...)"></div>
+        </div>
+        <div class="field"><label>Count</label><input type="number" id="tcm-count" value="3" min="1" max="10"></div>
+      ` : ''}
+      ${mode === 'brainrot' ? `<div class="field"><label>Topic / Hook</label><input type="text" id="br-hook" placeholder="Auto-generate from viral trends"></div>` : ''}
+      ${mode === 'tutorial' ? `<div class="field"><label>Topic</label><input type="text" id="tut-topic" placeholder="e.g. Python decorators"></div>` : ''}
+      ${mode === 'viral' ? `<div class="field"><label>Topic</label><input type="text" id="viral-topic" placeholder="e.g. satisfying crafts"></div>` : ''}
+      ${mode === 'clipper' ? `<div class="field"><label>Source URL</label><input type="url" id="clip-url" placeholder="YouTube or local path"></div>` : ''}
+    </div>
+  `;
+
+  const pane2 = `
+    <div class="modal-pane">
+      <div class="modal-section-label">Assets & Voice</div>
+      <div class="modal-section">
+        <label style="font-size:10px; color:var(--dim); text-transform:uppercase; font-weight:700; display:block; margin-bottom:8px">Voice Selection</label>
+        <div class="opt-cards" data-key="voice" data-value="en_US-ryan-high" style="max-height:180px; overflow-y:auto">
+          ${voiceOptions}
+        </div>
+      </div>
+      <div class="modal-section">
+        <label style="font-size:10px; color:var(--dim); text-transform:uppercase; font-weight:700; display:block; margin-bottom:8px">Background</label>
+        <div class="opt-cards" data-key="background" data-value="" style="max-height:120px; overflow-y:auto">
+          ${bgOptions}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const pane3 = `
+    <div class="modal-pane">
+      <div class="modal-section-label">Pipeline & Advanced</div>
+      <div class="field">
+        <label>Pipeline Mode</label>
+        <div class="toggle-row">
+          <button class="toggle-btn selected" data-group="dry_run" data-value="n" onclick="toggleBtn(this,'dry_run')">Production</button>
+          <button class="toggle-btn" data-group="dry_run" data-value="y" onclick="toggleBtn(this,'dry_run')">Dry Run</button>
+        </div>
+      </div>
+      ${visualSection}
+      ${advFields}
+      <div class="advanced-only" style="margin-top:20px; color:var(--dim); font-size:11px">
+        * Advanced mode enables deeper customization of the production pipeline.
+      </div>
+    </div>
+  `;
+
+  body.innerHTML = pane1 + pane2 + pane3;
 
   if (mode === 'tcm') {
     title.innerHTML = '<span>TCM</span> Configure';
-    const ps = await fetch('/api/plan-status').then(r=>r.json()).catch(()=>({tcm_pending:0}));
-    const hasPending = ps.tcm_pending > 0;
-    body.innerHTML = `
-      ${hasPending ? `
-      <div class="modal-section">
-        <div class="modal-section-label">Existing Plan · ${ps.tcm_pending} lessons pending</div>
-        <div class="toggle-row">
-          <button class="toggle-btn selected" data-group="use_existing" data-value="y"
-            onclick="toggleBtn(this,'use_existing');toggleTcmSections()">
-            continue existing plan
-          </button>
-          <button class="toggle-btn" data-group="use_existing" data-value="n"
-            onclick="toggleBtn(this,'use_existing');toggleTcmSections()">
-            generate new plan
-          </button>
-        </div>
-      </div>` : ''}
-      <div id="tcm-topic-section" ${hasPending?'style="display:none"':''}>
-        <div class="modal-section">
-          <div class="modal-section-label">Topic Focus</div>
-          <div class="opt-cards" data-key="topic" data-value="1">
-            ${optCard('1','Traditional Chinese Medicine (TCM)',true)}
-            ${optCard('2','Eastern Medicine',false)}
-            ${optCard('3','Ayurvedic Medicine',false)}
-            ${optCard('4','Holistic Wellness',false)}
-            ${optCard('5','Custom…',false)}
-          </div>
-        </div>
-        <div class="field" data-show-if="topic=5" style="display:none">
-          <label for="tcm-custom">Custom Topic</label>
-          <input type="text" id="tcm-custom" placeholder="e.g. Qi Gong for beginners">
-        </div>
-        <div class="field">
-          <label for="tcm-extra">Sub-topics / extra details <span style="color:var(--dim);font-weight:400">(optional)</span></label>
-          <input type="text" id="tcm-extra" placeholder="e.g. focus on anxiety, sleep, herbal remedies">
-        </div>
-      </div>
-      <div class="field" id="tcm-count-field">
-        <label for="tcm-count">Videos to generate</label>
-        <input type="number" id="tcm-count" value="3" min="1" max="10">
-        <div class="field-hint">1–10 · recommended ≤5 on 8 GB RAM</div>
-      </div>
-      <div class="modal-section">
-        <div class="modal-section-label">Voice (Piper)</div>
-        <div class="opt-cards" data-key="voice" data-value="en_US-ryan-high">
-          ${optCard('en_US-ryan-high','Ryan (High Quality)',true)}
-          ${optCard('en_US-lessac-high','Lessac (High Quality)',false)}
-          ${optCard('en-us-lessac-medium','Lessac (Medium)',false)}
-        </div>
-      </div>
-      <div class="field">
-        <div class="modal-section-label">Pipeline Mode</div>
-        <div class="toggle-row">
-          <button class="toggle-btn selected" data-group="dry_run" data-value="n" onclick="toggleBtn(this,'dry_run')">Production (Full)</button>
-          <button class="toggle-btn" data-group="dry_run" data-value="y" onclick="toggleBtn(this,'dry_run')">Dry Run (Fast)</button>
-        </div>
-      </div>
-      ${advHtml}
-    `;
     _modalStdinFn = () => {
       const hasPending2 = !!document.querySelector('[data-group="use_existing"]');
+      const count = document.getElementById('tcm-count').value || '3';
       if (hasPending2) {
         const useExisting = getToggleVal('use_existing');
-        const count = document.getElementById('tcm-count').value || '3';
         if (useExisting === 'y') return `y\n${count}\n`;
         const topic = document.querySelector('.opt-cards[data-key="topic"]')?.dataset.value || '1';
         const custom = (document.getElementById('tcm-custom')?.value || '').replace(/[\n\r]/g, ' ');
@@ -1644,71 +1912,30 @@ async function openModal(mode) {
         const topic = document.querySelector('.opt-cards[data-key="topic"]')?.dataset.value || '1';
         const custom = (document.getElementById('tcm-custom')?.value || '').replace(/[\n\r]/g, ' ');
         const extra  = (document.getElementById('tcm-extra')?.value || '').replace(/[\n\r]/g, ' ');
-        const count = document.getElementById('tcm-count').value || '3';
         return `${topic}\n${topic==='5'?custom+'\n':''}${extra}\n${count}\n`;
       }
     };
-
   } else if (mode === 'brainrot') {
     title.innerHTML = '<span>Brainrot</span> Configure';
-    body.innerHTML = `
-      <div class="modal-section">
-        <div class="modal-section-label">Voice (Piper)</div>
-        <div class="opt-cards" data-key="voice" data-value="en_US-ryan-high">
-          ${optCard('en_US-ryan-high','Ryan (High Quality)',true)}
-          ${optCard('en_US-lessac-high','Lessac (High Quality)',false)}
-          ${optCard('en-us-lessac-medium','Lessac (Medium)',false)}
-        </div>
-      </div>
-      <div class="field">
-        <div class="modal-section-label">Pipeline Mode</div>
-        <div class="toggle-row">
-          <button class="toggle-btn selected" data-group="dry_run" data-value="n" onclick="toggleBtn(this,'dry_run')">Production (Full)</button>
-          <button class="toggle-btn" data-group="dry_run" data-value="y" onclick="toggleBtn(this,'dry_run')">Dry Run (Fast)</button>
-        </div>
-      </div>
-      ${advHtml}
-    `;
     _modalStdinFn = () => "\n";
+  } else if (mode === 'rotgen') {
+    title.innerHTML = '<span>RotGen</span> Character + Gameplay';
+    _modalStdinFn = () => "\n";
+  } else if (mode === 'tutorial') {
     title.innerHTML = '<span>Tutorial</span> Topic';
-    body.innerHTML = `
-      <div class="field">
-        <label for="tut-topic">Tutorial topic</label>
-        <input type="text" id="tut-topic" placeholder="e.g. Python decorators (blank = auto-pick)">
-      </div>`;
     _modalStdinFn = () => (document.getElementById('tut-topic').value || '') + '\n';
-
   } else if (mode === 'viral') {
     title.innerHTML = '<span>Viral</span> Topic';
-    body.innerHTML = `
-      <div class="field">
-        <label for="viral-topic">Video topic</label>
-        <input type="text" id="viral-topic" placeholder="e.g. satisfying marble runs (blank = random)">
-      </div>`;
     _modalStdinFn = () => (document.getElementById('viral-topic').value || '') + '\n';
-
-  } else if (mode === 'ideas') {
-    title.innerHTML = '<span>YT Ideas</span> API Key';
-    body.innerHTML = `
-      <div class="field">
-        <label for="ideas-key">YouTube Data API v3 key</label>
-        <input type="text" id="ideas-key" placeholder="AIza… (blank = Ollama-only mode)">
-        <div class="field-hint">Optional — leave blank to use Ollama for idea generation</div>
-      </div>`;
-    _modalStdinFn = () => (document.getElementById('ideas-key').value || '') + '\n';
-
   } else if (mode === 'clipper') {
     title.innerHTML = '<span>Clipper</span> Source';
-    body.innerHTML = `
-      <div class="field">
-        <label for="clip-url">YouTube URL or local video path</label>
-        <input type="url" id="clip-url" placeholder="https://youtube.com/watch?v=...">
-      </div>`;
     _modalStdinFn = () => (document.getElementById('clip-url').value || '') + '\n';
+  } else {
+    title.innerHTML = `<span>${mode.toUpperCase()}</span> Configure`;
+    _modalStdinFn = () => "\n";
   }
 
   overlay.style.display = 'flex';
-  // Focus first input or launch button
   setTimeout(() => {
     const first = body.querySelector('input,button');
     if (first) first.focus();
@@ -1733,14 +1960,17 @@ async function launchFromModal() {
   if (stdin_input == null) { closeModal(); return; }
   const mode = _modalMode;
   
-  // Extract custom fields from modal if present
-  const dryRunVal = getToggleVal('dry_run') || 'n';
-  const voiceVal  = document.querySelector('.opt-cards[data-key="voice"]')?.dataset.value || 'en_US-ryan-high';
+  // Extract fields from modal
+  const dryRunVal    = getToggleVal('dry_run') || 'n';
+  const voiceVal     = document.querySelector('.opt-cards[data-key="voice"]')?.dataset.value || 'en_US-ryan-high';
+  const bgVal        = document.querySelector('.opt-cards[data-key="background"]')?.dataset.value || '';
+  const charVal      = document.querySelector('.opt-cards[data-key="character"]')?.dataset.value || '';
   
-  // Advanced
-  const llmModel = document.getElementById('modal-model')?.value || document.getElementById('global-model').value;
-  const hdMode   = getToggleVal('hd_mode') || 'n';
-  const author   = document.getElementById('global-author').value;
+  // Advanced / Global fallbacks
+  const llmModel    = document.getElementById('modal-model')?.value || document.getElementById('global-model').value;
+  const hdMode      = getToggleVal('hd_mode') || 'n';
+  const author      = document.getElementById('global-author').value;
+  const temperature = document.getElementById('modal-temp')?.value || '0.7';
 
   closeModal();
 
@@ -1754,9 +1984,12 @@ async function launchFromModal() {
         stdin_input,
         dry_run: dryRunVal,
         voice: voiceVal,
+        background: bgVal,
+        character: charVal,
         llm_model: llmModel,
         hd_mode: hdMode,
-        author_name: author
+        author_name: author,
+        temperature: temperature
     })
   });
   const {job_id} = await res.json();

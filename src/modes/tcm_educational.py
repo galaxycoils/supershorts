@@ -1,6 +1,7 @@
 # src/modes/tcm_educational.py - Traditional Chinese Medicine Educational Mode
 import gc
 import json
+import os
 import datetime
 import time
 import random
@@ -77,11 +78,12 @@ def generate_tcm_curriculum(focus: str, extra: str, previous_titles=None, llm_se
         return {"curriculum_title": "TCM Essentials", "lessons": [{"chapter": i+1, "part": 1, "title": f"TCM Lesson {i+1}", "status": "pending", "youtube_id": None} for i in range(10)]}
 
 class TCMMode(BaseMode):
-    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, plan=None, dry_run=False, voice=None):
+    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, plan=None, dry_run=False, voice=None, custom_bg=None):
         super().__init__(llm_service, tts_service, uploader_service)
         self.plan = plan
         self.dry_run = dry_run
         self.voice = voice
+        self.custom_bg = custom_bg
 
     def get_pending_topics(self) -> List[Dict[str, Any]]:
         if not self.plan: return []
@@ -132,12 +134,6 @@ Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highli
             audio_path = Path(f"dry_run_{uid}.wav")
             audio_path.touch()
         else:
-            # Piper voice selection
-            if self.voice and hasattr(self.tts, 'system'):
-                # Hacky way to set voice for standard service if it supports it
-                # but better to just pass it if possible.
-                # For now we'll just use the default logic but we could enhance ITTSService.
-                pass
             audio_path = self.tts.text_to_speech(short_script, self.output_dir / f"tcm_audio_{uid}.mp3", voice=self.voice)
 
         if self.dry_run:
@@ -156,10 +152,13 @@ Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highli
         if self.dry_run:
             Path(output_path).touch()
             return output_path
-        bg_query = random.choice(TCM_BG_KEYWORDS)
+            
+        bg_source = self.custom_bg if (self.custom_bg and Path(self.custom_bg).exists()) else None
+        bg_query = random.choice(TCM_BG_KEYWORDS) if not bg_source else None
+        
         compose_video(assets["images"], assets["audio"], output_path,
                       VideoOptions(video_type="short", lesson_title=content.get("title", "TCM"),
-                                   script=assets["script"][0], bg_query=bg_query))
+                                   script=assets["script"][0], bg_query=bg_query, custom_bg=bg_source))
         return output_path
 
     def upload(self, content: Dict[str, Any], video_path: str) -> Optional[str]:
@@ -193,5 +192,5 @@ def run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None, dry_
         TCM_PLAN_FILE.write_text(json.dumps(plan, indent=2))
 
     raw_count = Prompt.ask("How many videos to produce?", default="3")
-    mode = TCMMode(llm_service, tts_service, uploader_service, plan, dry_run=dry_run, voice=voice)
+    mode = TCMMode(llm_service, tts_service, uploader_service, plan, dry_run=dry_run, voice=voice, custom_bg=os.environ.get("CUSTOM_BG"))
     mode.run_pipeline(int(raw_count))

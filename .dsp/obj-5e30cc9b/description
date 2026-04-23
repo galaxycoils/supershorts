@@ -1,0 +1,3 @@
+source: menu.py
+kind: object
+purpose: Rich terminal menu — renders mode options, collects user choice, shows content plan stats

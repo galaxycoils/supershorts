@@ -1,0 +1,1 @@
+safe_json_parse wraps json.loads with error handling

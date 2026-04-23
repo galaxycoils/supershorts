@@ -1,0 +1,3 @@
+source: src/infrastructure/llm.py
+kind: object
+purpose: LLM client — Ollama API calls, JSON parsing, prompt execution

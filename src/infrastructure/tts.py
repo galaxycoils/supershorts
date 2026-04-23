@@ -83,6 +83,6 @@ class StandardTTSService(ITTSService):
             raise
 
 # Legacy function for backward compatibility
-def text_to_speech(text: str, output_path: Path) -> Path:
+def text_to_speech(text: str, output_path: Path, voice: Optional[str] = None) -> Path:
     service = StandardTTSService()
-    return service.text_to_speech(text, output_path)
+    return service.text_to_speech(text, output_path, voice=voice)

@@ -1,0 +1,3 @@
+source: src/utils/json.py
+kind: object
+purpose: JSON utilities — safe parsing helpers

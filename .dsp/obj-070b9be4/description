@@ -1,0 +1,3 @@
+source: src/modes/viral.py
+kind: object
+purpose: Viral gameplay mode — Subway Surfers-style background with AI narration + YouTube content packages

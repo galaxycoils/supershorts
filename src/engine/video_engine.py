@@ -153,10 +153,13 @@ def compose_video(slide_paths: List[Union[str, Path]], audio_paths: List[Union[s
             raise ValueError("Slide/audio mismatch")
 
         query = bg_query if bg_query else lesson_title
-        if force_viral_bg:
+        if options.custom_bg and Path(options.custom_bg).exists():
+            bg_path = options.custom_bg
+        elif force_viral_bg:
             bg_path = get_local_viral_gameplay() or get_relevant_pexels_video(query, video_type)
         else:
             bg_path = get_relevant_pexels_video(query, video_type)
+
         if not bg_path:
             bg_path = get_local_gameplay(video_type)
 
@@ -200,7 +203,7 @@ def compose_video(slide_paths: List[Union[str, Path]], audio_paths: List[Union[s
             final_clip = final_clip.set_audio(audio_clip)
             image_clips.append(final_clip)
 
-        final_video = concatenate_videoclips(image_clips, method="compose")
+        final_video = concatenate_videoclips(image_clips, method="chain")
 
         if script:
             try:

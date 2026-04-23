@@ -1,0 +1,3 @@
+source: src/utils/cleanup.py
+kind: object
+purpose: Cleanup utilities — safe resource cleanup (MoviePy clips, file handles)

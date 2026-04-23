@@ -12,7 +12,11 @@ BACKGROUNDS_PATH = ASSETS_PATH / "backgrounds"
 GAMEPLAY_PATH = ASSETS_PATH / "gameplay"
 VIRAL_GAMEPLAY_PATH = ASSETS_PATH / "viral_gameplay"
 FONT_FILE = ASSETS_PATH / "fonts" / "arial.ttf"
-BACKGROUND_MUSIC_PATH = ASSETS_PATH / "music" / "background.mp3"
+
+# Background Music - allows override via env var CUSTOM_MUSIC
+_env_music = os.environ.get("CUSTOM_MUSIC")
+BACKGROUND_MUSIC_PATH = Path(_env_music) if _env_music else (ASSETS_PATH / "music" / "background.mp3")
+
 PEXELS_CACHE_DIR = PROJECT_ROOT / "assets" / "pexels"
 
 # API Keys
@@ -85,5 +89,6 @@ class VideoOptions:
     force_viral_bg: bool = False
     script: Optional[str] = None
     bg_query: Optional[str] = None
+    custom_bg: Optional[str] = None
     threads: int = VIDEO_THREADS
     fps: int = VIDEO_FPS

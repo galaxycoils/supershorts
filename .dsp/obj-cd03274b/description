@@ -1,0 +1,3 @@
+source: tqdm
+kind: external
+purpose: tqdm — progress bars for batch processing loops

@@ -1,0 +1,1 @@
+uses MoviePy to generate a built-in fallback vertical short when the external clipper pipeline is unavailable

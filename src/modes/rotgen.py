@@ -5,12 +5,16 @@
 import gc
 import math
 import json
+import os
 import random
 import datetime
 from pathlib import Path
+from typing import List, Dict, Any, Optional
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
+from src.core.base_mode import BaseMode
 
 from moviepy.editor import (
     AudioFileClip,
@@ -627,50 +631,111 @@ def _produce_one_rotgen(
     }
 
 
-def run_rotgen_pipeline(shorts_per_run: int = 3) -> None:
-    """RotGen Character Mode — N shorts back-to-back, auto-pilot."""
-    import time as _time
-    from tqdm import tqdm
-    from src.infrastructure.browser_uploader import upload_to_youtube_browser
-    from src.core.learning import log_upload
+class RotgenMode(BaseMode):
+    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None, custom_bg=None, custom_char=None):
+        super().__init__(llm_service, tts_service, uploader_service)
+        self.dry_run = dry_run
+        self.voice = voice
+        self.custom_bg = custom_bg
+        self.custom_char = custom_char
 
-    print("\n  ByteBot RotGen — AI Character Mode\n")
-    ensure_dirs()
+    def get_pending_topics(self) -> List[Dict[str, Any]]:
+        plan = load_rotgen_plan()
+        done = {v["topic"] for v in plan.get("videos", []) if v.get("status") == "complete"}
+        available = [t for t in VIRAL_TOPICS if t not in done] or list(VIRAL_TOPICS)
+        return [{"title": t, "topic": t} for t in available]
 
-    # Build panel + load character ONCE — reused across all 3 videos
-    panel_bg   = _build_panel_background()
-    custom_img = _load_custom_character()
+    def mark_complete(self, topic: Dict[str, Any], video_id: Optional[str]):
+        if self.dry_run: return
+        plan = load_rotgen_plan()
+        entry = topic.copy()
+        entry["youtube_id"] = video_id
+        entry["status"] = "complete" if video_id else "upload_failed"
+        plan["videos"].append(entry)
+        save_rotgen_plan(plan)
+        if video_id:
+            from src.core.learning import log_upload
+            log_upload(topic["title"], video_id, "rotgen")
 
-    plan = load_rotgen_plan()
+    def generate_script(self, topic: Dict[str, Any]) -> Dict[str, Any]:
+        return generate_rotgen_script(topic["topic"])
 
-    # Pick N unique topics, skipping already-completed ones
-    done = {v["topic"] for v in plan.get("videos", []) if v.get("status") == "complete"}
-    available = [t for t in VIRAL_TOPICS if t not in done] or list(VIRAL_TOPICS)
-    topics = random.sample(available, min(shorts_per_run, len(available)))
-    results   = []
-    bar_fmt   = "{l_bar}{bar}| {n_fmt}/{total_fmt} shorts [{elapsed}<{remaining}]"
+    def generate_assets(self, content: Dict[str, Any], uid: str) -> Dict[str, List[Path]]:
+        script_text = strip_emojis(content.get("script", ""))
+        audio_path = self.output_dir / f"rotgen_vo_{uid}.mp3"
+        
+        if self.dry_run:
+            audio_path = Path(f"dry_rotgen_{uid}.wav")
+            audio_path.touch()
+        else:
+            audio_path = self.tts.text_to_speech(script_text, audio_path, voice=self.voice)
+            
+        # Character
+        char_img = None
+        if self.custom_char and Path(self.custom_char).exists():
+            char_img = self._prepare_char_img(Path(self.custom_char))
+        else:
+            char_img = _load_custom_character() # fallback to first in dir
+            
+        panel_bg = _build_panel_background()
+        # Note: we return panel_bg as a special asset if needed, 
+        # but here we'll just handle it in compose or return as metadata.
+        return {"audio": [audio_path], "char_img": [char_img], "panel_bg": [panel_bg]}
 
-    for i, topic in enumerate(tqdm(topics, desc="  RotGen Shorts",
-                                   unit="short", bar_format=bar_fmt)):
-        print(f"\n  ── Short {i+1}/{shorts_per_run}: {topic} ──")
+    def _prepare_char_img(self, path: Path) -> Image.Image:
+        img = Image.open(path).convert("RGBA")
+        img.thumbnail((CANVAS_W, CANVAS_H), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
+        ox = (CANVAS_W - img.width) // 2
+        oy = (CANVAS_H - img.height) // 2
+        canvas.paste(img, (ox, oy), img)
+        return canvas
+
+    def compose(self, content: Dict[str, Any], assets: Dict[str, List[Path]], output_path: str) -> str:
+        if self.dry_run:
+            Path(output_path).touch()
+            return output_path
+            
+        audio_clip = AudioFileClip(str(assets["audio"][0]))
+        total_dur  = audio_clip.duration
+        
+        char_clip = build_character_clip(True, total_dur, assets["panel_bg"][0], assets["char_img"][0])
+        
+        # Gameplay with background override
+        bg_source = self.custom_bg if (self.custom_bg and Path(self.custom_bg).exists()) else get_rotgen_gameplay()
+        gameplay_clip = build_gameplay_clip(bg_source, total_dur)
+        
         try:
-            entry = _produce_one_rotgen(topic, panel_bg, custom_img,
-                                        upload_to_youtube_browser, log_upload)
-            results.append(entry)
-            plan["videos"].append(entry)
-            save_rotgen_plan(plan)
+            compose_rotgen_video(char_clip, gameplay_clip, [], audio_clip, Path(output_path), script=content["script"])
+        finally:
+            safe_close(audio_clip, gameplay_clip, char_clip)
+        return output_path
 
-            # Wait between uploads (skip after last)
-            if i < len(topics) - 1 and entry.get("youtube_id"):
-                print(f"\n  Waiting {UPLOAD_WAIT_SECONDS}s before next upload...")
-                _time.sleep(UPLOAD_WAIT_SECONDS)
+    def upload(self, content: Dict[str, Any], video_path: str) -> Optional[str]:
+        title = f"{content.get('title', 'AI Fact')[:80]} #Shorts"
+        hashtags = content.get("hashtags", "#AI #Shorts #ByteBot")
+        desc = f"{content['script']}\n\n{hashtags}\n\nAI for Developers by {YOUR_NAME}"
+        return self.uploader.upload(Path(video_path), title, desc, "AI,Shorts,BrainRot,ByteBot,AIFacts,Tech")
 
-        except Exception as e:
-            print(f"  Error on '{topic}': {e}")
-            import traceback; traceback.print_exc()
 
-    # Summary
-    done   = sum(1 for r in results if r.get("status") == "complete")
-    failed = len(results) - done
-    print(f"\n  RotGen done — {done}/{shorts_per_run} uploaded"
-          + (f", {failed} failed/local" if failed else "") + ".")
+def run_rotgen_pipeline(shorts_per_run: int = 3, llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None):
+    from src.infrastructure.llm import OllamaLLMService, ollama_generate
+    from src.infrastructure.tts import StandardTTSService
+    from src.infrastructure.browser_uploader import YouTubeBrowserUploader
+
+    mode = RotgenMode(
+        llm_service or OllamaLLMService(generate_fn=ollama_generate),
+        tts_service or StandardTTSService(),
+        uploader_service or YouTubeBrowserUploader(),
+        dry_run=dry_run,
+        voice=voice,
+        custom_bg=os.environ.get("CUSTOM_BG"),
+        custom_char=os.environ.get("CUSTOM_CHAR")
+    )
+    
+    ensure_dirs()
+    pending = mode.get_pending_topics()
+    print(f"🚀 RotGen Pipeline: {len(pending)} topics available, producing {shorts_per_run}.")
+    
+    for i, topic in enumerate(pending[:shorts_per_run]):
+        mode.produce_video(topic, i + 1, shorts_per_run)

@@ -1,0 +1,3 @@
+source: src/utils/captions.py
+kind: object
+purpose: Caption utilities — subtitle generation and formatting for video overlays

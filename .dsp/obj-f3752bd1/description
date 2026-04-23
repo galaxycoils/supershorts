@@ -1,0 +1,3 @@
+source: src/modes/tutorial.py
+kind: object
+purpose: Tutorial mode — generates deep-dive ~10-min tutorial videos + linked shorts

@@ -1,0 +1,3 @@
+source: src/utils/text.py
+kind: object
+purpose: Text utilities — emoji stripping, markdown stripping, script word-count clamping

@@ -1,0 +1,3 @@
+source: src/modes/studio_ideas.py
+kind: object
+purpose: YouTube Studio ideas mode — fetches real YT suggestions, generates thumbnails & scripts

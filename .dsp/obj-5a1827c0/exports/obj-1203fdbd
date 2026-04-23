@@ -1,0 +1,1 @@
+reads OLLAMA_MODEL, OLLAMA_TIMEOUT from config

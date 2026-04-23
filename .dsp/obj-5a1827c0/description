@@ -1,0 +1,3 @@
+source: src/core/config.py
+kind: object
+purpose: Centralized config — paths, API keys, model settings (PROJECT_ROOT, OLLAMA_MODEL, etc.)

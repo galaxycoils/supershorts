@@ -1,0 +1,3 @@
+source: src/modes/brainrot.py
+kind: object
+purpose: Brain Rot mode — generates sensationalized AI short-form videos with viral hooks
