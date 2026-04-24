@@ -1,73 +1,73 @@
 {
-  "curriculum_title": "Introduction to Programming",
+  "curriculum_title": "Sleep and Health",
   "lessons": [
     {
       "chapter": 1,
       "part": 1,
-      "title": "Basics of Computer Science",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 1,
-      "part": 2,
-      "title": "Programming Fundamentals",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 1,
-      "part": 3,
-      "title": "Variables and Data Types",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 1,
-      "part": 4,
-      "title": "Control Structures: If-Else Statements",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 1,
-      "part": 5,
-      "title": "Loops and Iteration",
-      "status": "pending",
+      "title": "Introduction to Sleep: What Is it and Why It Matters?",
+      "status": "complete",
       "youtube_id": null
     },
     {
       "chapter": 2,
       "part": 1,
-      "title": "Functions and Subroutines",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 2,
-      "part": 2,
-      "title": "Arrays and Lists",
+      "title": "Understanding the Importance of Sleep for Health",
       "status": "pending",
       "youtube_id": null
     },
     {
       "chapter": 3,
       "part": 1,
-      "title": "Object-Oriented Programming (OOP)",
-      "status": "pending",
-      "youtube_id": null
-    },
-    {
-      "chapter": 3,
-      "part": 2,
-      "title": "Inheritance and Polymorphism",
+      "title": "Sleep Patterns and Their Effects on Physical Health",
       "status": "pending",
       "youtube_id": null
     },
     {
       "chapter": 4,
       "part": 1,
-      "title": "Error Handling and Exception Management",
+      "title": "Sleeping Disorders: Common Types and Causes",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 5,
+      "part": 1,
+      "title": "Improving Sleep Quality: Tips and Techniques",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 6,
+      "part": 1,
+      "title": "The Impact of Stress on Sleep",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 7,
+      "part": 1,
+      "title": "Sleep and Mental Health: How Sleep Affects Anxiety and Depression",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 8,
+      "part": 1,
+      "title": "Sleep and Nutrition: The Relationship Between the Two",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 9,
+      "part": 1,
+      "title": "The Role of Sleep in Weight Management",
+      "status": "pending",
+      "youtube_id": null
+    },
+    {
+      "chapter": 10,
+      "part": 1,
+      "title": "Sleep and Exercise: How They Interact to Improve Health",
       "status": "pending",
       "youtube_id": null
     }

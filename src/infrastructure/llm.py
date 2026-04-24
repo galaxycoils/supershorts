@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import concurrent.futures
 from typing import Any, Union, Optional, Callable
@@ -24,7 +25,7 @@ def ollama_generate(prompt: str, json_mode: bool = True, model: str = OLLAMA_MOD
             model=model,
             messages=[{'role': 'user', 'content': full_prompt}],
             options={
-                'temperature': 0.6,
+                'temperature': float(os.environ.get('LLM_TEMPERATURE', '0.6')),
                 'num_ctx': 4096,
                 'num_gpu': 1,
                 'num_thread': 8,

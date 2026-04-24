@@ -23,7 +23,7 @@ PEXELS_CACHE_DIR = PROJECT_ROOT / "assets" / "pexels"
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 
 # LLM Config
-OLLAMA_MODEL = "qwen2.5-coder:3b"
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:3b")
 OLLAMA_TIMEOUT = 120
 
 # User Info

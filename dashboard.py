@@ -125,6 +125,13 @@ def api_run(mode):
     env["OLLAMA_MODEL"] = data.get("llm_model", "llama3")
     env["YOUR_NAME"] = data.get("author_name", "SuperShorts")
     env["LLM_TEMPERATURE"] = str(data.get("temperature", "0.7"))
+    env["LLM_TONE"] = data.get("tone", "educational")
+    if mode == "tcm":
+        tcm_map = {"1": "Traditional Chinese Medicine", "2": "Eastern Medicine", "3": "Ayurvedic Medicine", "4": "Holistic Wellness"}
+        env["TCM_USE_EXISTING"] = "n"
+        env["TCM_TOPIC"] = tcm_map.get(str(data.get("tcm_topic", "1")), "Traditional Chinese Medicine")
+        env["TCM_EXTRA"] = data.get("topic", "")
+        env["TCM_COUNT"] = str(max(1, min(10, int(data.get("count", 3)))))
     if data.get("hd_mode") == "y": env["RENDER_HD"] = "1"
     if data.get("background"): env["CUSTOM_BG"] = str(PROJECT_ROOT / "assets" / "backgrounds" / data.get("background"))
     if data.get("character"): env["CUSTOM_CHAR"] = str(PROJECT_ROOT / "assets" / "characters" / data.get("character"))
