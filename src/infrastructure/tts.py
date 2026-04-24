@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+from typing import Optional
 from src.core.config import FONT_FILE
 from src.utils.text import strip_emojis, strip_markdown
 from src.core.interfaces import ITTSService
