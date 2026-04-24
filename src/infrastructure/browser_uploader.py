@@ -5,6 +5,7 @@ import time
 import datetime
 import re
 import concurrent.futures
+from dataclasses import dataclass
 from typing import Optional, Union, Any, List
 from pathlib import Path
 from selenium import webdriver
@@ -32,6 +33,16 @@ VIDEO_URL_PATTERNS = (
     "/watch?v=",
 )
 STUDIO_VIDEO_PATTERN = re.compile(r"/video/([A-Za-z0-9_-]{11})/")
+
+@dataclass
+class UploadMetrics:
+    """Per-attempt upload telemetry captured by upload_with_retry."""
+    attempt: int
+    duration_seconds: float
+    success: bool
+    error: Optional[str]
+    video_id: Optional[str]
+
 
 PROFILE_PATH = str(Path.home() / "Library/Application Support/Firefox/Profiles/youtube_uploader")
 FIREFOX_PROFILES_DIR = Path.home() / "Library/Application Support/Firefox/Profiles"
@@ -324,3 +335,91 @@ def upload_to_youtube_browser(video_path: Union[str, Path], title: str, descript
     finally:
         if driver:
             driver.quit()
+
+
+_RETRY_BASE_DELAY = 5  # seconds between retry attempts
+
+
+class SeleniumUploader(IVideoUploader):
+    """IVideoUploader implementation with retry hardening and metrics capture.
+
+    Wraps the existing upload() method — core logic is untouched.
+    All retry and monitoring concerns live here.
+    """
+
+    def __init__(self, browser_adapter: BrowserAdapter = None) -> None:
+        from src.utils.upload_monitor import UploadMonitor
+        self._inner = YouTubeBrowserUploader(browser_adapter=browser_adapter)
+        self.monitor = UploadMonitor()
+
+    def upload(
+        self,
+        video_path: Path,
+        title: str,
+        description: str,
+        tags: List[str],
+        thumbnail_path: Optional[Path] = None,
+    ) -> Optional[str]:
+        """Delegate to inner uploader — satisfies IVideoUploader protocol."""
+        return self._inner.upload(
+            video_path=video_path,
+            title=title,
+            description=description,
+            tags=tags,
+            thumbnail_path=thumbnail_path,
+        )
+
+    def upload_with_retry(
+        self,
+        video_path: Path,
+        title: str,
+        description: str,
+        tags: List[str],
+        thumbnail_path: Optional[Path] = None,
+        max_retries: int = 3,
+    ) -> Optional[str]:
+        """Upload with automatic retry and per-attempt metrics logging.
+
+        Retries up to max_retries times on None return or exception.
+        Delay between attempts: _RETRY_BASE_DELAY seconds (fixed).
+        All attempts are recorded via self.monitor.
+        """
+        last_result: Optional[str] = None
+
+        for attempt in range(1, max_retries + 1):
+            t_start = time.monotonic()
+            error: Optional[str] = None
+            video_id: Optional[str] = None
+
+            try:
+                video_id = self.upload(
+                    video_path=video_path,
+                    title=title,
+                    description=description,
+                    tags=tags,
+                    thumbnail_path=thumbnail_path,
+                )
+            except Exception as exc:
+                error = str(exc)
+                video_id = None
+
+            duration = time.monotonic() - t_start
+            success = video_id is not None
+
+            self.monitor.record(UploadMetrics(
+                attempt=attempt,
+                duration_seconds=duration,
+                success=success,
+                error=error,
+                video_id=video_id,
+            ))
+
+            if success:
+                return video_id
+
+            if attempt < max_retries:
+                print(f"⚠️ Upload attempt {attempt}/{max_retries} failed — retrying in {_RETRY_BASE_DELAY}s...")
+                time.sleep(_RETRY_BASE_DELAY)
+
+        print(f"❌ All {max_retries} upload attempts failed.")
+        return None

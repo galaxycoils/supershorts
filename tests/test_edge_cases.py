@@ -21,11 +21,11 @@ def test_generate_brainrot_script_missing_keys(mock_ollama):
     assert len(result["slides"]) == 4
     assert result["slides"][0]["text"] == "Hook"
 
-@patch('src.modes.tcm_educational.ollama_generate')
-def test_generate_tcm_curriculum_api_error(mock_ollama):
-    # Simulate API exception
-    mock_ollama.side_effect = Exception("Ollama Down")
-    result = generate_tcm_curriculum("TCM", "Extra")
+def test_generate_tcm_curriculum_api_error():
+    # Simulate API exception via injected ILLMService
+    mock_llm = MagicMock()
+    mock_llm.generate.side_effect = Exception("Ollama Down")
+    result = generate_tcm_curriculum("TCM", "Extra", llm_service=mock_llm)
     # Should use fallback curriculum
     assert result["curriculum_title"] == "TCM Essentials"
     assert len(result["lessons"]) == 10

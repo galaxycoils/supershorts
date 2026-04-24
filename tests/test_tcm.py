@@ -9,14 +9,10 @@ def test_clamp_words_tcm():
     assert len(clamped.split()) >= 10
     assert len(clamped.split()) <= 20
 
-@patch('ollama.chat')
-def test_generate_tcm_curriculum_mock(mock_ollama):
-    mock_ollama.return_value = {
-        'message': {
-            'content': '{"curriculum_title": "Test TCM", "lessons": [{"chapter": 1, "part": 1, "title": "Lesson 1", "status": "pending", "youtube_id": null}]}'
-        }
-    }
-    result = generate_tcm_curriculum("TCM", "")
+def test_generate_tcm_curriculum_mock():
+    mock_llm = MagicMock()
+    mock_llm.generate.return_value = {"curriculum_title": "Test TCM", "lessons": [{"chapter": 1, "part": 1, "title": "Lesson 1", "status": "pending", "youtube_id": None}]}
+    result = generate_tcm_curriculum("TCM", "", llm_service=mock_llm)
     assert result['curriculum_title'] == "Test TCM"
     assert len(result['lessons']) == 1
     assert result['lessons'][0]['title'] == "Lesson 1"

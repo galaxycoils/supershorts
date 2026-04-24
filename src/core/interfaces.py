@@ -17,6 +17,11 @@ class IVideoUploader(Protocol):
         """Upload video to platform and return video ID."""
         ...
 
+class IBRollSelector(Protocol):
+    def select(self, topic: str, video_type: str) -> Optional[str]:
+        """Return a local video path for b-roll given a topic, or None on failure."""
+        ...
+
 class IVideoEngine(Protocol):
     def generate_visuals(self, output_dir: Union[str, Path], video_type: str, slide_content: Optional[Dict[str, Any]] = None,
                          slide_number: int = 1, total_slides: int = 1, is_thumbnail: bool = False, thumbnail_title: str = "") -> str:

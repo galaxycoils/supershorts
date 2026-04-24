@@ -1,14 +1,16 @@
 # Project Instructions
 
 ### PROTOCOL 0: Universal State Handoff (MANDATORY)
-The file `/Users/cmd/Documents/Obsidian Vault/SuperShorts/STATE_HANDOFF.md` is the SINGLE source of truth for cross-agent memory. 
+The file `/Users/cmd/Documents/Obsidian Vault/PROJECTS/SuperShorts/STATE_HANDOFF.md` is the SINGLE source of truth for cross-agent memory. 
 1. **On Session Start**: You MUST read this file immediately before ANY other action to pick up context from Gemini/Codex.
 2. **During Execution**: Log architectural patterns and failed attempts here.
 3. **On Session End**: Update "Current Status" and "Next Actions" before exiting.
 
----
-
-This project uses [metaswarm](https://github.com/dsifry/metaswarm)...
+### PROTOCOL 1: Universal Skill Library (MANDATORY)
+The folder `/Users/cmd/Documents/Obsidian Vault/PROJECTS/SuperShorts/Skills/` contains the master logic for all expert personas and workflows.
+1. **Search**: Before starting work, search this folder for a relevant skill.
+2. **Follow**: Follow the "Core Rules" and "Workflows" defined in the Obsidian note.
+3. **Evolve**: After completing a task, update the "Evolved Learnings" section of the relevant skill if you found a better way or fixed a bug.
 
 ### Starting work
 

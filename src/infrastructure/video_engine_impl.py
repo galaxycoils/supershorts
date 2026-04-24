@@ -23,7 +23,7 @@ from src.infrastructure.video import (
     get_local_viral_gameplay, get_relevant_pexels_video
 )
 from src.utils.cleanup import safe_close
-from src.core.interfaces import IVideoEngine
+from src.core.interfaces import IVideoEngine, IBRollSelector
 
 # Brainrot Constants
 BRAINROT_PALETTES = [
@@ -123,6 +123,9 @@ def draw_wrapped_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.Free
 
 class StandardVideoEngine(IVideoEngine):
     """Standard implementation of the video engine using PIL and MoviePy."""
+
+    def __init__(self, broll_selector: Optional[IBRollSelector] = None) -> None:
+        self.broll_selector = broll_selector
 
     def generate_visuals(self, output_dir: Union[str, Path], video_type: str, slide_content: Optional[Dict[str, Any]] = None,
                         slide_number: int = 1, total_slides: int = 1, is_thumbnail: bool = False, thumbnail_title: str = "") -> str:
@@ -291,7 +294,7 @@ class StandardVideoEngine(IVideoEngine):
         char_clip = self._build_rotgen_char_clip(True, total_dur, panel_bg, char_img)
         
         # 2. Gameplay
-        bg_source = options.custom_bg if (options.custom_bg and Path(options.custom_bg).exists()) else self._get_rotgen_gameplay()
+        bg_source = options.custom_bg if (options.custom_bg and Path(options.custom_bg).exists()) else self._get_rotgen_gameplay(topic=options.lesson_title or "")
         gameplay_clip = self._build_rotgen_gameplay_clip(bg_source, total_dur)
         
         # 3. Composite
@@ -456,11 +459,16 @@ class StandardVideoEngine(IVideoEngine):
         gc.collect()
         return clip
 
-    def _get_rotgen_gameplay(self) -> str | None:
+    def _get_rotgen_gameplay(self, topic: str = "") -> str | None:
         p = get_local_viral_gameplay()
         if p: return p
         p = get_local_gameplay("short")
         if p: return p
+        # AI-driven selection when a selector is injected
+        if self.broll_selector and topic:
+            p = self.broll_selector.select(topic, "short")
+            if p: return p
+        # Fallback: static query list
         for query in ROTGEN_PEXELS_QUERIES:
             p = get_relevant_pexels_video(query, "short")
             if p: return p
@@ -520,6 +528,8 @@ class StandardVideoEngine(IVideoEngine):
                 bg_path = options.custom_bg
             elif force_viral_bg:
                 bg_path = get_local_viral_gameplay() or get_relevant_pexels_video(query, video_type)
+            elif self.broll_selector:
+                bg_path = self.broll_selector.select(query, video_type)
             else:
                 bg_path = get_relevant_pexels_video(query, video_type)
 
