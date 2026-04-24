@@ -22,13 +22,31 @@ const MODES = [
 ];
 
 const CHARACTERS = [
-    { id: 'en_US-ryan-high', name: 'Adam', archetype: 'Architect', img: 'peter.png' },
-    { id: 'en_US-lessac-high', name: 'Antoni', archetype: 'Analyst', img: 'peter_finance.png' },
-    { id: 'en_US-amy-medium', name: 'Amy', archetype: 'Runner', img: 'stewie.png' },
-    { id: 'en_GB-alan-medium', name: 'Arnold', archetype: 'Guardian', img: 'spongebob.png' },
-    { id: 'en_US-hfc_female-medium', name: 'Rachel', archetype: 'Weaver', img: 'squidward.png' },
-    { id: 'en_US-joe-medium', name: 'Joe', archetype: 'Engineer', img: 'patrick.png' },
-    { id: 'en_US-kristin-medium', name: 'Kristin', archetype: 'Visionary', img: 'trump.png' }
+    { id: 'en_US-ryan-high',      name: 'Adam',    archetype: 'Architect',  img: 'adam_avatar.png',    voice: 'Ryan · High' },
+    { id: 'en_US-lessac-high',    name: 'Antoni',  archetype: 'Analyst',    img: 'antoni_avatar.png',  voice: 'Lessac · High' },
+    { id: 'en_US-amy-medium',     name: 'Amy',     archetype: 'Runner',     img: 'amy_avatar.png',     voice: 'Amy · Med' },
+    { id: 'en_GB-alan-medium',    name: 'Arnold',  archetype: 'Guardian',   img: 'arnold_avatar.png',  voice: 'Alan · Med' },
+    { id: 'en_US-hfc_female-medium', name: 'Rachel', archetype: 'Weaver',   img: 'rachel_avatar.png',  voice: 'HFC · Med' },
+    { id: 'en_US-joe-medium',     name: 'Joe',     archetype: 'Engineer',   img: 'joe_avatar.png',     voice: 'Joe · Med' },
+    { id: 'en_US-kristin-medium', name: 'Kristin', archetype: 'Visionary',  img: 'kristin_avatar.png', voice: 'Kristin · Med' },
+];
+
+const POPULAR_TOPICS = [
+    "Why AI Will Replace 90% of Jobs by 2030",
+    "This Free AI Tool Changes Everything",
+    "The Truth About Intermittent Fasting",
+    "How Billionaires Think Differently",
+    "3 Habits That Rewire Your Brain",
+    "Why Most People Never Build Wealth",
+    "The Hidden Cost of Social Media",
+    "How to Learn Anything 10x Faster",
+    "The Science Behind Deep Sleep",
+    "Why Your Morning Routine Matters",
+    "The Untold History of Cryptocurrency",
+    "How to Read 52 Books in a Year",
+    "The Real Reason Diets Fail",
+    "Why Stoicism Is Going Viral Again",
+    "How Top Athletes Train Their Mind",
 ];
 
 // ── NAVIGATION ─────────────────────────────────────────────────────
@@ -63,9 +81,11 @@ async function refreshHealth() {
         document.getElementById('ollama-txt').textContent = h.ollama ? 'ollama · ready' : 'ollama · down';
         if (h.ram_gb !== undefined) {
             const ramTxt = document.getElementById('ram-text');
-            if (ramTxt) ramTxt.textContent = h.ram_gb + ' GB';
+            const total = h.ram_total_gb || 16;
+            if (ramTxt) ramTxt.textContent = h.ram_gb + ' / ' + total + ' GB';
             const ramFill = document.getElementById('ram-fill');
-            if (ramFill) ramFill.style.width = Math.min(100, (h.ram_gb / 16) * 100) + '%';
+            const usedPct = h.ram_pct !== undefined ? h.ram_pct : (h.ram_gb / total * 100);
+            if (ramFill) ramFill.style.width = Math.min(100, usedPct) + '%';
         }
     } catch (e) {}
 }
@@ -183,6 +203,7 @@ function renderStep() {
                                 <div class="char-archetype-tag">${c.archetype}</div>
                             </div>
                             <div class="char-name">${c.name}</div>
+                            <div style="font-size:9px; color:var(--text-dim); margin-top:2px;">${c.voice}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -209,6 +230,10 @@ function renderStep() {
                         <label>EXTRA DETAILS</label>
                         <textarea id="modal-topic" placeholder="e.g. focus on anxiety, sleep..." style="width:100%; height:80px; background:#111; border:1px solid #222; border-radius:8px; color:#fff; padding:12px;"></textarea>
                     </div>
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                        <button onclick="autoPickTopic()" style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#a78bfa; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">🎲 Auto from Trending</button>
+                        <span style="font-size:11px; color:var(--text-dim);">Picks a random viral subject</span>
+                    </div>
                     <div class="field">
                         <label>VIDEOS TO GENERATE</label>
                         <input type="number" id="tcm-count" value="3" min="1" max="10" style="background:#111; border:1px solid #222; color:#fff; padding:10px; border-radius:8px; width:80px;">
@@ -234,20 +259,24 @@ function renderStep() {
                         <label>TOPIC OR URL</label>
                         <textarea id="modal-topic" placeholder="Write your topic here or paste a URL..." style="width:100%; height:100px; background:#111; border:1px solid #222; border-radius:8px; color:#fff; padding:12px;"></textarea>
                     </div>
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                        <button onclick="autoPickTopic()" style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#a78bfa; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">🎲 Auto from Trending</button>
+                        <span style="font-size:11px; color:var(--text-dim);">Picks a random viral topic</span>
+                    </div>
                 `;
             }
-            
+
             body.innerHTML = `
                 <div style="width:100%">
                     ${fields}
-                    <div class="modal-section-label" style="margin-top:20px;">TONE</div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
-                        <div class="char-card ${_selectedTone==='educational'?'selected':''}" style="padding:12px; height:auto; border-radius:8px;" onclick="setTone('educational')">🧠 Educational</div>
-                        <div class="char-card ${_selectedTone==='funny'?'selected':''}" style="padding:12px; height:auto; border-radius:8px;" onclick="setTone('funny')">😂 Funny</div>
+                    <div class="modal-section-label" style="margin-top:20px; margin-bottom:8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim);">TONE</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <button type="button" data-tone="educational" class="tone-btn ${_selectedTone==='educational'?'tone-selected':''}" onclick="setTone('educational')" style="padding:12px; border-radius:8px; border:1px solid ${_selectedTone==='educational'?'#8B5CF6':'#222'}; background:${_selectedTone==='educational'?'rgba(139,92,246,0.12)':'#111'}; color:#fff; cursor:pointer; font-size:14px; font-weight:600; transition:all 0.2s;">🧠 Educational</button>
+                        <button type="button" data-tone="funny" class="tone-btn ${_selectedTone==='funny'?'tone-selected':''}" onclick="setTone('funny')" style="padding:12px; border-radius:8px; border:1px solid ${_selectedTone==='funny'?'#8B5CF6':'#222'}; background:${_selectedTone==='funny'?'rgba(139,92,246,0.12)':'#111'}; color:#fff; cursor:pointer; font-size:14px; font-weight:600; transition:all 0.2s;">😂 Funny</button>
                     </div>
                 </div>
             `;
-            if (_modalData.topic !== undefined) document.getElementById('modal-topic').value = _modalData.topic;
+            if (_modalData.topic !== undefined) document.getElementById('modal-topic')?.value && (document.getElementById('modal-topic').value = _modalData.topic);
             if (_modalMode === 'tcm' && _modalData.tcmTopic) document.getElementById('tcm-topic').value = _modalData.tcmTopic;
             if (_modalMode === 'tcm' && _modalData.tcmCount) document.getElementById('tcm-count').value = _modalData.tcmCount;
             if (_modalMode === 'brainrot' && _modalData.autoGen !== undefined) document.getElementById('auto-gen-toggle').checked = _modalData.autoGen;
@@ -265,14 +294,15 @@ function renderStep() {
                     <div class="field">
                         <label>LLM MODEL</label>
                         <select id="modal-model" style="width:100%; background:#111; border:1px solid #222; color:#fff; padding:10px; border-radius:8px;">
-                            ${data.models.map(m => {
-                                let label = m;
-                                if (m === recs.scripting) label += " (Scripting ★)";
-                                if (m === recs.reasoning) label += " (Reasoning ★)";
-                                if (m === recs.creative) label += " (Creative ★)";
-                                return `<option value="${m}" ${_modalData.model === m ? 'selected' : ''}>${label}</option>`;
+                            ${(data.model_info || data.models.map(m=>({name:m,label:m}))).map(mi => {
+                                let label = mi.label;
+                                if (mi.name === recs.scripting) label += " (Scripting ★)";
+                                if (mi.name === recs.reasoning) label += " (Reasoning ★)";
+                                if (mi.name === recs.creative) label += " (Creative ★)";
+                                return `<option value="${mi.name}" ${_modalData.model === mi.name ? 'selected' : ''}>${label}</option>`;
                             }).join('')}
                         </select>
+                        ${data.models.length === 0 ? '<p style="font-size:11px; color:#ef4444; margin-top:6px;">⚠ No Ollama models found. Run: <code>ollama pull llama3.2:3b</code></p>' : ''}
                     </div>
                     ${recList ? `<div style="font-size:11px; color:var(--text-dim); margin-bottom:15px; background:rgba(139,92,246,0.05); padding:10px; border-radius:8px; border:1px solid var(--border)">
                         <div style="font-weight:700; color:var(--accent); margin-bottom:4px; text-transform:uppercase; letter-spacing:1px">System Recommendations</div>
@@ -286,12 +316,17 @@ function renderStep() {
                         </div>
                     </div>
                     <div class="field">
-                        <label>LLM TEMPERATURE: <span id="temp-val" style="color:var(--accent)">${_modalData.temp || '0.7'}</span></label>
-                        <p style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">0.0 = Precise/Technical | 1.0 = Creative/Random</p>
-                        <input type="range" id="modal-temp" min="0" max="1" step="0.1" value="${_modalData.temp || '0.7'}" style="width:100%; accent-color:#8B5CF6;" oninput="document.getElementById('temp-val').textContent=this.value">
+                        <label style="display:flex; justify-content:space-between; align-items:center;">
+                            LLM TEMPERATURE
+                            <span id="temp-val" style="color:var(--accent); font-family:'Fira Code',monospace; font-size:16px; font-weight:800;">${_modalData.temp || '0.7'}</span>
+                        </label>
+                        <input type="range" id="modal-temp" min="0" max="1" step="0.1" value="${_modalData.temp || '0.7'}" style="width:100%; accent-color:#8B5CF6; margin:10px 0;" oninput="updateTempInfo(this.value)">
+                        <div id="temp-info" style="font-size:11px; color:var(--text-dim); background:rgba(139,92,246,0.05); padding:8px 10px; border-radius:6px; border:1px solid var(--border);"></div>
                     </div>
                 </div>
             `;
+            // Init temp info display
+            setTimeout(() => updateTempInfo(_modalData.temp || '0.7'), 0);
         }
     } catch (e) {
         console.error("Render error:", e);
@@ -309,7 +344,31 @@ function toggleChar(id) {
 
 function setTone(t) {
     _selectedTone = t;
-    renderStep();
+    document.querySelectorAll('.tone-btn').forEach(btn => {
+        const isSel = btn.dataset.tone === t;
+        btn.style.borderColor = isSel ? '#8B5CF6' : '#222';
+        btn.style.background = isSel ? 'rgba(139,92,246,0.12)' : '#111';
+    });
+}
+
+function autoPickTopic() {
+    const topic = POPULAR_TOPICS[Math.floor(Math.random() * POPULAR_TOPICS.length)];
+    const el = document.getElementById('modal-topic');
+    if (el) { el.value = topic; el.focus(); }
+}
+
+function updateTempInfo(v) {
+    document.getElementById('temp-val').textContent = v;
+    const info = document.getElementById('temp-info');
+    if (!info) return;
+    const f = parseFloat(v);
+    let label, desc;
+    if (f <= 0.2)      { label = '❄️ Very Precise'; desc = 'Near-deterministic. Factual, consistent, no variation. Best for data-heavy or code-heavy scripts.'; }
+    else if (f <= 0.4) { label = '📐 Precise'; desc = 'Low creativity. Structured, reliable output. Good for educational or technical content.'; }
+    else if (f <= 0.6) { label = '⚖️ Balanced (recommended)'; desc = 'Moderate creativity. Reliable yet engaging. Best for most content types.'; }
+    else if (f <= 0.8) { label = '✨ Creative'; desc = 'Higher variation. More expressive, playful tone. Good for entertainment or storytelling.'; }
+    else               { label = '🔥 Very Creative'; desc = 'Maximum randomness. Unexpected ideas, sometimes off-topic. Use for brainstorming only.'; }
+    info.innerHTML = `<strong style="color:var(--accent)">${label}</strong><br>${desc}`;
 }
 
 function setDry(val) {
@@ -333,7 +392,7 @@ async function launchProduction() {
     
     if (mode === 'tcm') {
         count = parseInt(_modalData.tcmCount) || 3;
-        stdin_input = `n\n${_modalData.tcmTopic}\n${_modalData.topic}\n${count}\n`;
+        stdin_input = '';  // TCM reads from env vars now
     } else if (mode === 'brainrot') {
         stdin_input = _modalData.autoGen ? '\n' : (_modalData.topic + '\n');
     } else {
@@ -354,7 +413,9 @@ async function launchProduction() {
                 voice: voice,
                 temperature: temp,
                 llm_model: model,
-                tone: _selectedTone
+                tone: _selectedTone,
+                tcm_topic: _modalData.tcmTopic || '1',
+                tcm_extra: _modalData.topic || '',
             })
         });
         const data = await res.json();
@@ -442,6 +503,30 @@ function toggleAdvancedMode() {
     saveGlobalSettings();
 }
 
+// ── GLOBAL MODEL SELECT ───────────────────────────────────────────
+async function populateGlobalModelSelect() {
+    const sel = document.getElementById('global-model');
+    if (!sel) return;
+    let data;
+    try {
+        data = await fetch('/api/models').then(r => r.json());
+    } catch (e) {
+        data = { models: ['llama3', 'mistral'], model_info: [{name:'llama3',label:'llama3'},{name:'mistral',label:'mistral'}], recommendations: {} };
+    }
+    const recs = data.recommendations || {};
+    const modelInfo = data.model_info || (data.models || []).map(m => ({ name: m, label: m }));
+    // Remember previously saved model
+    const saved = JSON.parse(localStorage.getItem('supershorts_settings') || '{}').model;
+    sel.innerHTML = modelInfo.map(mi => {
+        let label = mi.label || mi.name;
+        if (mi.name === recs.scripting) label += ' (Scripting ★)';
+        if (mi.name === recs.reasoning) label += ' (Reasoning ★)';
+        if (mi.name === recs.creative)  label += ' (Creative ★)';
+        const selected = saved ? mi.name === saved : false;
+        return `<option value="${mi.name}" ${selected ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+}
+
 // ── INIT ──────────────────────────────────────────────────────────
 buildModeGrid();
 refreshStats();
@@ -449,6 +534,7 @@ refreshHealth();
 refreshDisk();
 refreshGallery();
 loadGlobalSettings();
+populateGlobalModelSelect();
 setInterval(refreshStats, 15000);
 setInterval(refreshHealth, 8000);
 setInterval(refreshDisk, 30000);

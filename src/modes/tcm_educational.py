@@ -71,11 +71,20 @@ def generate_tcm_curriculum(focus: str, extra: str, previous_titles=None, llm_se
         "}\n"
         "10 lessons. No markdown, no commentary."
     )
+    fallback = {"curriculum_title": "TCM Essentials", "lessons": [{"chapter": i+1, "part": 1, "title": f"TCM Lesson {i+1}", "status": "pending", "youtube_id": None} for i in range(10)]}
     try:
-        return llm.generate(prompt, json_mode=True)
+        result = llm.generate(prompt, json_mode=True)
+        lessons = result.get("lessons") if isinstance(result, dict) else None
+        if not lessons:
+            console.print("[yellow]⚠  Curriculum empty — using fallback[/yellow]")
+            return fallback
+        # Force all lessons to pending status
+        for l in lessons:
+            l["status"] = "pending"
+        return result
     except Exception as e:
         console.print(f"[yellow]⚠  Curriculum fallback ({e})[/yellow]")
-        return {"curriculum_title": "TCM Essentials", "lessons": [{"chapter": i+1, "part": 1, "title": f"TCM Lesson {i+1}", "status": "pending", "youtube_id": None} for i in range(10)]}
+        return fallback
 
 class TCMMode(BaseMode):
     def __init__(self, llm_service=None, tts_service=None, uploader_service=None, plan=None, dry_run=False, voice=None, custom_bg=None, custom_music=None):
@@ -88,7 +97,7 @@ class TCMMode(BaseMode):
 
     def get_pending_topics(self) -> List[Dict[str, Any]]:
         if not self.plan: return []
-        return [l for l in self.plan.get("lessons", []) if l.get("status") == "pending"]
+        return [l for l in self.plan.get("lessons", []) if l.get("status") not in ("complete", "published")]
 
     def mark_complete(self, topic: Dict[str, Any], video_id: Optional[str]):
         if self.dry_run:
@@ -172,27 +181,45 @@ Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highli
 
 def run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None):
     console.print(Panel.fit("🌿 [bold green]SuperShorts TCM Mode[/bold green] 🌿"))
-    
+
+    # Dashboard mode: read config from env vars (skips interactive prompts)
+    env_topic = os.environ.get("TCM_TOPIC", "")
+    env_extra = os.environ.get("TCM_EXTRA", "")
+    env_count = os.environ.get("TCM_COUNT", "")
+    env_use_existing = os.environ.get("TCM_USE_EXISTING", "").lower()
+    headless = bool(env_topic)  # running from dashboard if topic is set
+
     plan = None
     if TCM_PLAN_FILE.exists():
         try:
             plan = json.loads(TCM_PLAN_FILE.read_text())
             _show_plan_status(plan)
-            # When called from Dashboard with stdin_input, we might want to skip Prompt.ask
-            # but standard implementation uses Prompt.ask. 
-            # If stdin_input is provided, Prompt.ask consumes it.
-            if Prompt.ask("Use existing plan?", choices=["y", "n"], default="y") == "n":
+            if headless:
+                use_existing = env_use_existing != "n"
+            else:
+                use_existing = Prompt.ask("Use existing plan?", choices=["y", "n"], default="y") == "y"
+            if not use_existing:
                 plan = None
-        except: pass
+        except:
+            plan = None
 
     if plan is None:
-        focus = Prompt.ask("Topic focus", default="Traditional Chinese Medicine")
-        extra = Prompt.ask("Extra details", default="")
+        if headless:
+            focus = env_topic or "Traditional Chinese Medicine"
+            extra = env_extra
+        else:
+            focus = Prompt.ask("Topic focus", default="Traditional Chinese Medicine")
+            extra = Prompt.ask("Extra details", default="")
+        console.print(f"[cyan]Generating curriculum for: {focus}[/cyan]")
         llm = llm_service or OllamaLLMService()
         plan = generate_tcm_curriculum(focus, extra, llm_service=llm)
         TCM_PLAN_FILE.write_text(json.dumps(plan, indent=2))
 
-    raw_count = Prompt.ask("How many videos to produce?", default="3")
-    mode = TCMMode(llm_service, tts_service, uploader_service, plan, dry_run=dry_run, voice=voice, 
+    if headless:
+        raw_count = env_count or "3"
+    else:
+        raw_count = Prompt.ask("How many videos to produce?", default="3")
+
+    mode = TCMMode(llm_service, tts_service, uploader_service, plan, dry_run=dry_run, voice=voice,
                    custom_bg=os.environ.get("CUSTOM_BG"), custom_music=os.environ.get("CUSTOM_MUSIC"))
     mode.run_pipeline(int(raw_count))

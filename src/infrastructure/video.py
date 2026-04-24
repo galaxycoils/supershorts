@@ -37,6 +37,13 @@ def get_local_gameplay(video_type: str) -> str:
     clips = list(GAMEPLAY_PATH.glob("*.mp4"))
     if clips:
         return str(random.choice(clips))
+    # Fallback: use cached Pexels downloads when GAMEPLAY_PATH is empty
+    if PEXELS_CACHE_DIR.exists():
+        cached = list(PEXELS_CACHE_DIR.glob("*.mp4"))
+        if cached:
+            chosen = random.choice(cached)
+            print(f"Using cached Pexels video as gameplay fallback: {chosen.name}")
+            return str(chosen)
     return None
 
 def get_local_viral_gameplay() -> str | None:
