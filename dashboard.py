@@ -8,44 +8,86 @@ import sys
 import uuid
 import time
 import datetime
-import subprocess
 import threading
 import shutil
 import re
+import io
 import requests as _req
 from pathlib import Path
 from flask import Flask, Response, jsonify, request, stream_with_context, render_template, send_from_directory
 
+# Clean Architecture Imports
+from src.infrastructure.llm import OllamaLLMService
+from src.infrastructure.tts import StandardTTSService
+from src.infrastructure.browser_uploader import YouTubeBrowserUploader
+from src.infrastructure.video_engine_impl import StandardVideoEngine
+
+# Mode Runner Imports
+from src.modes.tcm_educational import run_tcm_mode
+from src.modes.brainrot import run_brainrot_pipeline
+from src.modes.rotgen import run_rotgen_pipeline
+from src.modes.tutorial import start_tutorial_generation
+from src.modes.studio_ideas import start_idea_generator
+from src.modes.viral import start_viral_gameplay_mode, generate_youtube_content_package
+from src.modes.clipper import run_video_clipper
+from src.core.learning import start_learning_mode, suggest_improvements
+from main import main_flow
+
 PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
-
-# Use venv python if present (has all deps), else fall back to current interpreter
-_VENV_PY = PROJECT_ROOT / "venv" / "bin" / "python3"
-PYTHON = str(_VENV_PY) if _VENV_PY.exists() else sys.executable
 
 app   = Flask(__name__, template_folder="templates", static_folder="static")
 START = time.time()
 
+# ── stdout redirection for threads ───────────────────────────────────────────
+
+class ThreadLocalStdout(io.TextIOBase):
+    def __init__(self, original_stdout):
+        self.original_stdout = original_stdout
+        self.outputs = {} # thread_id -> list of strings
+        self.lock = threading.Lock()
+
+    def write(self, s):
+        tid = threading.get_ident()
+        with self.lock:
+            if tid in self.outputs:
+                # Split by lines to keep it clean
+                for line in s.splitlines():
+                    if line.strip():
+                        self.outputs[tid].append(line.strip())
+            self.original_stdout.write(s)
+        return len(s)
+
+    def flush(self):
+        self.original_stdout.flush()
+
+    def register_thread(self, tid, output_list):
+        with self.lock:
+            self.outputs[tid] = output_list
+
+    def unregister_thread(self, tid):
+        with self.lock:
+            if tid in self.outputs:
+                del self.outputs[tid]
+
+thread_local_stdout = ThreadLocalStdout(sys.stdout)
+sys.stdout = thread_local_stdout
+sys.stderr = thread_local_stdout
+
 # ── job registry ──────────────────────────────────────────────────────────────
 JOBS: dict[str, dict] = {}
 
-MODE_COMMANDS = {
-    "educational": "from main import main_flow; main_flow(lessons_per_run={count})",
-    "brainrot":    "from src.modes.brainrot import run_brainrot_pipeline; run_brainrot_pipeline({count}, dry_run={dry_run}, voice='{voice}')",
-    "rotgen":      "from src.modes.rotgen import run_rotgen_pipeline; run_rotgen_pipeline({count}, dry_run={dry_run}, voice='{voice}')",
-    "tcm":         "from src.modes.tcm_educational import run_tcm_mode; run_tcm_mode(dry_run={dry_run}, voice='{voice}')",
-    "tutorial":    "from src.generator import start_tutorial_generation; start_tutorial_generation()",
-    "viral":       "from src.generator import start_viral_gameplay_mode; start_viral_gameplay_mode()",
-    "ideas":       "from src.modes.studio_ideas import start_idea_generator; start_idea_generator()",
-    "learning":    "from src.core.learning import suggest_improvements; suggest_improvements()",
-    "package":     "from src.generator import generate_youtube_content_package; generate_youtube_content_package()",
-    "clipper":     "from src.modes.clipper import run_video_clipper; run_video_clipper()",
-}
-
-WORKFLOW_COMMANDS = {
-    "daily":         [str(PROJECT_ROOT / "run_workflow.py"), str(PROJECT_ROOT / "workflows/daily.workflow.json")],
-    "tcm-weekly":    [str(PROJECT_ROOT / "run_workflow.py"), str(PROJECT_ROOT / "workflows/tcm-weekly.workflow.json")],
-    "full-pipeline": [str(PROJECT_ROOT / "run_workflow.py"), str(PROJECT_ROOT / "workflows/full-pipeline.workflow.json")],
+RUNNERS = {
+    "educational": main_flow,
+    "brainrot":    run_brainrot_pipeline,
+    "rotgen":      run_rotgen_pipeline,
+    "tcm":         run_tcm_mode,
+    "tutorial":    start_tutorial_generation,
+    "viral":       start_viral_gameplay_mode,
+    "ideas":       start_idea_generator,
+    "learning":    suggest_improvements,
+    "package":     generate_youtube_content_package,
+    "clipper":     run_video_clipper,
 }
 
 def _dir_mb(path: Path) -> int:
@@ -116,41 +158,85 @@ def api_assets():
 
 @app.route("/api/run/<mode>", methods=["POST"])
 def api_run(mode):
-    if mode not in MODE_COMMANDS: return jsonify({"error": "unknown mode"}), 400
+    if mode not in RUNNERS: return jsonify({"error": "unknown mode"}), 400
     data = request.json or {}
-    count = max(1, min(10, int(data.get("count", 1))))
-    dry_run = "True" if data.get("dry_run") == "y" else "False"
-    voice = data.get("voice", "en_US-ryan-high")
-    env = os.environ.copy()
-    env["OLLAMA_MODEL"] = data.get("llm_model", "llama3")
-    env["YOUR_NAME"] = data.get("author_name", "SuperShorts")
-    env["LLM_TEMPERATURE"] = str(data.get("temperature", "0.7"))
-    env["LLM_TONE"] = data.get("tone", "educational")
-    if mode == "tcm":
-        tcm_map = {"1": "Traditional Chinese Medicine", "2": "Eastern Medicine", "3": "Ayurvedic Medicine", "4": "Holistic Wellness"}
-        env["TCM_USE_EXISTING"] = "n"
-        env["TCM_TOPIC"] = tcm_map.get(str(data.get("tcm_topic", "1")), "Traditional Chinese Medicine")
-        env["TCM_EXTRA"] = data.get("topic", "")
-        env["TCM_COUNT"] = str(max(1, min(10, int(data.get("count", 3)))))
-    if data.get("hd_mode") == "y": env["RENDER_HD"] = "1"
-    if data.get("background"): env["CUSTOM_BG"] = str(PROJECT_ROOT / "assets" / "backgrounds" / data.get("background"))
-    if data.get("character"): env["CUSTOM_CHAR"] = str(PROJECT_ROOT / "assets" / "characters" / data.get("character"))
-
+    
     job_id = str(uuid.uuid4())[:8]
     JOBS[job_id] = {"status": "running", "output": [], "mode": mode}
 
-    def run():
-        code = MODE_COMMANDS[mode].format(count=count, dry_run=dry_run, voice=voice)
-        cmd = [PYTHON, "-c", f"import sys; sys.path.insert(0,'{PROJECT_ROOT}'); {code}"]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE, cwd=str(PROJECT_ROOT), env=env, text=True)
-        if data.get("stdin_input"): proc.stdin.write(data["stdin_input"]); proc.stdin.flush()
-        for line in iter(proc.stdout.readline, ""):
-            JOBS[job_id]["output"].append(line.strip())
-        proc.wait()
-        JOBS[job_id]["status"] = "finished" if proc.returncode == 0 else "failed"
+    def run_job():
+        tid = threading.get_ident()
+        thread_local_stdout.register_thread(tid, JOBS[job_id]["output"])
+        
+        # Set up environment for the thread (some modes still use os.environ)
+        os.environ["OLLAMA_MODEL"] = data.get("llm_model", "llama3")
+        os.environ["YOUR_NAME"] = data.get("author_name", "SuperShorts")
+        os.environ["LLM_TEMPERATURE"] = str(data.get("temperature", "0.7"))
+        os.environ["LLM_TONE"] = data.get("tone", "educational")
+        
+        if data.get("hd_mode") == "y": os.environ["RENDER_HD"] = "1"
+        if data.get("background"): os.environ["CUSTOM_BG"] = str(PROJECT_ROOT / "assets" / "backgrounds" / data.get("background"))
+        if data.get("character"): os.environ["CUSTOM_CHAR"] = str(PROJECT_ROOT / "assets" / "characters" / data.get("character"))
+        if data.get("music"): os.environ["CUSTOM_MUSIC"] = str(PROJECT_ROOT / "assets" / "music" / data.get("music"))
 
-    threading.Thread(target=run, daemon=True).start()
+        # Instantiate services
+        llm = OllamaLLMService()
+        tts = StandardTTSService()
+        uploader = YouTubeBrowserUploader()
+        engine = StandardVideoEngine()
+        
+        count = max(1, min(10, int(data.get("count", 1))))
+        dry_run = data.get("dry_run") == "y"
+        voice = data.get("voice", "en_US-ryan-high")
+        topic = data.get("topic")
+
+        try:
+            runner = RUNNERS[mode]
+            if mode == "educational":
+                runner(lessons_per_run=count, llm_service=llm, tts_service=tts, uploader_service=uploader, video_engine=engine)
+            elif mode in ["brainrot", "rotgen"]:
+                runner(shorts_per_run=count, llm_service=llm, tts_service=tts, uploader_service=uploader, video_engine=engine, dry_run=dry_run, voice=voice, topic=topic)
+            elif mode == "tcm":
+                tcm_map = {"1": "Traditional Chinese Medicine", "2": "Eastern Medicine", "3": "Ayurvedic Medicine", "4": "Holistic Wellness"}
+                tcm_topic = tcm_map.get(str(data.get("tcm_topic", "1")), "Traditional Chinese Medicine")
+                extra = data.get("topic", "")
+                runner(llm_service=llm, tts_service=tts, uploader_service=uploader, video_engine=engine, dry_run=dry_run, voice=voice, topic=tcm_topic, extra=extra, count=count)
+            elif mode == "tutorial":
+                runner(llm_service=llm, tts_service=tts, uploader_service=uploader, video_engine=engine, dry_run=dry_run, voice=voice, topic=topic)
+            else:
+                # viral, ideas, learning, package, clipper
+                runner(llm_service=llm, tts_service=tts, uploader_service=uploader, video_engine=engine, dry_run=dry_run, voice=voice)
+            
+            JOBS[job_id]["status"] = "finished"
+        except Exception as e:
+            import traceback
+            JOBS[job_id]["output"].append(f"❌ Error: {str(e)}")
+            JOBS[job_id]["output"].append(traceback.format_exc())
+            JOBS[job_id]["status"] = "failed"
+        finally:
+            thread_local_stdout.unregister_thread(tid)
+
+    threading.Thread(target=run_job, daemon=True).start()
     return jsonify({"job_id": job_id})
+
+@app.route("/api/disk")
+def api_disk():
+    return jsonify({
+        "output_mb": _dir_mb(PROJECT_ROOT / "output"),
+        "pexels_mb": _dir_mb(PROJECT_ROOT / "assets" / "pexels"),
+        "assets_mb": _dir_mb(PROJECT_ROOT / "assets")
+    })
+
+@app.route("/api/terminate/<job_id>", methods=["POST"])
+def api_terminate(job_id):
+    if job_id not in JOBS: return jsonify({"error": "not found"}), 404
+    job = JOBS[job_id]
+    if job["status"] == "running":
+        # We can't easily kill a thread in Python. 
+        # For now, we just mark it as terminated.
+        job["status"] = "terminated"
+        return jsonify({"status": "terminated"})
+    return jsonify({"error": "job not running"}), 400
 
 @app.route("/api/stream/<job_id>")
 def api_stream(job_id):

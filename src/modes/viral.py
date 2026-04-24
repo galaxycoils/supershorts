@@ -5,29 +5,41 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.core.config import (
-    CONTENT_PACKAGE_TOPICS, YOUR_NAME, OUTPUT_DIR, VIRAL_GAMEPLAY_PATH,
-    OLLAMA_MODEL, OLLAMA_TIMEOUT, VideoOptions
+    CONTENT_PACKAGE_TOPICS, YOUR_NAME, OUTPUT_DIR, VIRAL_GAMEPLAY_PATH, VideoOptions
 )
-from src.infrastructure.llm import ollama_generate
-from src.infrastructure.tts import text_to_speech
-from src.infrastructure.video import get_local_background, get_local_gameplay, get_relevant_pexels_video
-from src.engine.video_engine import generate_visuals, compose_video
+from src.core.interfaces import IVideoEngine, ILLMService, ITTSService, IVideoUploader
 from src.utils.text import strip_emojis, enforce_script_length, clamp_words
-from src.utils.json import safe_json_parse
 
-def generate_youtube_content_package() -> None:
+def generate_youtube_content_package(llm_service=None, tts_service=None, uploader_service=None, video_engine=None, dry_run=False, voice=None) -> None:
     """Expert YouTube Content Strategist — auto-picks topic, generates script + video + upload."""
-    from src.infrastructure.browser_uploader import upload_to_youtube_browser
-    from src.core.learning import log_upload
+    if not all([llm_service, tts_service, uploader_service, video_engine]):
+        raise ValueError("All services (llm, tts, uploader, engine) must be provided to generate_youtube_content_package")
 
     print("\n  📦 YouTube Content Strategist Activated\n")
 
-    raw   = input("  Seed category (or Enter to auto-pick): ").strip()
+    # Handle non-interactive mode (Dashboard)
+    import os
+    raw = os.environ.get("PACKAGE_TOPIC", "")
+    if not raw:
+        try:
+            raw = input("  Seed category (or Enter to auto-pick): ").strip()
+        except EOFError:
+            raw = ""
+            
     topic = raw if raw else random.choice(CONTENT_PACKAGE_TOPICS)
     if not raw:
         print(f"  Auto-picked: {topic}")
 
-    prompt = f"""You are an expert YouTube scriptwriter and content strategist.
+    if dry_run:
+        result = {
+            "selected_title": f"{topic} DRY RUN",
+            "full_script": "This is a dry run script. It should be long enough but it is just a test.",
+            "pexels_keywords": "test dryrun",
+            "description": "Dry run description",
+            "hashtags": "#DryRun"
+        }
+    else:
+        prompt = f"""You are an expert YouTube scriptwriter and content strategist.
 Create a complete production package for a 5-minute YouTube video.
 
 Topic: {topic}
@@ -47,8 +59,8 @@ Return ONLY valid JSON:
   "hashtags": "#Tag1 #Tag2"
 }}"""
 
-    print("  Calling Ollama for content package...")
-    result = ollama_generate(prompt, json_mode=True)
+        print("  Calling LLM for content package...")
+        result = llm_service.generate(prompt, json_mode=True)
 
     if not result or not result.get("full_script"):
         print("  ⚠️  LLM returned empty — using fallback script.")
@@ -69,42 +81,68 @@ Return ONLY valid JSON:
     timestamp    = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = f"pkg_{timestamp}"
 
-    audio_path = text_to_speech(script, OUTPUT_DIR / f"{unique_id}_audio.mp3")
+    audio_path = OUTPUT_DIR / f"{unique_id}_audio.mp3"
+    if dry_run:
+        audio_path.touch()
+    else:
+        audio_path = tts_service.text_to_speech(script, audio_path, voice=voice)
 
     slide_dir  = OUTPUT_DIR / f"{unique_id}_slides"
-    slide_path = generate_visuals(
-        slide_dir, "long",
-        slide_content={"title": title, "content": script[:600]},
-        slide_number=1, total_slides=1,
-    )
+    if dry_run:
+        slide_dir.mkdir(exist_ok=True, parents=True)
+        slide_path = slide_dir / "slide_1.png"
+        slide_path.touch()
+    else:
+        slide_path = video_engine.generate_visuals(
+            slide_dir, "long",
+            slide_content={"title": title, "content": script[:600]},
+            slide_number=1, total_slides=1,
+        )
 
     video_path = OUTPUT_DIR / f"{unique_id}_video.mp4"
-    compose_video([slide_path], [audio_path], video_path, VideoOptions(video_type="long", lesson_title=title, script=script))
+    if dry_run:
+        video_path.touch()
+    else:
+        video_engine.compose_video([slide_path], [audio_path], video_path, VideoOptions(video_type="long", lesson_title=title, script=script))
 
-    tags     = ",".join(dict.fromkeys((pexels_kw + ",YouTube,education").split(",")[:10]))
-    print(f"  Uploading → {title[:60]}...")
-    video_id = upload_to_youtube_browser(video_path, title, desc, tags)
+    if dry_run:
+        video_id = "DRY_RUN_ID"
+    else:
+        tags     = ",".join(dict.fromkeys((pexels_kw + ",YouTube,education").split(",")[:10]))
+        print(f"  Uploading → {title[:60]}...")
+        video_id = uploader_service.upload(video_path, title, desc, tags.split(","))
 
     if video_id:
+        from src.core.learning import log_upload
         log_upload(title, video_id, "content_package")
 
 
-def start_viral_gameplay_mode():
+def start_viral_gameplay_mode(llm_service=None, tts_service=None, uploader_service=None, video_engine=None, dry_run=False, voice=None):
     """Educational videos with FORCED viral gameplay backgrounds."""
-    from src.infrastructure.browser_uploader import upload_to_youtube_browser as upload_to_youtube
     from src.core.learning import log_upload
     from src.generator import generate_lesson_content
+
+    if not all([llm_service, tts_service, uploader_service, video_engine]):
+        raise ValueError("All services (llm, tts, uploader, engine) must be provided to start_viral_gameplay_mode")
 
     clips = list(VIRAL_GAMEPLAY_PATH.glob("*.mp4"))
     if not clips:
         print(f"\n⚠️ No gameplay clips found in {VIRAL_GAMEPLAY_PATH}/")
 
-    topic = input("Enter topic for viral gameplay video: ").strip()
+    # Handle non-interactive mode (Dashboard)
+    import os
+    topic = os.environ.get("VIRAL_TOPIC", "")
+    if not topic:
+        try:
+            topic = input("Enter topic for viral gameplay video: ").strip()
+        except EOFError:
+            topic = ""
+            
     if not topic:
         topic = "Future of AI Agents"
         print(f"  Using: {topic}")
 
-    content = generate_lesson_content(topic)
+    content = generate_lesson_content(topic, llm_service=llm_service)
     unique_id = f"viral_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     slides_data = content.get('long_form_slides', [])[:5]
@@ -116,25 +154,39 @@ def start_viral_gameplay_mode():
     for i, slide in enumerate(tqdm(slides_data, desc="  TTS (viral)")):
         txt = f"{slide.get('title', '')}. {slide.get('content', '')}"
         audio_path = OUTPUT_DIR / f"{unique_id}_audio_{i}.mp3"
-        slide_audio_paths.append(text_to_speech(txt, audio_path))
+        if dry_run:
+            audio_path.touch()
+            slide_audio_paths.append(audio_path)
+        else:
+            slide_audio_paths.append(tts_service.text_to_speech(txt, audio_path, voice=voice))
 
     slide_dir = OUTPUT_DIR / f"{unique_id}_slides"
     slide_paths = []
     for i, slide in enumerate(tqdm(slides_data, desc="  Slides (viral)")):
-        path = generate_visuals(slide_dir, 'short', slide, slide_number=i+1, total_slides=len(slides_data))
+        if dry_run:
+            slide_dir.mkdir(exist_ok=True, parents=True)
+            path = slide_dir / f"slide_{i+1}.png"
+            path.touch()
+        else:
+            path = video_engine.generate_visuals(slide_dir, 'short', slide, slide_number=i+1, total_slides=len(slides_data))
         slide_paths.append(path)
 
     video_path = OUTPUT_DIR / f"{unique_id}.mp4"
-    viral_script = ' '.join(f"{s.get('title', '')}. {s.get('content', '')}" for s in slides_data)
-    viral_script = clamp_words(viral_script, min_w=99, max_w=127)
-    compose_video(slide_paths, slide_audio_paths, video_path, 
-                  VideoOptions(video_type='short', lesson_title=topic, force_viral_bg=True, script=viral_script))
+    if dry_run:
+        video_path.touch()
+        video_id = "DRY_RUN_ID"
+    else:
+        viral_script = ' '.join(f"{s.get('title', '')}. {s.get('content', '')}" for s in slides_data)
+        viral_script = clamp_words(viral_script, min_w=99, max_w=127)
+        video_engine.compose_video(slide_paths, slide_audio_paths, video_path, 
+                      VideoOptions(video_type='short', lesson_title=topic, force_viral_bg=True, script=viral_script))
 
-    thumb_path = generate_visuals(OUTPUT_DIR, 'short', thumbnail_title=topic)
+        thumb_path = Path(video_engine.generate_visuals(OUTPUT_DIR, 'short', is_thumbnail=True, thumbnail_title=topic))
 
-    hashtags = content.get("hashtags", "#AI #Shorts #Viral")
-    desc = f"{topic}\n\n{hashtags}\n\nProduced by SuperShorts"
-    video_id = upload_to_youtube(video_path, f"{topic[:80]} #Shorts", desc, "AI,Shorts,Viral", thumb_path)
+        hashtags = content.get("hashtags", "#AI #Shorts #Viral")
+        desc = f"{topic}\n\n{hashtags}\n\nProduced by SuperShorts"
+        video_id = uploader_service.upload(video_path, f"{topic[:80]} #Shorts", desc, ["AI", "Shorts", "Viral"], thumb_path)
+    
     if video_id:
         log_upload(topic, video_id, "viral_gameplay")
     print(f"✅ Viral gameplay video done: {topic}")

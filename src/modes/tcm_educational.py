@@ -14,13 +14,9 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich import box
 
-from src.core.config import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT, YOUR_NAME, VideoOptions, OUTPUT_DIR
-from src.core.interfaces import ILLMService, ITTSService, IVideoUploader
+from src.core.config import PROJECT_ROOT, YOUR_NAME, VideoOptions
+from src.core.interfaces import ILLMService, ITTSService, IVideoUploader, IVideoEngine
 from src.core.base_mode import BaseMode
-from src.infrastructure.llm import OllamaLLMService, ollama_generate
-from src.infrastructure.tts import StandardTTSService
-from src.infrastructure.browser_uploader import YouTubeBrowserUploader
-from src.engine.video_engine import generate_visuals, compose_video
 from src.utils.text import clamp_words
 import src.core.learning as _learning
 
@@ -57,7 +53,8 @@ def _show_plan_status(plan):
     console.print(table)
 
 def generate_tcm_curriculum(focus: str, extra: str, previous_titles=None, llm_service: ILLMService = None) -> dict:
-    llm = llm_service or OllamaLLMService(generate_fn=ollama_generate)
+    if not llm_service:
+        raise ValueError("llm_service is required for generate_tcm_curriculum")
     prev = f"\nDo not repeat these titles: {previous_titles}" if previous_titles else ""
     prompt = (
         f"Create a 10-lesson educational video curriculum about: {focus}.\n"
@@ -73,7 +70,7 @@ def generate_tcm_curriculum(focus: str, extra: str, previous_titles=None, llm_se
     )
     fallback = {"curriculum_title": "TCM Essentials", "lessons": [{"chapter": i+1, "part": 1, "title": f"TCM Lesson {i+1}", "status": "pending", "youtube_id": None} for i in range(10)]}
     try:
-        result = llm.generate(prompt, json_mode=True)
+        result = llm_service.generate(prompt, json_mode=True)
         lessons = result.get("lessons") if isinstance(result, dict) else None
         if not lessons:
             console.print("[yellow]⚠  Curriculum empty — using fallback[/yellow]")
@@ -87,8 +84,8 @@ def generate_tcm_curriculum(focus: str, extra: str, previous_titles=None, llm_se
         return fallback
 
 class TCMMode(BaseMode):
-    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, plan=None, dry_run=False, voice=None, custom_bg=None, custom_music=None):
-        super().__init__(llm_service, tts_service, uploader_service)
+    def __init__(self, llm_service, tts_service, uploader_service, video_engine, plan=None, dry_run=False, voice=None, custom_bg=None, custom_music=None):
+        super().__init__(llm_service, tts_service, uploader_service, video_engine)
         self.plan = plan
         self.dry_run = dry_run
         self.voice = voice
@@ -100,13 +97,10 @@ class TCMMode(BaseMode):
         return [l for l in self.plan.get("lessons", []) if l.get("status") not in ("complete", "published")]
 
     def mark_complete(self, topic: Dict[str, Any], video_id: Optional[str]):
-        if self.dry_run:
-            print(f"DEBUG: Dry run complete for {topic['title']}")
-            return
         topic["status"] = "complete"
-        topic["youtube_id"] = video_id
+        topic["youtube_id"] = video_id or "DRY_RUN"
         TCM_PLAN_FILE.write_text(json.dumps(self.plan, indent=2))
-        if video_id:
+        if video_id and not self.dry_run:
             _learning.log_upload(topic["title"], video_id, "tcm")
 
     def generate_script(self, topic: Dict[str, Any]) -> Dict[str, Any]:
@@ -150,7 +144,7 @@ Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highli
             slide_path = self.output_dir / f"dry_slide_{uid}.png"
             slide_path.touch()
         else:
-            slide_path = generate_visuals(
+            slide_path = self.video_engine.generate_visuals(
                 output_dir=self.output_dir / f"tcm_slides_{uid}",
                 video_type="short",
                 slide_content={"title": content.get("title", "TCM"), "content": content.get("short_form_highlight", "")},
@@ -166,7 +160,7 @@ Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highli
         bg_source = self.custom_bg if (self.custom_bg and Path(self.custom_bg).exists()) else None
         bg_query = random.choice(TCM_BG_KEYWORDS) if not bg_source else None
         
-        compose_video(assets["images"], assets["audio"], output_path,
+        self.video_engine.compose_video(assets["images"], assets["audio"], output_path,
                       VideoOptions(video_type="short", lesson_title=content.get("title", "TCM"),
                                    script=assets["script"][0], bg_query=bg_query, custom_bg=bg_source, custom_music=self.custom_music))
         return output_path
@@ -179,13 +173,16 @@ Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highli
         tags = ["TCM", "Traditional Chinese Medicine", "Wellness", "Health", "Eastern Medicine"]
         return self.uploader.upload(Path(video_path), content.get("title", "TCM") + " #Shorts", desc, tags)
 
-def run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None, dry_run=False, voice=None):
+def run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None, video_engine=None, dry_run=False, voice=None, topic=None, extra=None, count=None):
     console.print(Panel.fit("🌿 [bold green]SuperShorts TCM Mode[/bold green] 🌿"))
 
-    # Dashboard mode: read config from env vars (skips interactive prompts)
-    env_topic = os.environ.get("TCM_TOPIC", "")
-    env_extra = os.environ.get("TCM_EXTRA", "")
-    env_count = os.environ.get("TCM_COUNT", "")
+    if not all([llm_service, tts_service, uploader_service, video_engine]):
+        raise ValueError("All services (llm, tts, uploader, engine) must be provided to run_tcm_mode")
+
+    # Dashboard mode: read config from env vars or arguments (skips interactive prompts)
+    env_topic = topic or os.environ.get("TCM_TOPIC", "")
+    env_extra = extra or os.environ.get("TCM_EXTRA", "")
+    env_count = count or os.environ.get("TCM_COUNT", "")
     env_use_existing = os.environ.get("TCM_USE_EXISTING", "").lower()
     headless = bool(env_topic)  # running from dashboard if topic is set
 
@@ -211,8 +208,7 @@ def run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None, dry_
             focus = Prompt.ask("Topic focus", default="Traditional Chinese Medicine")
             extra = Prompt.ask("Extra details", default="")
         console.print(f"[cyan]Generating curriculum for: {focus}[/cyan]")
-        llm = llm_service or OllamaLLMService()
-        plan = generate_tcm_curriculum(focus, extra, llm_service=llm)
+        plan = generate_tcm_curriculum(focus, extra, llm_service=llm_service)
         TCM_PLAN_FILE.write_text(json.dumps(plan, indent=2))
 
     if headless:
@@ -220,6 +216,6 @@ def run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None, dry_
     else:
         raw_count = Prompt.ask("How many videos to produce?", default="3")
 
-    mode = TCMMode(llm_service, tts_service, uploader_service, plan, dry_run=dry_run, voice=voice,
+    mode = TCMMode(llm_service, tts_service, uploader_service, video_engine, plan, dry_run=dry_run, voice=voice,
                    custom_bg=os.environ.get("CUSTOM_BG"), custom_music=os.environ.get("CUSTOM_MUSIC"))
     mode.run_pipeline(int(raw_count))

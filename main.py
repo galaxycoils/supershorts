@@ -8,15 +8,17 @@ import traceback
 from pathlib import Path
 from tqdm import tqdm
 from rich.prompt import Prompt
-from src.core.config import VideoOptions
+from src.core.config import VideoOptions, YOUR_NAME, PROJECT_ROOT, OUTPUT_DIR
+
+from src.core.interfaces import ILLMService, ITTSService, IVideoUploader, IVideoEngine
+from src.infrastructure.llm import OllamaLLMService
+from src.infrastructure.tts import StandardTTSService
+from src.infrastructure.browser_uploader import YouTubeBrowserUploader
+from src.infrastructure.video_engine_impl import StandardVideoEngine
 
 from src.generator import (
     generate_curriculum,
     generate_lesson_content,
-    text_to_speech,
-    generate_visuals,
-    compose_video,
-    YOUR_NAME,
     start_viral_gameplay_mode,
     start_tutorial_generation,
     generate_youtube_content_package,
@@ -25,21 +27,23 @@ from src.generator import (
     run_tcm_mode,
     run_video_clipper,
     start_idea_generator,
-    log_upload,
-    PROJECT_ROOT,
-    start_learning_mode
+    start_learning_mode,
+    clamp_words,
+    text_to_speech,
+    generate_visuals,
+    compose_video,
+    upload_to_youtube
 )
-from src.core.learning import suggest_improvements # learning.py renamed
+from src.core.learning import log_upload, suggest_improvements
 
 # Alias for legacy main.py names
 start_brainrot_generation = run_brainrot_pipeline
 start_rotgen_mode = run_rotgen_pipeline
-upload_to_youtube = lambda *args, **kwargs: __import__('src.infrastructure.browser_uploader', fromlist=['upload_to_youtube_browser']).upload_to_youtube_browser(*args, **kwargs)
+
 import menu
 from menu import console
 
 CONTENT_PLAN_FILE = Path("content_plan.json")
-OUTPUT_DIR = Path("output")
 
 
 def cleanup_after_upload(video_path: Path, title: str, video_id: str, mode: str):
@@ -63,11 +67,11 @@ def cleanup_after_upload(video_path: Path, title: str, video_id: str, mode: str)
         console.print(f"[yellow]⚠  Cleanup warning: {e}[/yellow]")
 
 
-def get_content_plan():
+def get_content_plan(llm_service: ILLMService):
     if not CONTENT_PLAN_FILE.exists():
         console.print("[cyan]📄 content_plan.json not found. Generating new plan…[/cyan]")
         with console.status("[cyan]Generating curriculum via Ollama…[/cyan]"):
-            new_plan = generate_curriculum()
+            new_plan = generate_curriculum(llm_service=llm_service)
         with open(CONTENT_PLAN_FILE, 'w') as f:
             json.dump(new_plan, f, indent=2)
         console.print(f"[green]✅ New curriculum saved to {CONTENT_PLAN_FILE}[/green]")
@@ -82,7 +86,7 @@ def get_content_plan():
         except Exception as e:
             console.print(f"[red]❌ ERROR loading existing plan: {e}. Regenerating…[/red]")
             with console.status("[cyan]Regenerating curriculum via Ollama…[/cyan]"):
-                new_plan = generate_curriculum()
+                new_plan = generate_curriculum(llm_service=llm_service)
             with open(CONTENT_PLAN_FILE, 'w') as f:
                 json.dump(new_plan, f, indent=2)
             return new_plan
@@ -93,10 +97,11 @@ def update_content_plan(plan):
         json.dump(plan, f, indent=2)
 
 
-def produce_lesson_videos(lesson):
+def produce_lesson_videos(lesson, llm_service: ILLMService, tts_service: ITTSService, 
+                          uploader_service: IVideoUploader, video_engine: IVideoEngine):
     console.print(f"\n[bold cyan]▶  Starting production: [white]'{lesson['title']}'[/white][/bold cyan]")
     unique_id = f"{datetime.datetime.now().strftime('%Y%m%d')}_{lesson['chapter']}_{lesson['part']}"
-    lesson_content = generate_lesson_content(lesson['title'])
+    lesson_content = generate_lesson_content(lesson['title'], llm_service=llm_service)
 
     console.print("\n[bold]── Long-Form Video ──[/bold]")
     intro_slide = {"title": lesson['title'], "content": f"Chapter {lesson['chapter']} | Part {lesson['part']}"}
@@ -111,14 +116,14 @@ def produce_lesson_videos(lesson):
     for i, script in enumerate(tqdm(slide_scripts, desc="  TTS (long)", unit="slide",
                                     bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
         audio_path = OUTPUT_DIR / f"audio_slide_{i+1}_{unique_id}.mp3"
-        wav_path = text_to_speech(script, audio_path)
+        wav_path = tts_service.text_to_speech(script, audio_path)
         slide_audio_paths.append(wav_path)
 
     slide_dir = OUTPUT_DIR / f"slides_long_{unique_id}"
     slide_paths = []
     for i, slide in enumerate(tqdm(all_slides, desc="  Slides (long)", unit="slide",
                                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]")):
-        path = generate_visuals(
+        path = video_engine.generate_visuals(
             output_dir=slide_dir,
             video_type='long',
             slide_content=slide,
@@ -130,7 +135,7 @@ def produce_lesson_videos(lesson):
     long_video_path = OUTPUT_DIR / f"long_video_{unique_id}.mp4"
     console.print(f"[cyan]🎥 Creating long-form video: [dim]{long_video_path}[/dim][/cyan]")
     long_full_script = '\n'.join(slide_scripts)
-    compose_video(slide_paths, slide_audio_paths, long_video_path, VideoOptions(
+    video_engine.compose_video(slide_paths, slide_audio_paths, long_video_path, VideoOptions(
         video_type='long', lesson_title=lesson['title'], script=long_full_script
     ))
 
@@ -140,25 +145,25 @@ def produce_lesson_videos(lesson):
         except Exception:
             pass
 
-    long_thumb_path = generate_visuals(
+    long_thumb_path = Path(video_engine.generate_visuals(
         output_dir=OUTPUT_DIR,
         video_type='long',
+        is_thumbnail=True,
         thumbnail_title=lesson['title']
-    )
+    ))
 
     console.print("\n[bold]── Short Video ──[/bold]")
-    from src.generator import clamp_words
     raw_short = (f"{lesson_content['short_form_highlight']}\n\n"
                  f"Link to the full lesson is in the description below.")
     short_script = clamp_words(raw_short, min_w=99, max_w=127)
     short_audio_mp3_path = OUTPUT_DIR / f"short_audio_{unique_id}.mp3"
-    short_audio_path = text_to_speech(short_script, short_audio_mp3_path)
+    short_audio_path = tts_service.text_to_speech(short_script, short_audio_mp3_path)
     short_slide_dir = OUTPUT_DIR / f"slides_short_{unique_id}"
     short_slide_content = {
         "title": "Quick Tip!",
         "content": f"{lesson_content['short_form_highlight']}\n\n#AI for developers by {YOUR_NAME}"
     }
-    short_slide_path = generate_visuals(
+    short_slide_path = video_engine.generate_visuals(
         output_dir=short_slide_dir,
         video_type='short',
         slide_content=short_slide_content,
@@ -167,7 +172,7 @@ def produce_lesson_videos(lesson):
     )
     short_video_path = OUTPUT_DIR / f"short_video_{unique_id}.mp4"
     console.print(f"[cyan]🎥 Creating short video: [dim]{short_video_path}[/dim][/cyan]")
-    compose_video([short_slide_path], [short_audio_path], short_video_path, VideoOptions(
+    video_engine.compose_video([short_slide_path], [short_audio_path], short_video_path, VideoOptions(
         video_type='short', lesson_title=lesson['title'], script=short_script
     ))
 
@@ -177,17 +182,18 @@ def produce_lesson_videos(lesson):
         except Exception:
             pass
 
-    short_thumb_path = generate_visuals(
+    short_thumb_path = Path(video_engine.generate_visuals(
         output_dir=OUTPUT_DIR,
         video_type='short',
+        is_thumbnail=True,
         thumbnail_title=f"Quick Tip: {lesson['title']}"
-    )
+    ))
 
     console.print("\n[cyan]📤 Uploading to YouTube…[/cyan]")
     hashtags = lesson_content.get("hashtags", "#AI #Developer #LearnAI")
     long_desc = f"Part of the 'AI for Developers' series by {YOUR_NAME}.\n\nToday's Lesson: {lesson['title']}\n\n{hashtags}"
-    long_tags = "AI, Artificial Intelligence, Developer, Programming, Tutorial, " + lesson['title'].replace(" ", ", ")
-    long_video_id = upload_to_youtube(
+    long_tags = ["AI", "Artificial Intelligence", "Developer", "Programming", "Tutorial"] + lesson['title'].split()
+    long_video_id = uploader_service.upload(
         long_video_path, lesson['title'], long_desc, long_tags, long_thumb_path
     )
     if long_video_id:
@@ -201,8 +207,8 @@ def produce_lesson_videos(lesson):
         short_desc = (f"{lesson_content['short_form_highlight']}\n\n"
                       f"Watch the full lesson with {YOUR_NAME} here: https://www.youtube.com/watch?v={long_video_id}\n\n"
                       f"{hashtags}")
-        short_video_id = upload_to_youtube(
-            short_video_path, short_title.strip(), short_desc, "AI,Shorts,TechTip", short_thumb_path
+        short_video_id = uploader_service.upload(
+            short_video_path, short_title.strip(), short_desc, ["AI", "Shorts", "TechTip"], short_thumb_path
         )
         if short_video_id:
             log_upload(short_title, short_video_id, "short")
@@ -212,25 +218,32 @@ def produce_lesson_videos(lesson):
     return None
 
 
-def main_flow(lessons_per_run: int = 2):
+def main_flow(lessons_per_run: int = 2, llm_service=None, tts_service=None, uploader_service=None, video_engine=None):
     console.print("[bold cyan]🚀 Starting Money Printer V2 (100% Local Ollama)[/bold cyan]")
     console.print(f"[dim]📁 Working dir: {os.getcwd()}[/dim]")
     console.print(f"[dim]📁 Output dir:  {OUTPUT_DIR.resolve()}[/dim]")
+    
+    # Instantiate services if not provided
+    llm_service = llm_service or OllamaLLMService()
+    tts_service = tts_service or StandardTTSService()
+    uploader_service = uploader_service or YouTubeBrowserUploader()
+    video_engine = video_engine or StandardVideoEngine()
+    
     try:
         OUTPUT_DIR.mkdir(exist_ok=True)
-        plan = get_content_plan()
+        plan = get_content_plan(llm_service)
         pending = [(i, lesson) for i, lesson in enumerate(plan['lessons']) if lesson['status'] == 'pending']
         if not pending:
             console.print("[green]🎉 All lessons done! Generating fresh curriculum…[/green]")
             previous_titles = [l['title'] for l in plan['lessons']]
             with console.status("[cyan]Generating new curriculum via Ollama…[/cyan]"):
-                new_plan = generate_curriculum(previous_titles=previous_titles)
+                new_plan = generate_curriculum(previous_titles=previous_titles, llm_service=llm_service)
             update_content_plan(new_plan)
             plan = new_plan
             pending = [(i, lesson) for i, lesson in enumerate(new_plan['lessons']) if lesson['status'] == 'pending']
         for _, lesson in pending[:lessons_per_run]:
             try:
-                video_id = produce_lesson_videos(lesson)
+                video_id = produce_lesson_videos(lesson, llm_service, tts_service, uploader_service, video_engine)
                 if video_id:
                     for original in plan['lessons']:
                         if original['title'].strip().lower() == lesson['title'].strip().lower():
@@ -249,35 +262,49 @@ def main_flow(lessons_per_run: int = 2):
 
 
 def main():
+    # Instantiate services for the entire session
+    llm_service = OllamaLLMService()
+    tts_service = StandardTTSService()
+    uploader_service = YouTubeBrowserUploader()
+    video_engine = StandardVideoEngine()
+    
     while True:
         choice = menu.show_menu()
         try:
             if choice == "1":
                 count = menu.ask_video_count("Educational", default=2)
-                main_flow(lessons_per_run=count)
+                main_flow(lessons_per_run=count, llm_service=llm_service, tts_service=tts_service, 
+                          uploader_service=uploader_service, video_engine=video_engine)
             elif choice == "2":
                 count = menu.ask_video_count("Brain Rot", default=3)
-                start_brainrot_generation(count)
+                start_brainrot_generation(count, llm_service=llm_service, tts_service=tts_service, 
+                                          uploader_service=uploader_service, video_engine=video_engine)
             elif choice == "3":
-                start_viral_gameplay_mode()
+                start_viral_gameplay_mode(llm_service=llm_service, tts_service=tts_service, 
+                                          uploader_service=uploader_service, video_engine=video_engine)
             elif choice == "4":
-                start_tutorial_generation()
+                start_tutorial_generation(llm_service=llm_service, tts_service=tts_service, 
+                                          uploader_service=uploader_service, video_engine=video_engine)
             elif choice == "5":
                 start_learning_mode()
             elif choice == "6":
-                start_idea_generator()
+                start_idea_generator(llm_service=llm_service, tts_service=tts_service, 
+                                     uploader_service=uploader_service, video_engine=video_engine)
             elif choice == "7":
                 menu.view_content_plan()
                 continue  # view_content_plan has its own "Press Enter"
             elif choice == "8":
                 count = menu.ask_video_count("RotGen", default=3)
-                start_rotgen_mode(count)
+                start_rotgen_mode(count, llm_service=llm_service, tts_service=tts_service, 
+                                  uploader_service=uploader_service, video_engine=video_engine)
             elif choice == "9":
-                generate_youtube_content_package()
+                generate_youtube_content_package(llm_service=llm_service, tts_service=tts_service, 
+                                                 uploader_service=uploader_service, video_engine=video_engine)
             elif choice == "10":
                 run_video_clipper()
             elif choice == "11":
-                run_tcm_mode()
+                run_tcm_mode(llm_service=llm_service, tts_service=tts_service, 
+                             uploader_service=uploader_service, video_engine=video_engine)
             elif choice == "12":
                 console.print("\n[bold cyan]  Goodbye![/bold cyan]")
                 break

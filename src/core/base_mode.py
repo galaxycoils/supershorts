@@ -6,11 +6,7 @@ from typing import List, Dict, Any, Optional
 from tqdm import tqdm
 
 from src.core.config import OUTPUT_DIR, VideoOptions
-from src.core.interfaces import ILLMService, ITTSService, IVideoUploader
-from src.infrastructure.llm import OllamaLLMService
-from src.infrastructure.tts import StandardTTSService
-from src.infrastructure.browser_uploader import YouTubeBrowserUploader
-from src.engine.video_engine import generate_visuals, compose_video
+from src.core.interfaces import ILLMService, ITTSService, IVideoUploader, IVideoEngine
 
 class BaseMode(abc.ABC):
     """
@@ -20,10 +16,12 @@ class BaseMode(abc.ABC):
     def __init__(self, 
                  llm_service: Optional[ILLMService] = None, 
                  tts_service: Optional[ITTSService] = None, 
-                 uploader_service: Optional[IVideoUploader] = None):
-        self.llm = llm_service or OllamaLLMService()
-        self.tts = tts_service or StandardTTSService()
-        self.uploader = uploader_service or YouTubeBrowserUploader()
+                 uploader_service: Optional[IVideoUploader] = None,
+                 video_engine: Optional[IVideoEngine] = None):
+        self.llm = llm_service
+        self.tts = tts_service
+        self.uploader = uploader_service
+        self.video_engine = video_engine
         self.output_dir = OUTPUT_DIR
 
     @abc.abstractmethod

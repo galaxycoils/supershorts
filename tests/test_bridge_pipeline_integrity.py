@@ -29,7 +29,7 @@ class TestBridgePipelineIntegrity:
         }
 
     @patch('src.infrastructure.llm.ollama.chat')
-    @patch('src.engine.video_engine.get_relevant_pexels_video')
+    @patch('src.infrastructure.video_engine_impl.get_relevant_pexels_video')
     @patch('src.infrastructure.tts.subprocess.run')
     def test_mode_to_infra_pipeline(self, mock_subproc, mock_pexels, mock_ollama, mock_env):
         """
@@ -81,11 +81,12 @@ class TestBridgePipelineIntegrity:
         video_output = mock_env["output_dir"] / "final_video.mp4"
         
         # Mock heavy MoviePy internals to avoid actual rendering but verify orchestration
-        with patch('src.engine.video_engine.VideoFileClip') as mock_vclip, \
-             patch('src.engine.video_engine.AudioFileClip') as mock_aclip, \
-             patch('src.engine.video_engine.ImageClip') as mock_iclip, \
-             patch('src.engine.video_engine.CompositeVideoClip') as mock_composite, \
-             patch('src.engine.video_engine.concatenate_videoclips') as mock_concat:
+        # Patching in src.infrastructure.video_engine_impl where StandardVideoEngine is defined
+        with patch('src.infrastructure.video_engine_impl.VideoFileClip') as mock_vclip, \
+             patch('src.infrastructure.video_engine_impl.AudioFileClip') as mock_aclip, \
+             patch('src.infrastructure.video_engine_impl.ImageClip') as mock_iclip, \
+             patch('src.infrastructure.video_engine_impl.CompositeVideoClip') as mock_composite, \
+             patch('src.infrastructure.video_engine_impl.concatenate_videoclips') as mock_concat:
             
             # Setup mock durations and behavior
             mock_aclip.return_value.duration = 5.0

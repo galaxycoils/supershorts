@@ -23,7 +23,7 @@ def test_generate_tcm_curriculum_mock(mock_ollama):
 
 from src.generator import generate_lesson_content, compose_video
 
-@patch('src.generator.ollama_generate')
+@patch('src.infrastructure.llm.ollama_generate')
 def test_generate_lesson_content_params(mock_ollama):
     mock_ollama.return_value = {
         "long_form_slides": [],
@@ -35,17 +35,18 @@ def test_generate_lesson_content_params(mock_ollama):
     
     # Check if the prompt sent to ollama contains our custom strings
     # We need to access the first argument of the first call
+    assert mock_ollama.called
     args, kwargs = mock_ollama.call_args
     prompt = args[0]
     assert "TCM Series" in prompt
     assert "Custom Style" in prompt
 
-@patch('src.engine.video_engine.get_relevant_pexels_video')
-@patch('src.engine.video_engine.get_local_gameplay')
-@patch('src.engine.video_engine.AudioFileClip')
-@patch('src.engine.video_engine.ImageClip')
-@patch('src.engine.video_engine.concatenate_videoclips')
-@patch('src.engine.video_engine.VideoFileClip')
+@patch('src.infrastructure.video_engine_impl.get_relevant_pexels_video')
+@patch('src.infrastructure.video_engine_impl.get_local_gameplay')
+@patch('src.infrastructure.video_engine_impl.AudioFileClip')
+@patch('src.infrastructure.video_engine_impl.ImageClip')
+@patch('src.infrastructure.video_engine_impl.concatenate_videoclips')
+@patch('src.infrastructure.video_engine_impl.VideoFileClip')
 def test_compose_video_bg_query(mock_video, mock_concat, mock_image, mock_audio, mock_local, mock_pexels):
     # Mock necessary objects for compose_video to run without errors
     mock_pexels.return_value = "fake_bg.mp4"
@@ -77,7 +78,7 @@ def test_compose_video_bg_query(mock_video, mock_concat, mock_image, mock_audio,
     mock_image.return_value = mock_image_instance
     
     # Run compose_video with bg_query
-    with patch('src.engine.video_engine.CompositeVideoClip') as mock_composite:
+    with patch('src.infrastructure.video_engine_impl.CompositeVideoClip') as mock_composite:
         mock_composite.return_value.duration = 1.0
         mock_composite.return_value.set_audio.return_value = mock_composite.return_value
         compose_video(["img.png"], ["audio.wav"], "out.mp4", VideoOptions(

@@ -1,10 +1,17 @@
 # SuperShorts — Gemini CLI Context
 
+### CRITICAL PROTOCOL: Universal State Handoff
+Read `/Users/cmd/Documents/Obsidian Vault/SuperShorts/STATE_HANDOFF.md` IMMEDIATELY on session start. This is the SINGLE source of truth.
+1. **Pickup**: Resume exactly where last agent (Claude/Codex) left off.
+2. **Log**: Record successes and "gotchas" during execution.
+3. **Handoff**: Update current status before finishing.
+
+---
+
 ## Project
 AI video factory. Topic → YouTube Short. Fully local (Ollama LLM + Piper TTS + MoviePy).
-Repo: https://github.com/galaxycoils/supershorts
-Local: /Users/cmd/money-printer-v2
-Current version: v3.4.0
+- **Metaswarm Workflow**: Use `/start-task` (or equivalent) for complex work. Follow Phase Execution Loop: Plan → Work → Verify → Commit.
+- **TDD Enforcement**: Tests first, 100% coverage required (see `.coverage-thresholds.json`).
 
 ## Run
 ```bash

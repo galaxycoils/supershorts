@@ -1,10 +1,17 @@
 # SuperShorts — Codex / Agent CLI Context
 
+### MANDATORY PROTOCOL: Universal State Handoff
+Read `/Users/cmd/Documents/Obsidian Vault/SuperShorts/STATE_HANDOFF.md` IMMEDIATELY upon starting session. This is your "Second Brain".
+1. **Sync**: Pick up context from Gemini/Claude.
+2. **Learn**: Log bugs, patterns, and decisions during work.
+3. **Handover**: Update status/next actions before closing.
+
+---
+
 ## Identity
-- **Project**: SuperShorts v3.4.0
-- **Repo**: https://github.com/galaxycoils/supershorts
-- **Local**: /Users/cmd/money-printer-v2
-- **Branch convention**: feature branches off `main`
+- **Project**: SuperShorts v3.5.0
+- **Metaswarm Development**: Follow the full development pipeline (Research → Plan → Design Review → Implementation → Verification).
+- **TDD Requirement**: Write tests before implementation. 100% coverage is mandatory as defined in `.coverage-thresholds.json`.
 
 ## What This Is
 Fully local AI video pipeline. Given a topic, it generates a YouTube Short end-to-end:

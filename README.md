@@ -1,4 +1,4 @@
-# SuperShorts Production Suite v3.0
+# SuperShorts Production Suite v3.5.0
 
 ![SuperShorts Dashboard Preview](https://raw.githubusercontent.com/galaxycoils/supershorts/main/uiexample/IMG_1469.JPG)
 
@@ -103,7 +103,7 @@ Access the UI at: **`http://localhost:5050`**
 ---
 
 ## 📈 Roadmap
-- [x] v3.0: Componentized UI & RotGen Aesthetic
+- [x] v3.5.0: Componentized UI & RotGen Aesthetic
 - [ ] v3.1: Multi-platform uploading (TikTok, Instagram)
 - [ ] v3.2: Cloud-synced asset library
 - [ ] v3.3: Advanced AI-driven B-Roll selection

@@ -3,14 +3,14 @@ from unittest.mock import MagicMock, patch
 from pathlib import Path
 from src.generator import generate_brainrot_topics, generate_brainrot_script, render_brainrot_slide, create_brainrot_video, generate_tcm_curriculum
 
-@patch('src.modes.brainrot.ollama_generate')
+@patch('src.infrastructure.llm.ollama_generate')
 def test_generate_brainrot_topics_invalid_json(mock_ollama):
     # Simulate ollama returning garbage instead of expected dict
     mock_ollama.return_value = {"not_topics": []}
     result = generate_brainrot_topics(count=1)
     assert result == []
 
-@patch('src.modes.brainrot.ollama_generate')
+@patch('src.generator.ollama_generate')
 def test_generate_brainrot_script_missing_keys(mock_ollama):
     # Simulate ollama returning JSON without 'slides'
     mock_ollama.return_value = {"full_script": "Just script, no slides"}
@@ -30,15 +30,12 @@ def test_generate_tcm_curriculum_api_error(mock_ollama):
     assert result["curriculum_title"] == "TCM Essentials"
     assert len(result["lessons"]) == 10
 
-@patch('src.modes.brainrot.Image.new')
-@patch('src.modes.brainrot.Image.alpha_composite')
-@patch('src.modes.brainrot.get_gradient_overlay')
-@patch('src.modes.brainrot.ImageDraw.Draw')
-def test_render_brainrot_slide_disk_full(mock_draw, mock_gradient, mock_alpha, mock_image_new, tmp_path):
+@patch('src.infrastructure.video_engine_impl.Image.new')
+@patch('src.infrastructure.video_engine_impl.ImageDraw.Draw')
+def test_render_brainrot_slide_disk_full(mock_draw, mock_image_new, tmp_path):
     # Simulate disk full error during save
     mock_img = MagicMock()
     mock_image_new.return_value = mock_img
-    mock_alpha.return_value = mock_img
     
     # Mock draw.textlength
     mock_draw_instance = MagicMock()
@@ -60,14 +57,11 @@ def test_create_brainrot_video_mismatch():
     with pytest.raises(ValueError, match="Slide/audio count mismatch"):
         create_brainrot_video(["s1.png"], ["a1.wav", "a2.wav"], "out.mp4", "Title")
 
-@patch('src.modes.brainrot.Image.new')
-@patch('src.modes.brainrot.Image.alpha_composite')
-@patch('src.modes.brainrot.get_gradient_overlay')
-@patch('src.modes.brainrot.ImageDraw.Draw')
-def test_render_brainrot_slide_extreme_text(mock_draw, mock_gradient, mock_alpha, mock_image_new, tmp_path):
+@patch('src.infrastructure.video_engine_impl.Image.new')
+@patch('src.infrastructure.video_engine_impl.ImageDraw.Draw')
+def test_render_brainrot_slide_extreme_text(mock_draw, mock_image_new, tmp_path):
     mock_img = MagicMock()
     mock_image_new.return_value = mock_img
-    mock_alpha.return_value = mock_img
     
     mock_draw_instance = MagicMock()
     # Always return a large text length to force font size reduction

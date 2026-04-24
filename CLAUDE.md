@@ -1,8 +1,14 @@
 # Project Instructions
 
-This project uses [metaswarm](https://github.com/dsifry/metaswarm), a multi-agent orchestration framework for Claude Code. It provides 18 specialized agents, a 9-phase development workflow, and quality gates that enforce TDD, coverage thresholds, and spec-driven development.
+### PROTOCOL 0: Universal State Handoff (MANDATORY)
+The file `/Users/cmd/Documents/Obsidian Vault/SuperShorts/STATE_HANDOFF.md` is the SINGLE source of truth for cross-agent memory. 
+1. **On Session Start**: You MUST read this file immediately before ANY other action to pick up context from Gemini/Codex.
+2. **During Execution**: Log architectural patterns and failed attempts here.
+3. **On Session End**: Update "Current Status" and "Next Actions" before exiting.
 
-## How to Work in This Project
+---
+
+This project uses [metaswarm](https://github.com/dsifry/metaswarm)...
 
 ### Starting work
 

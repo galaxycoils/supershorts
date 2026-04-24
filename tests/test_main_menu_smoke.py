@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 
 
 def _run_main_once(choice: str):
@@ -29,23 +29,45 @@ def _run_main_once(choice: str):
 def test_menu_option_1_routes_to_educational():
     calls = _run_main_once("1")
     calls["ask_video_count"].assert_called_once_with("Educational", default=2)
-    calls["main_flow"].assert_called_once_with(lessons_per_run=1)
+    calls["main_flow"].assert_called_once_with(
+        lessons_per_run=1,
+        llm_service=ANY,
+        tts_service=ANY,
+        uploader_service=ANY,
+        video_engine=ANY
+    )
 
 
 def test_menu_option_2_routes_to_brainrot():
     calls = _run_main_once("2")
     calls["ask_video_count"].assert_called_once_with("Brain Rot", default=3)
-    calls["start_brainrot_generation"].assert_called_once_with(1)
+    calls["start_brainrot_generation"].assert_called_once_with(
+        1,
+        llm_service=ANY,
+        tts_service=ANY,
+        uploader_service=ANY,
+        video_engine=ANY
+    )
 
 
 def test_menu_option_3_routes_to_viral():
     calls = _run_main_once("3")
-    calls["start_viral_gameplay_mode"].assert_called_once_with()
+    calls["start_viral_gameplay_mode"].assert_called_once_with(
+        llm_service=ANY,
+        tts_service=ANY,
+        uploader_service=ANY,
+        video_engine=ANY
+    )
 
 
 def test_menu_option_4_routes_to_tutorial():
     calls = _run_main_once("4")
-    calls["start_tutorial_generation"].assert_called_once_with()
+    calls["start_tutorial_generation"].assert_called_once_with(
+        llm_service=ANY,
+        tts_service=ANY,
+        uploader_service=ANY,
+        video_engine=ANY
+    )
 
 
 def test_menu_option_5_routes_to_learning():
@@ -55,7 +77,12 @@ def test_menu_option_5_routes_to_learning():
 
 def test_menu_option_6_routes_to_studio_ideas():
     calls = _run_main_once("6")
-    calls["start_idea_generator"].assert_called_once_with()
+    calls["start_idea_generator"].assert_called_once_with(
+        llm_service=ANY,
+        tts_service=ANY,
+        uploader_service=ANY,
+        video_engine=ANY
+    )
 
 
 def test_menu_option_7_routes_to_content_plan():
@@ -66,12 +93,23 @@ def test_menu_option_7_routes_to_content_plan():
 def test_menu_option_8_routes_to_rotgen():
     calls = _run_main_once("8")
     calls["ask_video_count"].assert_called_once_with("RotGen", default=3)
-    calls["start_rotgen_mode"].assert_called_once_with(1)
+    calls["start_rotgen_mode"].assert_called_once_with(
+        1,
+        llm_service=ANY,
+        tts_service=ANY,
+        uploader_service=ANY,
+        video_engine=ANY
+    )
 
 
 def test_menu_option_9_routes_to_content_package():
     calls = _run_main_once("9")
-    calls["generate_youtube_content_package"].assert_called_once_with()
+    calls["generate_youtube_content_package"].assert_called_once_with(
+        llm_service=ANY,
+        tts_service=ANY,
+        uploader_service=ANY,
+        video_engine=ANY
+    )
 
 
 def test_menu_option_10_routes_to_clipper():
@@ -81,7 +119,12 @@ def test_menu_option_10_routes_to_clipper():
 
 def test_menu_option_11_routes_to_tcm():
     calls = _run_main_once("11")
-    calls["run_tcm_mode"].assert_called_once_with()
+    calls["run_tcm_mode"].assert_called_once_with(
+        llm_service=ANY,
+        tts_service=ANY,
+        uploader_service=ANY,
+        video_engine=ANY
+    )
 
 
 def test_menu_option_12_exits_cleanly():
