@@ -1,4 +1,10 @@
 # main.py - SuperShorts v2.6
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import gc
 import os
 import json

@@ -3,20 +3,20 @@ import requests
 from pathlib import Path
 from PIL import Image
 from src.core.config import (
-    BACKGROUNDS_PATH, GAMEPLAY_PATH, VIRAL_GAMEPLAY_PATH, 
-    PEXELS_API_KEY, PEXELS_CACHE_DIR
+    BACKGROUNDS_PATH, GAMEPLAY_PATH, VIRAL_GAMEPLAY_PATH,
+    PEXELS_API_KEY, PEXELS_CACHE_DIR, LONG_VIDEO_SIZE, SHORT_VIDEO_SIZE
 )
 
 def get_local_background(lesson_title: str, video_type: str) -> Image.Image:
     """Fixed for modern Pillow (no more ANTIALIAS error)."""
     if not BACKGROUNDS_PATH.exists() or len(list(BACKGROUNDS_PATH.glob("*.*"))) < 1:
         print("⚠️ Backgrounds folder is low/empty")
-        w, h = (1920, 1080) if video_type == 'long' else (1080, 1920)
+        w, h = LONG_VIDEO_SIZE if video_type == 'long' else SHORT_VIDEO_SIZE
         return Image.new('RGBA', (w, h), color=(12, 17, 29))
 
     images = list(BACKGROUNDS_PATH.glob("*.jpg")) + list(BACKGROUNDS_PATH.glob("*.png")) + list(BACKGROUNDS_PATH.glob("*.jpeg"))
     if not images:
-        w, h = (1920, 1080) if video_type == 'long' else (1080, 1920)
+        w, h = LONG_VIDEO_SIZE if video_type == 'long' else SHORT_VIDEO_SIZE
         return Image.new('RGBA', (w, h), color=(12, 17, 29))
 
     keywords = ["ai", "neural", "tech", "code", "abstract", "future", "data", "brain", "learning"]
@@ -29,7 +29,7 @@ def get_local_background(lesson_title: str, video_type: str) -> Image.Image:
     img = Image.open(chosen).convert("RGBA")
 
     # Modern Pillow resizing (no ANTIALIAS)
-    width, height = (1920, 1080) if video_type == 'long' else (1080, 1920)
+    width, height = LONG_VIDEO_SIZE if video_type == 'long' else SHORT_VIDEO_SIZE
     img = img.resize((width, height), Image.Resampling.LANCZOS)
     return img
 

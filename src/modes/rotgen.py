@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 
 from src.core.base_mode import BaseMode
 from src.core.config import (
-    YOUR_NAME, PROJECT_ROOT, VideoOptions
+    YOUR_NAME, PROJECT_ROOT, VideoOptions, VIDEO_FPS, VIDEO_THREADS
 )
 from src.core.interfaces import ILLMService, IVideoEngine, ITTSService, IVideoUploader
 from src.utils.text import strip_emojis, clamp_words
@@ -162,8 +162,8 @@ class RotgenMode(BaseMode):
             lesson_title=content.get("title", "Rotgen"),
             custom_bg=self.custom_bg,
             script=content.get("script"),
-            fps=24,
-            threads=3
+            fps=VIDEO_FPS,
+            threads=VIDEO_THREADS,
         )
         
         custom_char_path = Path(self.custom_char) if self.custom_char else None

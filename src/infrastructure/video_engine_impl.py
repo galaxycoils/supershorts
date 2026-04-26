@@ -136,8 +136,8 @@ class StandardVideoEngine(IVideoEngine):
         slide_content = slide_content or {}
         output_dir = Path(output_dir)
         output_dir.mkdir(exist_ok=True, parents=True)
-        width, height = (1920, 1080) if video_type == 'long' else (1080, 1920)
-        
+        width, height = LONG_VIDEO_SIZE if video_type == 'long' else SHORT_VIDEO_SIZE
+
         title = thumbnail_title if is_thumbnail else slide_content.get("title", "")
         final_bg = get_local_background(title, video_type)
         draw = ImageDraw.Draw(final_bg)
@@ -172,7 +172,7 @@ class StandardVideoEngine(IVideoEngine):
     def generate_brainrot_slide(self, output_dir: Union[str, Path], text: str, slide_num: int, total_slides: int, palette: Optional[Dict[str, Any]] = None) -> str:
         output_dir = Path(output_dir)
         output_dir.mkdir(exist_ok=True, parents=True)
-        width, height = 1080, 1920
+        width, height = SHORT_VIDEO_SIZE
         if not palette: palette = random.choice(BRAINROT_PALETTES)
         
         img = Image.new('RGB', (width, height), palette["bg"])
@@ -262,10 +262,10 @@ class StandardVideoEngine(IVideoEngine):
             temp_audio = str(output_path).replace('.mp4', 'TEMP_MPY_wvf_snd.mp4')
             final.write_videofile(
                 str(output_path),
-                fps=24,
+                fps=options.fps,
                 codec="libx264",
                 audio_codec="aac",
-                threads=3,
+                threads=options.threads,
                 preset="ultrafast",
                 logger='bar',
                 temp_audiofile=temp_audio,
@@ -332,12 +332,12 @@ class StandardVideoEngine(IVideoEngine):
 
             final_composite.write_videofile(
                 str(output_path),
-                fps=FPS,
+                fps=options.fps,
                 codec="libx264",
                 audio_codec="aac",
                 audio_bitrate="192k",
                 preset="ultrafast",
-                threads=3,
+                threads=options.threads,
                 logger="bar",
                 temp_audiofile=temp_audio,
             )
@@ -364,11 +364,11 @@ class StandardVideoEngine(IVideoEngine):
             
             final.write_videofile(
                 str(output_path),
-                fps=24,
+                fps=VIDEO_FPS,
                 codec="libx264",
                 audio_codec="aac",
                 preset="ultrafast",
-                threads=2,
+                threads=VIDEO_THREADS,
                 logger="bar",
             )
             return str(output_path)

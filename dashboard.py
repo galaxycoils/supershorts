@@ -2,6 +2,12 @@
 dashboard.py — SuperShorts Production Suite Dashboard  v3.0
 Refactored for componentized UI & RotGen V2 Aesthetic
 """
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import json
 import os
 import sys

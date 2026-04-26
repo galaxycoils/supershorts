@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 from src.core.config import (
-    YOUR_NAME, PROJECT_ROOT, VideoOptions
+    YOUR_NAME, PROJECT_ROOT, VideoOptions, VIDEO_FPS, VIDEO_THREADS
 )
 from src.core.interfaces import ILLMService, IVideoEngine, ITTSService, IVideoUploader
 from src.core.base_mode import BaseMode
@@ -115,8 +115,8 @@ Format JSON: 'slides' (list of 4 with 'text', 'duration_hint'), 'full_script', '
             video_type="short",
             lesson_title=content.get("title", "Brainrot"),
             custom_bg=self.custom_bg,
-            fps=24,
-            threads=3
+            fps=VIDEO_FPS,
+            threads=VIDEO_THREADS,
         )
         return self.video_engine.compose_brainrot_video(assets["images"], assets["audio"], output_path, options)
 

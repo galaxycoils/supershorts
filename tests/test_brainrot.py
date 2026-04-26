@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from src.generator import generate_brainrot_topics, generate_brainrot_script, render_brainrot_slide, create_brainrot_video
 from pathlib import Path
 from PIL import Image
+from src.core.config import SHORT_VIDEO_SIZE
 
 def test_generate_brainrot_topics_schema(mock_llm):
     mock_llm.generate.return_value = {
@@ -40,7 +41,7 @@ def test_render_brainrot_slide_output(tmp_path):
     path = Path(path_str)
     assert path.exists()
     with Image.open(path) as img:
-        assert img.size == (1080, 1920)
+        assert img.size == SHORT_VIDEO_SIZE
 
 @patch('src.infrastructure.video_engine_impl.StandardVideoEngine.compose_brainrot_video')
 def test_create_brainrot_video_logic(mock_compose):
