@@ -1,9 +1,12 @@
+import logging
 import os
 import random
 import math
 import gc
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union, Tuple
+
+logger = logging.getLogger(__name__)
 from tqdm import tqdm
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -71,7 +74,7 @@ def auto_scale_text(draw: ImageDraw.ImageDraw, text: str, font_path: str, start_
     
     while size >= min_size:
         try: f = ImageFont.truetype(font_path, size)
-        except: f = ImageFont.load_default()
+        except Exception: f = ImageFont.load_default()
         
         # simple word wrap
         words = text.split()
@@ -143,7 +146,7 @@ class StandardVideoEngine(IVideoEngine):
             title_font = ImageFont.truetype(str(FONT_FILE), 60 if video_type == 'long' else 70)
             content_font = ImageFont.truetype(str(FONT_FILE), 38 if video_type == 'long' else 44)
             footer_font = ImageFont.truetype(str(FONT_FILE), 24)
-        except:
+        except Exception:
             title_font = content_font = footer_font = ImageFont.load_default()
 
         if not is_thumbnail:
@@ -183,7 +186,8 @@ class StandardVideoEngine(IVideoEngine):
                 bg = bg.resize((width, height), Image.Resampling.LANCZOS)
                 bg = bg.filter(ImageFilter.GaussianBlur(radius=15))
                 img.paste(bg, (0, 0))
-        except: pass
+        except Exception as e:
+            logger.debug("Background image load skipped: %s", e)
 
         # 2. Gradient overlay
         overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
@@ -197,7 +201,7 @@ class StandardVideoEngine(IVideoEngine):
         try:
             font_main = ImageFont.truetype(str(FONT_FILE), 120)
             font_sub  = ImageFont.truetype(str(FONT_FILE), 60)
-        except:
+        except Exception:
             font_main = font_sub = ImageFont.load_default()
 
         # Progress bar at top
@@ -442,7 +446,7 @@ class StandardVideoEngine(IVideoEngine):
         d.polygon([(230, y(325)), (200, y(380)), (270, y(340))], fill=(240, 240, 255))
         d.rectangle([(155, y(395)), (245, y(430))], fill="white", outline=(180, 180, 200))
         try: badge_font = ImageFont.truetype(str(FONT_FILE), 22)
-        except: badge_font = ImageFont.load_default()
+        except Exception: badge_font = ImageFont.load_default()
         d.text((200, y(412)), "AI", fill=BLUE, font=badge_font, anchor="mm")
 
     def _build_rotgen_char_clip(self, speaking: bool, duration: float, panel_bg: np.ndarray, custom_img: Image.Image | None = None) -> ImageSequenceClip:
@@ -483,14 +487,15 @@ class StandardVideoEngine(IVideoEngine):
                     crop_x = (src_w - src_h * 1080 // 992) // 2
                     cropped = raw.crop(x1=max(0, crop_x), y1=0, x2=min(src_w, crop_x + src_h * 1080 // 992), y2=src_h)
                     try: raw.reader.close()
-                    except: pass
+                    except Exception: pass
                     raw = cropped
                 clip = raw.resize((1080, GAMEPLAY_H))
                 if clip.duration < duration: clip = clip.fx(vfx.loop, duration=duration)
                 else: clip = clip.subclip(0, duration)
                 clip = clip.fx(vfx.colorx, 0.55)
                 return clip
-            except: pass
+            except Exception as e:
+                logger.warning("Failed to load gameplay clip from %s: %s", bg_path, e)
         return ColorClip(size=(1080, GAMEPLAY_H), color=(10, 10, 30)).set_duration(duration)
 
     def compose_video(self, slide_paths: List[Union[str, Path]], audio_paths: List[Union[str, Path]], output_path: Union[str, Path], 

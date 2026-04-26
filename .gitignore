@@ -23,6 +23,7 @@ assets/pexels/
 .DS_Store
 
 # Runtime / generated state
+dry_*.wav
 config.json
 brainrot_plan.json
 rotgen_plan.json

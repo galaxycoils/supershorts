@@ -1,7 +1,10 @@
 import json
+import logging
 import os
 import re
 import concurrent.futures
+
+logger = logging.getLogger(__name__)
 from typing import Any, Union, Optional, Callable
 import ollama
 from src.core.config import OLLAMA_MODEL, OLLAMA_TIMEOUT
@@ -60,7 +63,8 @@ def ollama_generate(prompt: str, json_mode: bool = True, model: str = OLLAMA_MOD
         match = re.search(r'\[.*\]', text, re.DOTALL)
         if match:
             try: return json.loads(match.group(0))
-            except: pass
+            except json.JSONDecodeError:
+                logger.debug("Regex JSON fallback also failed for: %s", text[:100])
         return {}
 
 class OllamaLLMService(ILLMService):

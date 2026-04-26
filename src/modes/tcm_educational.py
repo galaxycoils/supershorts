@@ -1,6 +1,7 @@
 # src/modes/tcm_educational.py - Traditional Chinese Medicine Educational Mode
 import gc
 import json
+import logging
 import os
 import datetime
 import time
@@ -197,7 +198,8 @@ def run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None, vide
                 use_existing = Prompt.ask("Use existing plan?", choices=["y", "n"], default="y") == "y"
             if not use_existing:
                 plan = None
-        except:
+        except (json.JSONDecodeError, ValueError) as e:
+            logging.getLogger(__name__).warning("TCM plan file corrupt (%s), will regenerate: %s", TCM_PLAN_FILE, e)
             plan = None
 
     if plan is None:

@@ -9,7 +9,15 @@ from src.core.interfaces import ITTSService
 from src.infrastructure.adapters.system_adapter import SystemAdapter
 
 _PIPER_VOICES_DIR = Path.home() / ".local/share/piper-tts/voices"
-_PIPER_VOICE_NAMES = ("en_US-ryan-high", "en_US-lessac-high", "en-us-lessac-medium")
+_PIPER_VOICE_NAMES = (
+    "en_US-ryan-high",
+    "en_US-lessac-high",
+    "en_US-amy-medium",
+    "en_GB-alan-medium",
+    "en_US-hfc_female-medium",
+    "en_US-joe-medium",
+    "en_US-kristin-medium"
+)
 
 class StandardTTSService(ITTSService):
     def __init__(self, system_adapter: SystemAdapter = None):

@@ -15,6 +15,7 @@ from src.infrastructure.llm import OllamaLLMService
 from src.infrastructure.tts import StandardTTSService
 from src.infrastructure.browser_uploader import YouTubeBrowserUploader
 from src.infrastructure.video_engine_impl import StandardVideoEngine
+from src.infrastructure.broll_selector import AIBRollSelector
 
 from src.generator import (
     generate_curriculum,
@@ -227,7 +228,9 @@ def main_flow(lessons_per_run: int = 2, llm_service=None, tts_service=None, uplo
     llm_service = llm_service or OllamaLLMService()
     tts_service = tts_service or StandardTTSService()
     uploader_service = uploader_service or YouTubeBrowserUploader()
-    video_engine = video_engine or StandardVideoEngine()
+    if video_engine is None:
+        broll_selector = AIBRollSelector(llm_service)
+        video_engine = StandardVideoEngine(broll_selector=broll_selector)
     
     try:
         OUTPUT_DIR.mkdir(exist_ok=True)
@@ -266,7 +269,8 @@ def main():
     llm_service = OllamaLLMService()
     tts_service = StandardTTSService()
     uploader_service = YouTubeBrowserUploader()
-    video_engine = StandardVideoEngine()
+    broll_selector = AIBRollSelector(llm_service)
+    video_engine = StandardVideoEngine(broll_selector=broll_selector)
     
     while True:
         choice = menu.show_menu()

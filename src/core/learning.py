@@ -13,7 +13,7 @@ from src.core.config import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT
 import concurrent.futures
 
 LOG_FILE = PROJECT_ROOT / "performance_log.json"
-_FAKE_IDS = {"BROWSER_UPLOAD_SUCCESS", "MOCK_VIDEO_ID", "UPLOAD_ATTEMPTED", "BROWSER_UPLOAD_FAILED"}
+_FAKE_IDS = {"BROWSER_UPLOAD_SUCCESS", "MOCK_VIDEO_ID", "UPLOAD_ATTEMPTED", "BROWSER_UPLOAD_FAILED", "DRY_RUN", "DRY_RUN_ID"}
 
 
 def log_upload(title: str, video_id: str, mode: str):

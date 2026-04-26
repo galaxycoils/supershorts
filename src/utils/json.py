@@ -13,5 +13,6 @@ def safe_json_parse(text: str) -> dict:
         match = re.search(r'(\{.*\}|\[.*\])', text, re.DOTALL)
         if match:
             try: return json.loads(match.group(0))
-            except: pass
+            except json.JSONDecodeError:
+                pass
         raise

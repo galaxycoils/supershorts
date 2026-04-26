@@ -21,6 +21,7 @@ from src.infrastructure.llm import OllamaLLMService
 from src.infrastructure.tts import StandardTTSService
 from src.infrastructure.browser_uploader import YouTubeBrowserUploader
 from src.infrastructure.video_engine_impl import StandardVideoEngine
+from src.infrastructure.broll_selector import AIBRollSelector
 
 # Mode Runner Imports
 from src.modes.tcm_educational import run_tcm_mode
@@ -183,7 +184,8 @@ def api_run(mode):
         llm = OllamaLLMService()
         tts = StandardTTSService()
         uploader = YouTubeBrowserUploader()
-        engine = StandardVideoEngine()
+        broll_selector = AIBRollSelector(llm)
+        engine = StandardVideoEngine(broll_selector=broll_selector)
         
         count = max(1, min(10, int(data.get("count", 1))))
         dry_run = data.get("dry_run") == "y"

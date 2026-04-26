@@ -47,9 +47,17 @@ def get_local_gameplay(video_type: str) -> str:
     return None
 
 def get_local_viral_gameplay() -> str | None:
-    """NEW: Picks high-motion Subway Surfers / Minecraft style clips"""
+    """NEW: Picks high-motion Subway Surfers / Minecraft style clips.
+    Prioritizes cleaned_bg.mp4 if present.
+    """
     if not VIRAL_GAMEPLAY_PATH.exists():
         return None
+    
+    default_bg = VIRAL_GAMEPLAY_PATH / "cleaned_bg.mp4"
+    if default_bg.exists():
+        print(f"🔥 Using default viral background: {default_bg.name}")
+        return str(default_bg)
+
     clips = list(VIRAL_GAMEPLAY_PATH.glob("*.mp4"))
     if not clips:
         return None
