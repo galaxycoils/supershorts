@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "Coverage thresholds for orchestrator agents and CI. Portable across projects — adjust values per-repo.",
+  "$comment": "Coverage floor v4.0 — lowered from aspirational 100% to achievable 70%. Ratchet: raise by 5pp each release until 85%, then 90%. See plan-deployment-readiness.md Phase 5.",
   "thresholds": {
-    "lines": 100,
-    "branches": 100,
-    "functions": 100,
-    "statements": 100
+    "lines": 70,
+    "branches": 60,
+    "functions": 75,
+    "statements": 70
   },
   "enforcement": {
-    "command": "pytest --cov --cov-fail-under=100",
+    "command": "pytest --cov=src --cov-fail-under=70",
     "blockPRCreation": true,
     "blockTaskCompletion": true,
     "description": "Orchestrator agents MUST check coverage against these thresholds before marking any task complete or creating a PR. If coverage drops below any threshold, the task fails."

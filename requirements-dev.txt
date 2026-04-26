@@ -1,0 +1,7 @@
+# Development & test dependencies (not needed in production)
+-r requirements.txt
+pytest>=7
+pytest-cov>=4
+pytest-mock>=3
+ruff>=0.4
+python-dotenv>=1.0
