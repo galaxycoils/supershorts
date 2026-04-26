@@ -160,16 +160,19 @@ def run_video_clipper(llm_service=None, tts_service=None, uploader_service=None,
             console.print(f"  [{i+1}/{len(shorts)}] Uploading: {video_path.name}")
             
             if dry_run:
-                video_id = "DRY_RUN_ID"
+                video_id = None
             else:
                 video_id = uploader_service.upload(video_path, title, desc, tags)
-            
+
             if video_id:
                 log_upload(title, video_id, "clipper")
                 console.print(f"  [green]✅ Uploaded: {video_id}[/green]")
                 if i < len(shorts) - 1:
-                    console.print("[yellow]⏳ Waiting 30s before next upload…[/yellow]")
-                    import time; time.sleep(30)
+                    import time, os
+                    cooldown = int(os.environ.get("UPLOAD_COOLDOWN_S", "30"))
+                    if cooldown > 0:
+                        console.print(f"[yellow]⏳ Waiting {cooldown}s before next upload…[/yellow]")
+                        time.sleep(cooldown)
             else:
                 console.print(f"  [yellow]⚠ Upload failed for {video_path.name}[/yellow]")
 

@@ -106,7 +106,7 @@ Return ONLY valid JSON:
         video_engine.compose_video([slide_path], [audio_path], video_path, VideoOptions(video_type="long", lesson_title=title, script=script))
 
     if dry_run:
-        video_id = "DRY_RUN_ID"
+        video_id = None
     else:
         tags     = ",".join(dict.fromkeys((pexels_kw + ",YouTube,education").split(",")[:10]))
         print(f"  Uploading → {title[:60]}...")
@@ -174,7 +174,7 @@ def start_viral_gameplay_mode(llm_service=None, tts_service=None, uploader_servi
     video_path = OUTPUT_DIR / f"{unique_id}.mp4"
     if dry_run:
         video_path.touch()
-        video_id = "DRY_RUN_ID"
+        video_id = None
     else:
         viral_script = ' '.join(f"{s.get('title', '')}. {s.get('content', '')}" for s in slides_data)
         viral_script = clamp_words(viral_script, min_w=99, max_w=127)

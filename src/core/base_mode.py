@@ -1,6 +1,7 @@
 import abc
 import json
 import datetime
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from tqdm import tqdm
@@ -23,6 +24,17 @@ class BaseMode(abc.ABC):
         self.uploader = uploader_service
         self.video_engine = video_engine
         self.output_dir = OUTPUT_DIR
+
+    @staticmethod
+    def get_topic_input(env_var: str, prompt_text: str, default: str = "") -> str:
+        """Read topic from env var first, then interactive prompt, then default."""
+        value = os.environ.get(env_var, "")
+        if not value:
+            try:
+                value = input(prompt_text).strip()
+            except EOFError:
+                value = ""
+        return value or default
 
     @abc.abstractmethod
     def get_pending_topics(self) -> List[Dict[str, Any]]:
