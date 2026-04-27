@@ -3,5 +3,6 @@
 pytest>=7
 pytest-cov>=4
 pytest-mock>=3
+pytest-asyncio>=0.23
 ruff>=0.4
 python-dotenv>=1.0

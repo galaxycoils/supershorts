@@ -8,6 +8,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         gcc \
         libsndfile1-dev \
+        ffmpeg \
+        libavcodec-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libswscale-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libswresample-dev \
+        pkg-config \
+        espeak \
+        libespeak-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt pyproject.toml ./
@@ -34,6 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         procps \
         libgl1-mesa-glx \
         libglib2.0-0 \
+        espeak \
     && rm -rf /var/lib/apt/lists/*
 
 # Download geckodriver v0.34.0

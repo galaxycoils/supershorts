@@ -55,9 +55,9 @@ class TestBridgePipelineIntegrity:
         assert content["short_form_highlight"] == mock_env["content"]["short_form_highlight"]        
         # 2. Trigger TTS (via Bridge)
         audio_file_base = mock_env["output_dir"] / "test_audio"
-        # We need to fake the output of text_to_speech
-        with patch('src.infrastructure.tts.Path.exists', return_value=True):
-             # Ensure wav_path is returned and exists (mocked exists)
+        # Mock the actual TTS call to avoid unlinking issues and real tool dependencies
+        with patch('src.generator.text_to_speech') as mock_tts:
+             mock_tts.return_value = audio_file_base.with_suffix('.wav')
              final_audio = text_to_speech(content["short_form_highlight"], audio_file_base)
         
         # 3. Trigger Engine Visuals (via Bridge)
