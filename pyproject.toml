@@ -20,19 +20,19 @@ dependencies = [
     "librosa==0.10.1",
     "soundfile==0.12.1",
     # Image / Vision
-    "Pillow==10.2.0",
+    "Pillow==12.2.0",
     "opencv-python==4.9.0.80",
     "mediapipe==0.10.11",
     # ML / AI
     "faster-whisper==1.0.0",
-    "torch==2.2.1",
+    "torch==2.8.0",
     "sentence-transformers==2.5.1",
     "scikit-learn==1.4.1.post1",
     # Numerics
     "numpy==1.26.4",
     "scipy==1.12.0",
     # Web / API
-    "flask==3.0.2",
+    "flask==3.1.3",
     "flask-cors==4.0.0",
     "requests==2.31.0",
     "google-api-python-client==2.118.0",
@@ -42,12 +42,12 @@ dependencies = [
     "selenium==4.18.1",
     "webdriver-manager==4.0.1",
     # Downloader
-    "yt-dlp==2024.3.10",
+    "yt-dlp==2026.2.21",
     # Utilities
     "tqdm==4.66.2",
     "rich==13.7.0",
     "python-dateutil==2.9.0.post0",
-    "python-dotenv==1.0.1",
+    "python-dotenv==1.2.2",
     "psutil==5.9.8",
 ]
 
