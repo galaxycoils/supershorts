@@ -15,7 +15,7 @@
 
 | Service | File | Responsibility | Implementation Class |
 |---------|------|---------------|----------------------|
-| LLM Service | `src/infrastructure/llm.py` | Ollama JSON generation | `OllamaLLMService` |
+| LLM Service | `src/infrastructure/llm.py` | Multi-provider JSON generation | `get_llm_service`, `OllamaLLMService`, `LMStudioLLMService` |
 | TTS Service | `src/infrastructure/tts.py` | 3-tier speech synthesis | `StandardTTSService` |
 | Uploader (API) | `src/infrastructure/uploader.py` | YouTube API uploads | `YouTubeApiUploader` |
 | Uploader (Browser) | `src/infrastructure/browser_uploader.py` | Selenium-based uploads | `YouTubeBrowserUploader` |

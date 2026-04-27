@@ -44,31 +44,55 @@ class UploadMetrics:
     video_id: Optional[str]
 
 
-PROFILE_PATH = str(Path.home() / "Library/Application Support/Firefox/Profiles/youtube_uploader")
-FIREFOX_PROFILES_DIR = Path.home() / "Library/Application Support/Firefox/Profiles"
+def _get_firefox_profiles_dir() -> Path:
+    """Returns the platform-specific Firefox profiles directory."""
+    if sys.platform == "darwin":
+        return Path.home() / "Library/Application Support/Firefox/Profiles"
+    elif sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "Mozilla/Firefox/Profiles"
+        return Path.home() / "AppData/Roaming/Mozilla/Firefox/Profiles"
+    else:
+        # Linux fallback
+        standard_path = Path.home() / ".mozilla/firefox"
+        snap_path = Path.home() / "snap/firefox/common/.mozilla/firefox"
+        if snap_path.exists():
+            return snap_path
+        return standard_path
 
 
 def _find_firefox_profile() -> str:
+    """Finds a suitable Firefox profile for YouTube upload."""
     env_path = os.environ.get("FIREFOX_PROFILE_PATH")
     if env_path and os.path.isdir(env_path):
         return env_path
-    if os.path.isdir(PROFILE_PATH):
-        return PROFILE_PATH
 
-    if FIREFOX_PROFILES_DIR.is_dir():
-        preferred = sorted(FIREFOX_PROFILES_DIR.glob("*.default-release"))
+    profiles_dir = _get_firefox_profiles_dir()
+    youtube_profile = profiles_dir / "youtube_uploader"
+
+    if youtube_profile.is_dir():
+        return str(youtube_profile)
+
+    if profiles_dir.is_dir():
+        # Try to find default-release or default profiles
+        preferred = sorted(profiles_dir.glob("*.default-release"))
         if preferred:
             return str(preferred[0])
 
-        fallback = sorted(FIREFOX_PROFILES_DIR.glob("*.default"))
+        fallback = sorted(profiles_dir.glob("*.default"))
         if fallback:
             return str(fallback[0])
 
-        any_profiles = sorted(p for p in FIREFOX_PROFILES_DIR.iterdir() if p.is_dir())
+        any_profiles = sorted(p for p in profiles_dir.iterdir() if p.is_dir() and not p.name.startswith('.'))
         if any_profiles:
+            # Profiles usually have a dot in their name (e.g. xxxxxxxx.default)
+            profile_candidates = [p for p in any_profiles if '.' in p.name]
+            if profile_candidates:
+                return str(profile_candidates[0])
             return str(any_profiles[0])
 
-    return PROFILE_PATH
+    return str(youtube_profile)
 
 
 def _build_firefox_service():
@@ -193,7 +217,11 @@ def get_browser() -> webdriver.Firefox:
     options.add_argument("-profile")
     options.add_argument(profile_path)
 
-    if sys.platform == "darwin":
+    # Allow override via environment variable
+    env_bin = os.environ.get("FIREFOX_BINARY")
+    if env_bin and os.path.exists(env_bin):
+        options.binary_location = env_bin
+    elif sys.platform == "darwin":
         firefox_bin = "/Applications/Firefox.app/Contents/MacOS/firefox"
         if os.path.exists(firefox_bin):
             options.binary_location = firefox_bin

@@ -17,7 +17,7 @@ from rich.prompt import Prompt
 from src.core.config import VideoOptions, YOUR_NAME, PROJECT_ROOT, OUTPUT_DIR
 
 from src.core.interfaces import ILLMService, ITTSService, IVideoUploader, IVideoEngine
-from src.infrastructure.llm import OllamaLLMService
+from src.infrastructure.llm import get_llm_service
 from src.infrastructure.tts import StandardTTSService
 from src.infrastructure.browser_uploader import YouTubeBrowserUploader
 from src.infrastructure.video_engine_impl import StandardVideoEngine
@@ -42,6 +42,10 @@ from src.generator import (
     upload_to_youtube
 )
 from src.core.learning import log_upload, suggest_improvements
+from src.core.logging import setup_logging, get_logger
+
+# Initialize logger
+logger = get_logger(__name__)
 
 # Alias for legacy main.py names
 start_brainrot_generation = run_brainrot_pipeline
@@ -231,7 +235,7 @@ def main_flow(lessons_per_run: int = 2, llm_service=None, tts_service=None, uplo
     console.print(f"[dim]📁 Output dir:  {OUTPUT_DIR.resolve()}[/dim]")
     
     # Instantiate services if not provided
-    llm_service = llm_service or OllamaLLMService()
+    llm_service = llm_service or get_llm_service()
     tts_service = tts_service or StandardTTSService()
     uploader_service = uploader_service or YouTubeBrowserUploader()
     if video_engine is None:
@@ -271,8 +275,12 @@ def main_flow(lessons_per_run: int = 2, llm_service=None, tts_service=None, uplo
 
 
 def main():
+    # Initialize logging
+    setup_logging()
+    logger.info("Starting SuperShorts CLI")
+
     # Instantiate services for the entire session
-    llm_service = OllamaLLMService()
+    llm_service = get_llm_service()
     tts_service = StandardTTSService()
     uploader_service = YouTubeBrowserUploader()
     broll_selector = AIBRollSelector(llm_service)

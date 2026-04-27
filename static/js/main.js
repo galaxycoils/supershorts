@@ -76,9 +76,28 @@ async function refreshStats() {
 async function refreshHealth() {
     try {
         const h = await fetch('/api/health').then(r => r.json());
-        const led = document.getElementById('ollama-led');
-        led.className = h.ollama ? 'led on' : 'led off';
-        document.getElementById('ollama-txt').textContent = h.ollama ? 'ollama · ready' : 'ollama · down';
+
+        // Sidebar LED (shows active provider)
+        const sidebarLed = document.getElementById('ollama-led');
+        const sidebarTxt = document.getElementById('ollama-txt');
+        const activeProvider = JSON.parse(localStorage.getItem('supershorts_settings') || '{}').provider || 'lmstudio';
+        const activeOk = activeProvider === 'lmstudio' ? h.lmstudio : h.ollama;
+        if (sidebarLed) sidebarLed.className = activeOk ? 'led on' : 'led off';
+        if (sidebarTxt) sidebarTxt.textContent = `${activeProvider} · ${activeOk ? 'ready' : 'down'}`;
+
+        // Provider card LEDs in settings
+        const lmsLed = document.getElementById('led-lmstudio');
+        const lmsDetail = document.getElementById('lmstudio-detail');
+        if (lmsLed) lmsLed.className = h.lmstudio ? 'led on' : 'led off';
+        if (lmsDetail) lmsDetail.textContent = h.lmstudio ? 'connected' : 'offline';
+
+        const ollLed = document.getElementById('led-ollama');
+        const ollDetail = document.getElementById('ollama-detail');
+        if (ollLed) ollLed.className = h.ollama ? 'led on' : 'led off';
+        if (ollDetail) ollDetail.textContent = h.ollama ? 'connected' : 'offline';
+
+        if (typeof syncTriggerLed === 'function') syncTriggerLed();
+
         if (h.ram_gb !== undefined) {
             const ramTxt = document.getElementById('ram-text');
             const total = h.ram_total_gb || 16;
@@ -413,6 +432,8 @@ async function launchProduction() {
                 voice: voice,
                 temperature: temp,
                 llm_model: model,
+                llm_provider: (JSON.parse(localStorage.getItem('supershorts_settings') || '{}').provider) || 'lmstudio',
+                author_name: document.getElementById('global-author')?.value || 'SuperShorts',
                 tone: _selectedTone,
                 tcm_topic: _modalData.tcmTopic || '1',
                 tcm_extra: _modalData.topic || '',
@@ -483,48 +504,202 @@ function saveGlobalSettings() {
     const author = document.getElementById('global-author')?.value;
     const model = document.getElementById('global-model')?.value;
     const advanced = document.getElementById('adv-toggle')?.checked;
-    localStorage.setItem('supershorts_settings', JSON.stringify({author, model, advanced}));
-    termLine(`⚙️ Settings saved.`, 'ok');
+    const lmstudioUrl = document.getElementById('lmstudio-url')?.value;
+    const s = JSON.parse(localStorage.getItem('supershorts_settings') || '{}');
+    const provider = s.provider || 'lmstudio';
+    localStorage.setItem('supershorts_settings', JSON.stringify({author, model, provider, advanced, lmstudioUrl}));
+    termLine('Settings saved.', 'ok');
 }
 
 function loadGlobalSettings() {
     const s = JSON.parse(localStorage.getItem('supershorts_settings') || '{}');
     if (s.author && document.getElementById('global-author')) document.getElementById('global-author').value = s.author;
-    if (s.model && document.getElementById('global-model')) document.getElementById('global-model').value = s.model;
+    if (s.lmstudioUrl && document.getElementById('lmstudio-url')) document.getElementById('lmstudio-url').value = s.lmstudioUrl;
     if (s.advanced && document.getElementById('adv-toggle')) {
         document.getElementById('adv-toggle').checked = true;
         document.body.classList.add('advanced-mode-active');
     }
+    selectProvider(s.provider || 'lmstudio', false);
+}
+
+// ── DROPDOWN PRIMITIVES ──────────────────────────────────────────
+function toggleDropdown(id, e) {
+    if (e) e.stopPropagation();
+    const dd = document.getElementById(id);
+    if (!dd) return;
+    const wasOpen = dd.dataset.open === 'true';
+    closeDropdowns();
+    dd.dataset.open = String(!wasOpen);
+}
+function closeDropdowns() {
+    document.querySelectorAll('.dropdown[data-open="true"]').forEach(d => d.dataset.open = 'false');
+}
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dropdown')) closeDropdowns();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDropdowns(); });
+
+// ── PROVIDER ─────────────────────────────────────────────────────
+function selectProvider(provider, save = true) {
+    document.querySelectorAll('.dropdown-item[data-provider]').forEach(el => {
+        el.classList.toggle('selected', el.dataset.provider === provider);
+    });
+    const urlField = document.getElementById('lmstudio-url-field');
+    if (urlField) urlField.style.display = provider === 'lmstudio' ? '' : 'none';
+
+    // Update trigger display
+    const trigName = document.getElementById('trigger-name');
+    if (trigName) trigName.textContent = provider === 'lmstudio' ? 'LM Studio' : 'Ollama';
+    syncTriggerLed();
+
+    if (save) {
+        const s = JSON.parse(localStorage.getItem('supershorts_settings') || '{}');
+        s.provider = provider;
+        localStorage.setItem('supershorts_settings', JSON.stringify(s));
+        termLine(`Provider → ${provider}`, 'ok');
+        populateGlobalModelSelect();
+    }
+}
+
+function syncTriggerLed() {
+    const provider = (JSON.parse(localStorage.getItem('supershorts_settings') || '{}').provider) || 'lmstudio';
+    const sourceDetail = document.getElementById(`${provider}-detail`);
+    const sourceLed = document.getElementById(`led-${provider}`);
+    const trigLed = document.getElementById('trigger-led');
+    const trigDet = document.getElementById('trigger-detail');
+    if (trigLed && sourceLed) trigLed.className = sourceLed.className;
+    if (trigDet && sourceDetail) trigDet.textContent = sourceDetail.textContent;
+}
+
+async function testLMStudioConnection() {
+    const urlInput = document.getElementById('lmstudio-url');
+    const url = (urlInput?.value || 'http://127.0.0.1:1234/v1').replace(/\/$/, '');
+    try {
+        const r = await fetch('/api/health').then(r => r.json());
+        if (r.lmstudio) termLine(`LM Studio · connected at ${url}`, 'ok');
+        else termLine(`LM Studio · unreachable — is it running?`, 'err');
+    } catch (e) {
+        termLine('LM Studio · connection failed', 'err');
+    }
+    refreshLLMState();
+}
+
+async function refreshLLMState() {
+    await refreshHealth();
+    await populateGlobalModelSelect();
+}
+
+// ── MODEL DROPDOWN ───────────────────────────────────────────────
+async function populateGlobalModelSelect() {
+    const menu = document.getElementById('model-menu');
+    const hiddenSel = document.getElementById('global-model');
+    const countEl = document.getElementById('model-count');
+    if (!menu) return;
+    menu.innerHTML = '<div class="dropdown-empty">Fetching models…</div>';
+
+    let data;
+    try {
+        data = await fetch('/api/models').then(r => r.json());
+    } catch (e) {
+        data = { models: ['llama3', 'mistral'], model_info: [
+            {name:'llama3',label:'llama3',source:'ollama'},
+            {name:'mistral',label:'mistral',source:'ollama'}
+        ], recommendations: {} };
+    }
+
+    const recs = data.recommendations || {};
+    const modelInfo = data.model_info || (data.models || []).map(m => ({ name: m, label: m, source: 'unknown' }));
+    const saved = JSON.parse(localStorage.getItem('supershorts_settings') || '{}').model;
+    const activeModel = saved && modelInfo.some(m => m.name === saved) ? saved : (modelInfo[0]?.name || '');
+
+    if (countEl) countEl.textContent = `${modelInfo.length} on drive`;
+
+    if (modelInfo.length === 0) {
+        menu.innerHTML = '<div class="dropdown-empty">No models found — start LM Studio or Ollama</div>';
+        updateModelTrigger(null, null);
+        return;
+    }
+
+    const lms = modelInfo.filter(m => m.source === 'lmstudio');
+    const oll = modelInfo.filter(m => m.source === 'ollama');
+
+    let html = '';
+    if (lms.length) {
+        html += `<div class="dropdown-group-header">
+            <div class="led on"></div>LM Studio · MLX
+            <span class="group-count">${lms.length}</span>
+        </div>`;
+        html += lms.map(mi => renderModelItem(mi, recs, activeModel)).join('');
+    }
+    if (oll.length) {
+        html += `<div class="dropdown-group-header">
+            <div class="led ${lms.length ? 'off' : 'on'}"></div>Ollama · GGUF
+            <span class="group-count">${oll.length}</span>
+        </div>`;
+        html += oll.map(mi => renderModelItem(mi, recs, activeModel)).join('');
+    }
+    menu.innerHTML = html;
+
+    if (hiddenSel) {
+        hiddenSel.innerHTML = modelInfo.map(mi =>
+            `<option value="${mi.name}" ${mi.name === activeModel ? 'selected' : ''}>${mi.label || mi.name}</option>`
+        ).join('');
+    }
+
+    const active = modelInfo.find(m => m.name === activeModel);
+    updateModelTrigger(active);
+}
+
+function renderModelItem(mi, recs, activeModel) {
+    const isSelected = mi.name === activeModel;
+    const recTag = mi.name === recs.scripting ? '★ SCRIPT' : mi.name === recs.reasoning ? '★ REASON' : mi.name === recs.creative ? '★ CREATIVE' : '';
+    const safeName = mi.name.replace(/'/g, "\\'");
+    return `<div class="dropdown-item${isSelected ? ' selected' : ''}" data-model="${mi.name}" onclick="selectModel('${safeName}'); closeDropdowns()">
+        <div class="dropdown-item-body">
+            <span class="dropdown-item-name" title="${mi.name}">${mi.label || mi.name}</span>
+            <span class="dropdown-item-detail">${mi.source === 'lmstudio' ? 'loaded · ready' : 'installed'}</span>
+        </div>
+        ${recTag ? `<span class="badge-rec">${recTag}</span>` : ''}
+        <span class="badge-source ${mi.source === 'lmstudio' ? 'lmstudio' : 'ollama'}">${mi.source === 'lmstudio' ? 'LMS' : 'OLLAMA'}</span>
+    </div>`;
+}
+
+function updateModelTrigger(mi) {
+    const nameEl = document.getElementById('model-trigger-name');
+    const detEl  = document.getElementById('model-trigger-detail');
+    if (!nameEl) return;
+    if (!mi) {
+        nameEl.textContent = 'No model available';
+        if (detEl) detEl.textContent = 'start LM Studio or Ollama';
+        return;
+    }
+    nameEl.textContent = mi.label || mi.name;
+    if (detEl) detEl.textContent = `${mi.source === 'lmstudio' ? 'LM Studio · loaded' : 'Ollama · installed'}`;
+}
+
+function selectModel(name) {
+    const s = JSON.parse(localStorage.getItem('supershorts_settings') || '{}');
+    s.model = name;
+    localStorage.setItem('supershorts_settings', JSON.stringify(s));
+    document.querySelectorAll('.dropdown-item[data-model]').forEach(el => {
+        el.classList.toggle('selected', el.dataset.model === name);
+    });
+    const hiddenSel = document.getElementById('global-model');
+    if (hiddenSel) hiddenSel.value = name;
+
+    // Find model info to update trigger
+    const item = document.querySelector(`.dropdown-item[data-model="${CSS.escape(name)}"]`);
+    if (item) {
+        const isLMS = item.querySelector('.badge-source')?.classList.contains('lmstudio');
+        updateModelTrigger({ name, label: name, source: isLMS ? 'lmstudio' : 'ollama' });
+    }
+    termLine(`Model → ${name}`, 'ok');
 }
 
 function toggleAdvancedMode() {
     const isAdv = document.getElementById('adv-toggle')?.checked;
     document.body.classList.toggle('advanced-mode-active', isAdv);
     saveGlobalSettings();
-}
-
-// ── GLOBAL MODEL SELECT ───────────────────────────────────────────
-async function populateGlobalModelSelect() {
-    const sel = document.getElementById('global-model');
-    if (!sel) return;
-    let data;
-    try {
-        data = await fetch('/api/models').then(r => r.json());
-    } catch (e) {
-        data = { models: ['llama3', 'mistral'], model_info: [{name:'llama3',label:'llama3'},{name:'mistral',label:'mistral'}], recommendations: {} };
-    }
-    const recs = data.recommendations || {};
-    const modelInfo = data.model_info || (data.models || []).map(m => ({ name: m, label: m }));
-    // Remember previously saved model
-    const saved = JSON.parse(localStorage.getItem('supershorts_settings') || '{}').model;
-    sel.innerHTML = modelInfo.map(mi => {
-        let label = mi.label || mi.name;
-        if (mi.name === recs.scripting) label += ' (Scripting ★)';
-        if (mi.name === recs.reasoning) label += ' (Reasoning ★)';
-        if (mi.name === recs.creative)  label += ' (Creative ★)';
-        const selected = saved ? mi.name === saved : false;
-        return `<option value="${mi.name}" ${selected ? 'selected' : ''}>${label}</option>`;
-    }).join('');
 }
 
 // ── INIT ──────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-# SuperShorts Production Suite v3.5.0
+# SuperShorts Production Suite v3.6.0
 
 ![SuperShorts Dashboard Preview](https://raw.githubusercontent.com/galaxycoils/supershorts/main/uiexample/IMG_1469.JPG)
 
@@ -20,7 +20,7 @@ Built for performance and responsiveness, the UI has been refactored into a comp
 ### Backend: The Production Pipeline
 A robust Python-based microservice architecture:
 - **Flask API**: Orchestrates production jobs, asset management, and system health telemetry.
-- **Ollama Integration**: Fully local LLM inference for script generation and topic brainstorming.
+- **Multi-LLM Integration**: Fully local LLM inference via **Ollama** or **LM Studio** (OpenAI-compatible) for script generation and topic brainstorming.
 - **Piper TTS Engine**: Ultra-fast, neural text-to-speech synthesis with support for 9+ high-quality voices.
 - **Video Engine (MoviePy)**: A specialized composition layer that handles dynamic layering, auto-captions, background music blending, and "Chain" concatenation for 40% lower memory usage.
 - **Selenium Automation**: A built-in browser-based uploader for seamless YouTube Studio integration.
@@ -48,7 +48,7 @@ A robust Python-based microservice architecture:
 ### 1. Prerequisites
 - **Python 3.10+**
 - **Firefox** (required for the automated uploader)
-- **Ollama**: [Download Ollama](https://ollama.com) and pull your preferred model (e.g., `ollama pull llama3.2:3b`).
+- **Local LLM**: [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai).
 - **Piper TTS**: Ensure the Piper binary is in your path.
 
 ### 2. Environment Setup
@@ -104,9 +104,10 @@ Access the UI at: **`http://localhost:5050`**
 
 ## 📈 Roadmap
 - [x] v3.5.0: Componentized UI & RotGen Aesthetic
-- [ ] v3.1: Multi-platform uploading (TikTok, Instagram)
-- [ ] v3.2: Cloud-synced asset library
-- [ ] v3.3: Advanced AI-driven B-Roll selection
+- [x] v3.6.0: Multi-LLM Provider Support (LM Studio)
+- [ ] v3.7.0: Multi-platform uploading (TikTok, Instagram)
+- [ ] v3.8.0: Cloud-synced asset library
+- [ ] v3.9.0: Advanced AI-driven B-Roll selection
 
 ---
 

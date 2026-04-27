@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en" data-aesthetic="blueprint">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Plan Review: Iteration 4</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@700&display=swap" rel="stylesheet">
+    <style>
+        @layer reset, theme, layout, components, animation;
+
+        @layer reset {
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+                min-height: 100vh; 
+                overflow-x: hidden;
+                font-family: 'IBM Plex Sans', sans-serif;
+                background-color: var(--bg);
+                color: var(--text);
+                line-height: 1.6;
+            }
+            ul { list-style: none; }
+        }
+
+        @layer theme {
+            :root {
+                --blueprint-bg: #0f172a;
+                --blueprint-grid: rgba(34, 211, 238, 0.05);
+                --blueprint-accent: #22d3ee;
+                --blueprint-text: #f8fafc;
+                --surface: #1e293b;
+                --surface-elevated: #334155;
+                --border: rgba(34, 211, 238, 0.2);
+                --accent: var(--blueprint-accent);
+                --accent-dim: rgba(34, 211, 238, 0.1);
+                --text-dim: #94a3b8;
+                --bg: var(--blueprint-bg);
+                --text: var(--blueprint-text);
+                --font-mono: 'IBM Plex Mono', monospace;
+                --radius: 12px;
+                --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+                --status-green: #10b981;
+                --status-amber: #f59e0b;
+                --status-red: #ef4444;
+            }
+
+            body {
+                background-image: 
+                    linear-gradient(var(--blueprint-grid) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--blueprint-grid) 1px, transparent 1px);
+                background-size: 20px 20px;
+            }
+        }
+
+        @layer layout {
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 40px 20px;
+            }
+
+            .grid-60-40 {
+                display: grid;
+                grid-template-columns: 1.5fr 1fr;
+                gap: 32px;
+                margin-bottom: 40px;
+            }
+
+            .section-nav {
+                position: sticky;
+                top: 0;
+                background: rgba(15, 23, 42, 0.8);
+                backdrop-filter: blur(8px);
+                padding: 12px 0;
+                z-index: 100;
+                border-bottom: 1px solid var(--border);
+                margin-bottom: 40px;
+            }
+
+            .section-nav ul {
+                display: flex;
+                justify-content: center;
+                gap: 24px;
+            }
+
+            .section-nav a {
+                color: var(--text-dim);
+                text-decoration: none;
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                transition: color 0.2s;
+            }
+
+            .section-nav a:hover { color: var(--accent); }
+        }
+
+        @layer components {
+            .hero {
+                background: var(--surface);
+                padding: 60px;
+                border-radius: var(--radius);
+                border: 1px solid var(--border);
+                margin-bottom: 40px;
+                box-shadow: var(--shadow-md);
+                position: relative;
+                overflow: hidden;
+            }
+
+            .hero::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle, var(--accent-dim) 0%, transparent 70%);
+                pointer-events: none;
+            }
+
+            .hero-title {
+                font-size: 48px;
+                margin-bottom: 16px;
+                background: linear-gradient(to right, #fff, var(--accent));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .hero-subtitle {
+                font-size: 20px;
+                color: var(--text-dim);
+                max-width: 800px;
+            }
+
+            .impact-card {
+                background: var(--surface);
+                padding: 24px;
+                border-radius: var(--radius);
+                border: 1px solid var(--border);
+                height: 100%;
+            }
+
+            .impact-stat {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 12px;
+                padding-bottom: 12px;
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+            }
+
+            .impact-stat:last-child { border-bottom: none; }
+
+            .stat-label { color: var(--text-dim); font-size: 14px; }
+            .stat-value { font-weight: 700; font-family: var(--font-mono); }
+
+            .badge {
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+            }
+
+            .badge--green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+            .badge--amber { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+            .badge--red { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+            .mermaid-wrap {
+                background: var(--surface);
+                padding: 24px;
+                border-radius: var(--radius);
+                border: 1px solid var(--border);
+                margin-bottom: 40px;
+                position: relative;
+            }
+
+            .zoom-controls {
+                position: absolute;
+                top: 20px;
+                right: 24px;
+                display: flex;
+                gap: 8px;
+                z-index: 10;
+            }
+
+            .zoom-btn {
+                background: var(--surface-elevated);
+                border: 1px solid var(--border);
+                color: var(--text);
+                width: 32px;
+                height: 32px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 18px;
+                transition: all 0.2s;
+            }
+
+            .zoom-btn:hover { background: var(--accent); color: var(--blueprint-bg); }
+
+            .change-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                overflow: hidden;
+                margin-bottom: 24px;
+            }
+
+            .change-panel {
+                padding: 24px;
+                background: var(--surface);
+            }
+
+            .change-panel--current { border-right: 1px solid var(--border); }
+            .change-panel--planned { background: rgba(34, 211, 238, 0.03); }
+
+            .panel-header {
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                color: var(--text-dim);
+                margin-bottom: 16px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .panel-header::before {
+                content: '';
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+            }
+
+            .change-panel--current .panel-header::before { background: var(--text-dim); }
+            .change-panel--planned .panel-header::before { background: var(--accent); }
+
+            .code-block {
+                font-family: var(--font-mono);
+                font-size: 13px;
+                background: #0f172a;
+                padding: 16px;
+                border-radius: 8px;
+                color: #e2e8f0;
+                overflow-x: auto;
+            }
+
+            .rationale {
+                grid-column: 1 / -1;
+                padding: 16px 24px;
+                background: var(--surface-elevated);
+                border-top: 1px solid var(--border);
+                font-size: 14px;
+            }
+
+            .risk-card {
+                background: var(--surface);
+                padding: 20px;
+                border-radius: var(--radius);
+                border-left: 4px solid var(--accent);
+                margin-bottom: 16px;
+            }
+
+            .risk-card--high { border-left-color: var(--status-red); }
+            .risk-card--medium { border-left-color: var(--status-amber); }
+            .risk-card--low { border-left-color: var(--status-green); }
+
+            .risk-title { font-weight: 700; font-size: 16px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+            .risk-mitigation { font-size: 13px; color: var(--text-dim); margin-top: 12px; font-style: italic; }
+
+            .review-section {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 24px;
+            }
+
+            .review-card {
+                background: var(--surface);
+                padding: 24px;
+                border-radius: var(--radius);
+                border-top: 4px solid var(--border);
+            }
+
+            .review-card--good { border-top-color: var(--status-green); }
+            .review-card--bad { border-top-color: var(--status-red); }
+            .review-card--ugly { border-top-color: var(--status-amber); }
+            .review-card--q { border-top-color: var(--accent); }
+
+            .review-card h3 { margin-bottom: 16px; font-size: 18px; }
+            .review-list li { margin-bottom: 12px; font-size: 14px; position: relative; padding-left: 20px; }
+            .review-list li::before { content: '→'; position: absolute; left: 0; color: var(--accent); }
+        }
+
+        @layer animation {
+            @keyframes glow {
+                0% { box-shadow: 0 0 5px var(--accent-dim); }
+                50% { box-shadow: 0 0 20px var(--accent-dim); }
+                100% { box-shadow: 0 0 5px var(--accent-dim); }
+            }
+            .glow-node { animation: glow 2s infinite; }
+        }
+    </style>
+</head>
+<body data-aesthetic="blueprint">
+
+    <nav class="section-nav">
+        <ul>
+            <li><a href="#summary">Summary</a></li>
+            <li><a href="#impact">Impact</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#changes">Changes</a></li>
+            <li><a href="#risks">Risks</a></li>
+            <li><a href="#review">Review</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <header class="hero" id="summary">
+            <h1 class="hero-title">Plan Review: Iteration 4</h1>
+            <p class="hero-subtitle">Deep UI & Pipeline hardening. Moving SuperShorts from a functional prototype to a reliable, production-ready content engine with expressive style controls and robust fallbacks.</p>
+        </header>
+
+        <section class="grid-60-40" id="impact">
+            <div class="impact-card">
+                <h2 style="margin-bottom: 24px; font-size: 20px;">Execution Scope</h2>
+                <div class="impact-stat">
+                    <span class="stat-label">Files to Modify</span>
+                    <span class="stat-value">5</span>
+                </div>
+                <div class="impact-stat">
+                    <span class="stat-label">New Scripts</span>
+                    <span class="stat-value">1 (Icon Fetcher)</span>
+                </div>
+                <div class="impact-stat">
+                    <span class="stat-label">Target Subsystems</span>
+                    <span class="stat-value">UI, LLM, Video Engine</span>
+                </div>
+                <div class="impact-stat">
+                    <span class="stat-label">Estimated Effort</span>
+                    <span class="stat-value">~4-6 Hours</span>
+                </div>
+            </div>
+            <div class="impact-card">
+                <h2 style="margin-bottom: 24px; font-size: 20px;">Completeness</h2>
+                <div class="impact-stat">
+                    <span class="stat-label">Automated Tests</span>
+                    <span class="badge badge--green">Covered</span>
+                </div>
+                <div class="impact-stat">
+                    <span class="stat-label">Documentation</span>
+                    <span class="badge badge--amber">Partial</span>
+                </div>
+                <div class="impact-stat">
+                    <span class="stat-label">Migration/Rollback</span>
+                    <span class="badge badge--green">Low Risk</span>
+                </div>
+                <div class="impact-stat">
+                    <span class="stat-label">Performance Impact</span>
+                    <span class="badge badge--green">Optimized</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture">
+            <h2 style="margin-bottom: 24px;">Architecture Transformation</h2>
+            
+            <div class="mermaid-wrap">
+                <div class="panel-header">Current State Topology</div>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="zoomMermaid(0.1)">+</button>
+                    <button class="zoom-btn" onclick="zoomMermaid(-0.1)">−</button>
+                    <button class="zoom-btn" onclick="resetMermaid()">↺</button>
+                </div>
+                <pre class="mermaid" id="mermaid-current">
+graph LR
+    UI[main.js] -- "tone/model" --> API[dashboard.py]
+    API -- "os.environ" --> ENV[Env Vars]
+    LLM[llm.py] -- "ignoring tone" --> OLLAMA[Ollama API]
+    VE[video_engine.py] -- "query" --> PEXELS[Pexels API]
+    PEXELS -- "failure" --> DARK[Dark Fallback]
+    
+    style DARK fill:#f00,stroke:#fff,stroke-width:2
+    style LLM fill:#1e293b,stroke:#94a3b8
+                </pre>
+            </div>
+
+            <div class="mermaid-wrap">
+                <div class="panel-header">Planned State Topology</div>
+                <pre class="mermaid" id="mermaid-planned">
+graph LR
+    UI[main.js] -- "tone/model" --> API[dashboard.py]
+    API -- "os.environ" --> ENV[Env Vars]
+    LLM[llm.py] -- "inject tone style" --> OLLAMA[Ollama API]
+    VE[video_engine.py] -- "query" --> PEXELS[Pexels API]
+    PEXELS -- "failure" --> VIRAL[Viral Gameplay Fallback]
+    
+    style VIRAL fill:#059669,stroke:#fff,stroke-width:2,stroke-dasharray: 5 5
+    style LLM fill:#1e293b,stroke:#22d3ee,stroke-width:2
+    class LLM glow-node
+                </pre>
+            </div>
+        </section>
+
+        <section id="changes">
+            <h2 style="margin-bottom: 24px;">Change Breakdown</h2>
+
+            <!-- Tone Selector -->
+            <div class="change-grid">
+                <div class="change-panel change-panel--current">
+                    <div class="panel-header">Current Tone Logic</div>
+                    <div class="code-block">
+# src/infrastructure/llm.py
+def generate(prompt):
+    return ollama_generate(prompt)
+                    </div>
+                </div>
+                <div class="change-panel change-panel--planned">
+                    <div class="panel-header">Planned Tone Injection</div>
+                    <div class="code-block">
+# src/infrastructure/llm.py
+tone = os.environ.get("LLM_TONE")
+if tone == "funny":
+    prompt = f"Style: Humorous...\n{prompt}"
+return ollama_generate(prompt)
+                    </div>
+                </div>
+                <div class="rationale">
+                    Connecting the UI's "Funny" option to the LLM backend. Currently, users select a tone that is completely ignored during script generation.
+                </div>
+            </div>
+
+            <!-- Video Fallbacks -->
+            <div class="change-grid">
+                <div class="change-panel change-panel--current">
+                    <div class="panel-header">Engine Fallbacks</div>
+                    <div class="code-block">
+if not bg_path:
+    # returns None or ColorClip
+    return ColorClip((10,10,30))
+                    </div>
+                </div>
+                <div class="change-panel change-panel--planned">
+                    <div class="panel-header">Hardened Fallbacks</div>
+                    <div class="code-block">
+if not bg_path:
+    return get_local_viral_gameplay() 
+    # Always ensure a dynamic background
+                    </div>
+                </div>
+                <div class="rationale">
+                    Reduces "black screen" or static color failures when Pexels API hits rate limits or network issues. Guarantees high-engagement visuals.
+                </div>
+            </div>
+
+            <!-- RAM Stats -->
+            <div class="change-grid">
+                <div class="change-panel change-panel--current">
+                    <div class="panel-header">Dashboard Stats</div>
+                    <div class="code-block">
+# UI shows -- GB
+return jsonify({"ram_gb": ram_gb})
+                    </div>
+                </div>
+                <div class="change-panel change-panel--planned">
+                    <div class="panel-header">Accurate RAM Visualization</div>
+                    <div class="code-block">
+# UI shows 12 / 16 GB
+return jsonify({
+  "ram_gb": available, 
+  "ram_total_gb": total,
+  "ram_pct": percent
+})
+                    </div>
+                </div>
+                <div class="rationale">
+                    Providing better system awareness for users running local LLMs and video rendering simultaneously.
+                </div>
+            </div>
+        </section>
+
+        <section id="risks">
+            <h2 style="margin-bottom: 24px;">Risk Assessment</h2>
+            
+            <div class="risk-card risk-card--medium">
+                <div class="risk-title">
+                    <span>Pexels API Rate Limiting</span>
+                    <span class="badge badge--amber">Medium</span>
+                </div>
+                <p>Frequent "Auto-generate" calls might exhaust Pexels API keys quickly.</p>
+                <div class="risk-mitigation">Mitigation: Aggressively cache Pexels URLs and use local viral fallback pool as primary during high-frequency runs.</div>
+            </div>
+
+            <div class="risk-card risk-card--low">
+                <div class="risk-title">
+                    <span>Tone Hallucination</span>
+                    <span class="badge badge--green">Low</span>
+                </div>
+                <p>LLM might interpret "Funny" style instructions too literally, breaking JSON output format.</p>
+                <div class="risk-mitigation">Mitigation: Wrap tone instructions in strict system message; keep JSON schema instructions as the final instruction.</div>
+            </div>
+
+            <div class="risk-card risk-card--high">
+                <div class="risk-title">
+                    <span>TCM Mode VideoOptions Mismatch</span>
+                    <span class="badge badge--red">High</span>
+                </div>
+                <p>Plan mentions failure but doesn't specify which argument is missing. Mismatch in threads or fps could crash moviepy.</p>
+                <div class="risk-mitigation">Mitigation: Verify VideoOptions footprint against all compose_video signatures before applying.</div>
+            </div>
+        </section>
+
+        <section id="review">
+            <h2 style="margin-bottom: 24px;">Good / Bad / Ugly</h2>
+            <div class="review-section">
+                <div class="review-card review-card--good">
+                    <h3 style="color: var(--status-green);">The Good</h3>
+                    <ul class="review-list">
+                        <li>Correctly identifies the "ignored tone" bug in the LLM pipeline.</li>
+                        <li>Hardens video fallbacks, essential for a reliable "money printer".</li>
+                        <li>Modernizes UI stats for better resource management.</li>
+                    </ul>
+                </div>
+                <div class="review-card review-card--bad">
+                    <h3 style="color: var(--status-red);">The Bad</h3>
+                    <ul class="review-list">
+                        <li>Icon fetching logic is vague (Scraping? API? AI Generation?).</li>
+                        <li>Missing specific prompt templates for the new tone modifiers.</li>
+                        <li>No mention of logging improvements for the new fallbacks.</li>
+                    </ul>
+                </div>
+                <div class="review-card review-card--ugly">
+                    <h3 style="color: var(--status-amber);">The Ugly</h3>
+                    <ul class="review-list">
+                        <li>10-agent strategy is overkill for these surgical fixes.</li>
+                        <li>Silent fallback to "viral gameplay" might cause mismatched themes.</li>
+                        <li>Potential drift in VideoOptions between different production modes.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="gaps" style="margin-top: 40px;">
+            <div class="hero" style="padding: 32px; background: rgba(34, 211, 238, 0.05); border-color: var(--accent);">
+                <h2 style="font-size: 24px; margin-bottom: 16px;">Understanding Gaps</h2>
+                <div class="impact-stat">
+                    <span class="stat-label">Changes with Missing Rationale</span>
+                    <div style="flex-grow: 1; margin: 0 20px; background: #334155; height: 8px; border-radius: 4px; overflow: hidden;">
+                        <div style="width: 25%; background: var(--status-red); height: 100%;"></div>
+                    </div>
+                    <span class="stat-value">2 / 8</span>
+                </div>
+                <p style="font-size: 14px; margin-top: 16px;">
+                    <strong>Recommendation:</strong> Before implementing, document the specific viral gameplay sources for the fallback system. Ensure the LLM "Funny" prompt is tested for JSON compliance.
+                </p>
+            </div>
+        </section>
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#1e293b',
+                primaryBorderColor: '#22d3ee',
+                primaryTextColor: '#f8fafc',
+                lineColor: '#22d3ee',
+                fontSize: '14px',
+                fontFamily: "'IBM Plex Mono', monospace"
+            }
+        });
+
+        // Simple zoom/pan helper
+        let zoom = 1;
+        window.zoomMermaid = (delta) => {
+            zoom = Math.max(0.5, Math.min(2, zoom + delta));
+            document.querySelectorAll('pre.mermaid').forEach(m => {
+                m.style.transform = `scale(${zoom})`;
+                m.style.transformOrigin = 'center top';
+            });
+        };
+        window.resetMermaid = () => {
+            zoom = 1;
+            document.querySelectorAll('pre.mermaid').forEach(m => {
+                m.style.transform = 'scale(1)';
+            });
+        };
+    </script>
+</body>
+</html>

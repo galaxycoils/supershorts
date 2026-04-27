@@ -1,0 +1,20 @@
+{
+  "updatedAt": "2026-04-24T23:12:09.638Z",
+  "source": "stop",
+  "originCommand": "",
+  "reviewMode": "",
+  "conclusion": "Review found size policy violations in src/infrastructure/video_engine_impl.py.",
+  "outcome": "findings",
+  "findings": [],
+  "fileReferences": [
+    "src/infrastructure/video_engine_impl.py",
+    "main.py",
+    "dashboard.py"
+  ],
+  "fingerprint": {
+    "available": true,
+    "unstaged": ".../2026-04-24T20-02-48-531Z-unknown-j4qpzh.jsonl  |  4 ++\n .../2026-04-24T20-05-16-460Z-gemini-0o2om7.jsonl   |  4 ++\n .helloagents/sessions/main/d48650f2/STATE.md       | 12 ++--\n AGENTS.md                                          |  9 +--\n GEMINI.md                                          |  9 +--\n Notes/.compact-state.json                          | 35 +++++------\n .../2026/04/0001 - 2026-04-19 - Key Principles.md  | 70 ----------------------\n TODO.md                                            | 13 +++-\n dashboard.py                                       |  4 +-\n main.py                                            |  8 ++-\n 10 files changed, 61 insertions(+), 107 deletions(-)",
+    "staged": "",
+    "combined": ".../2026-04-24T20-02-48-531Z-unknown-j4qpzh.jsonl  |  4 ++\n .../2026-04-24T20-05-16-460Z-gemini-0o2om7.jsonl   |  4 ++\n .helloagents/sessions/main/d48650f2/STATE.md       | 12 ++--\n AGENTS.md                                          |  9 +--\n GEMINI.md                                          |  9 +--\n Notes/.compact-state.json                          | 35 +++++------\n .../2026/04/0001 - 2026-04-19 - Key Principles.md  | 70 ----------------------\n TODO.md                                            | 13 +++-\n dashboard.py                                       |  4 +-\n main.py                                            |  8 ++-\n 10 files changed, 61 insertions(+), 107 deletions(-)\n---"
+  }
+}

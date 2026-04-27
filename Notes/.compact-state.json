@@ -1,33 +1,34 @@
 {
   "userMessages": [
-    "160\t\n161\t    def mark_complete(self, topic: Dict[str, Any], video_id: Optional[str]):\n162\t        if not BRAINROT_PLAN_FILE.exists(): return\n163\t        try:\n164\t            with open(BRAINROT_PLAN_FILE) as f:\n165\t                plan = json.load(f)\n166\t            for t in plan.get(\"topics\", []):\n1",
-    "16:def ollama_generate(prompt: str, json_mode: bool = True, model: str = OLLAMA_MODEL, timeout: int = OLLAMA_TIMEOUT) -> Union[dict, list]:\n65:class OllamaLLMService(ILLMService):\n66:    def __init__(self, model: str = OLLAMA_MODEL, timeout: int = OLLAMA_TIMEOUT, generate_fn: Optional[Callable] = No",
-    "19:from src.infrastructure.llm import OllamaLLMService\n59:    llm = llm_service or OllamaLLMService()\n142:        llm = llm_service or OllamaLLMService()",
-    "45:from src.modes.tcm_educational import run_tcm_mode, generate_tcm_curriculum\n56:def generate_lesson_content(lesson_title, series_name=None, style_description=None):",
-    "50\t    table.add_column(\"Title\", style=\"white\")\n51\t    table.add_column(\"Status\", justify=\"center\")\n52\t    \n53\t    for l in plan.get(\"lessons\", []):\n54\t        status = \"[green]Done[/green]\" if l.get(\"status\") == \"complete\" else \"[yellow]Pending[/yellow]\"\n55\t        table.add_row(str(l.get(\"chapter\"",
-    "153\tdef test_tutorial_mode_dry_run(monkeypatch, harness):\n154\t    import src.modes.tutorial as tutorial\n155\t    import src.infrastructure.browser_uploader as uploader\n156\t    import src.core.learning as learning\n157\t\n158\t    monkeypatch.setattr(tutorial, \"OUTPUT_DIR\", harness.output_dir)\n159\t    mon",
-    "30\t            content += _SLIDE_PAD\n31\t        words = content.split()\n32\t        if len(words) > 200:\n33\t            content = \" \".join(words[:200])\n34\t        padded.append({**s, \"content\": content.strip()})\n35\t    return padded\n36\t\n37\tclass TutorialMode(BaseMode):\n38\t    def get_pending_topics(s",
-    "44\t    def produce_video(self, topic: Dict[str, Any], count: int, total: int) -> Optional[str]:\n45\t        \"\"\"Produce a single video for a topic (The Template Method).\"\"\"\n46\t        uid = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')\n47\t        print(f\"\\n▶️  [{count}/{total}] Topic: '{topic.get(",
-    "1\timport json\n2\timport time\n3\tfrom pathlib import Path\n4\tfrom types import SimpleNamespace\n5\t\n6\timport pytest\n7\tfrom PIL import Image\n8\t\n9\t\n10\tclass DryRunHarness:\n11\t    def __init__(self, root: Path):\n12\t        self.root = root\n13\t        self.output_dir = root / \"output\"\n14\t        self.output_d",
-    "1\timport os\n2\timport sys\n3\timport glob\n4\timport time\n5\timport datetime\n6\tfrom typing import Optional, Union, Any, List\n7\tfrom pathlib import Path\n8\tfrom selenium import webdriver\n9\tfrom selenium.webdriver.common.by import By\n10\tfrom selenium.webdriver.firefox.options import Options\n11\tfrom selenium.",
-    "1\t\"\"\"src/modes/brainrot.py - Brain Rot / High-Engagement Viral Shorts Generator\"\"\"\n2\timport gc\n3\timport json\n4\timport random\n5\timport datetime\n6\tfrom functools import lru_cache\n7\tfrom pathlib import Path\n8\timport numpy as np\n9\tfrom PIL import Image, ImageDraw, ImageFont, ImageFilter\n10\tfrom moviepy.",
-    "1\timport json\n2\timport random\n3\timport datetime\n4\tfrom pathlib import Path\n5\tfrom typing import List, Dict, Any, Optional\n6\tfrom tqdm import tqdm\n7\t\n8\tfrom src.core.config import TUTORIAL_TOPICS, YOUR_NAME, OUTPUT_DIR, OLLAMA_MODEL, OLLAMA_TIMEOUT, VideoOptions\n9\tfrom src.core.interfaces import ILLM",
-    "127\tdef run_tcm_mode(llm_service=None, tts_service=None, uploader_service=None):\n128\t    console.print(Panel.fit(\"🌿 [bold green]SuperShorts TCM Mode[/bold green] 🌿\"))\n129\t    \n130\t    plan = None\n131\t    if TCM_PLAN_FILE.exists():\n132\t        try:\n133\t            plan = json.loads(TCM_PLAN_FILE.re",
     "79\tclass TCMMode(BaseMode):\n80\t    def __init__(self, llm_service=None, tts_service=None, uploader_service=None, plan=None):\n81\t        super().__init__(llm_service, tts_service, uploader_service)\n82\t        self.plan = plan\n83\t\n84\t    def get_pending_topics(self) -> List[Dict[str, Any]]:\n85\t       ",
     "1\t# src/modes/tcm_educational.py - Traditional Chinese Medicine Educational Mode\n2\timport gc\n3\timport json\n4\timport datetime\n5\timport time\n6\timport random\n7\tfrom pathlib import Path\n8\tfrom typing import List, Dict, Any, Optional\n9\t\n10\tfrom rich.console import Console\n11\tfrom rich.panel import Panel\n",
     "19:def log_upload(title: str, video_id: str, mode: str):",
     "def log_upload(title: str, video_id: str, mode: str):\n    if not video_id or video_id in _FAKE_IDS:\n        print(f\"⚠️ Skipping log_upload: invalid video_id '{video_id}'\")\n        return\n    try:\n        data = json.loads(LOG_FILE.read_text()) if LOG_FILE.exists() else []\n        if not isinstance(d",
     "16:_FAKE_IDS = {\"BROWSER_UPLOAD_SUCCESS\", \"MOCK_VIDEO_ID\", \"UPLOAD_ATTEMPTED\", \"BROWSER_UPLOAD_FAILED\"}\n20:    if not video_id or video_id in _FAKE_IDS:",
     "<local-command-stdout>Set model to \u001b[1mOpus 4.7\u001b[22m</local-command-stdout>",
-    "is everything done if so create a file with whats done and what yu think needs to be done"
+    "is everything done if so create a file with whats done and what yu think needs to be done",
+    "<command-message>ultra-think</command-message>\n<command-name>/ultra-think</command-name>\n<command-args>everyting that needs to be done based on obsidian and current project on claude code and see how we can imporve it</command-args>",
+    "# Deep Analysis and Problem Solving Mode\n\nDeep analysis and problem solving mode\n\n## Instructions\n\nAnalyze the problem or question provided: **everyting that needs to be done based on obsidian and current project on claude code and see how we can imporve it**\n\nBefore proceeding, identify: the core c",
+    "---\ntags: [project, ai, video, python, flask]\ncreated: 2026-04-24\nupdated: 2026-04-24\nversion: v3.4.0\nrepo: https://github.com/galaxycoils/supershorts\nlocal: /Users/cmd/money-printer-v2\n---\n\n# SuperShorts — Project Overview\n\nFully local AI video factory. Takes a topic → outputs a YouTube Short with ",
+    "---\nsession_id: session_1777057739167_bo04h51ih\ntype: agent-session\ntitle: 2026-04-24 Mobile Refactor Plan & Known Issues\ncreated: 2026-04-24T15:08:59.167-04:00\nlast_active: 2026-04-24T15:14:50.438-04:00\nenabled_tools:\n  - read_only\n  - vault_ops\n  - external_mcp\n  - skills\nrequire_confirmation:\n  -",
+    "[Request interrupted by user]",
+    "<command-name>/plan</command-name>\n            <command-message>plan</command-message>\n            <command-args>onopus</command-args>",
+    "<local-command-stdout>Enabled plan mode</local-command-stdout>",
+    "github-release.md\nmain_menu_test_plan.md\nOO_DESIGN_REVIEW.md\nplan-fixes.md\nplan-iteration-4.md\nplan-mobile-refactor.md\nplan-rotgen-clone.md\nplan.md\nrotgen-v2-ui-refinement.md\ntcm-audio-fix.md\n---\n# Implementation Plan: Componentized Mobile-Friendly RotGen UI\n\n## 1. Skill Acquisition & Image Analysis",
+    "---\ntags: [architecture, pipeline, backend]\nrelated: [[SuperShorts — Project Overview]]\n---\n\n# Pipeline Architecture\n\n## Video Production Flow\n\n```\nUser clicks \"Run\" in dashboard\n         │\n         ▼\nPOST /api/run/{mode}\n  { count, voice, llm_model, temperature, dry_run, tcm_topic, tcm_extra }\n    ",
+    "[object Object]",
+    "[object Object]",
+    "[object Object]",
+    "File created successfully at: /Users/cmd/.claude/plans/snug-sparking-lantern.md"
   ],
   "summaries": [],
   "captures": [],
   "lastCompleted": "",
   "filesModified": [
-    "/Users/cmd/money-printer-v2/src/infrastructure/browser_uploader.py"
+    "/Users/cmd/money-printer-v2/src/infrastructure/browser_uploader.py",
+    "/Users/cmd/.claude/plans/snug-sparking-lantern.md"
   ],
   "workItems": [],
-  "notePath": "/Users/cmd/money-printer-v2/Notes/2026/04/0001 - 2026-04-19 - 19 From Src Infrastructure Llm Import Ollamallmservice.md",
-  "lastUpdated": "2026-04-21T22:01:25.778Z"
+  "notePath": "/Users/cmd/money-printer-v2/Notes/2026/04/0001 - 2026-04-19 - 79 Class Tcmmode Basemode.md",
+  "lastUpdated": "2026-04-24T22:59:52.511Z"
 }

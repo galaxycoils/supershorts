@@ -23,7 +23,9 @@ PEXELS_CACHE_DIR = PROJECT_ROOT / "assets" / "pexels"
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 
 # LLM Config
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:3b")
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "lmstudio")
+LMSTUDIO_BASE_URL = os.environ.get("LMSTUDIO_BASE_URL", "http://127.0.0.1:1234/v1")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mlx-qwen3.5-4b-claude-4.6-opus-reasoning-distilled")
 OLLAMA_TIMEOUT = 120
 
 # User Info

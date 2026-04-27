@@ -6,10 +6,11 @@ Read `/Users/cmd/Documents/Obsidian Vault/SuperShorts/STATE_HANDOFF.md` IMMEDIAT
 2. **Learn**: Log bugs, patterns, and decisions during work.
 3. **Handover**: Update status/next actions before closing.
 
----
-
-## Identity
-- **Project**: SuperShorts v3.5.0
+### PROTOCOL 1: Universal Skill Library
+Master logic resides in `/Users/cmd/Documents/Obsidian Vault/SuperShorts/Skills/`.
+1. **Lookup**: Check Obsidian for specialized skill workflows before acting.
+2. **Execute**: Adhere to "Core Rules" in the skill note.
+3. **Evolve**: Log new patterns/fixes to "Evolved Learnings" to improve future agent performance.
 - **Metaswarm Development**: Follow the full development pipeline (Research → Plan → Design Review → Implementation → Verification).
 - **TDD Requirement**: Write tests before implementation. 100% coverage is mandatory as defined in `.coverage-thresholds.json`.
 

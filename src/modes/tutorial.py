@@ -177,7 +177,7 @@ Return ONLY valid JSON:
 
 def generate_tutorial_content(topic: str, llm_service: Optional[ILLMService] = None) -> Dict[str, Any]:
     """Legacy wrapper for tutorial content generation."""
-    llm = llm_service or OllamaLLMService()
+    llm = llm_service or get_llm_service()
     mode = TutorialMode(llm, None, None, None)
     return mode.generate_script({"title": topic})
 

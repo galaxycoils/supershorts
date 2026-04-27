@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "supershorts"
+version = "4.0.0"
+description = "AI-powered short-form video generation and upload pipeline"
+requires-python = ">=3.10,<3.13"
+license = { text = "MIT" }
+dependencies = [
+    # LLM / TTS
+    "ollama==0.1.6",
+    "pyttsx3==2.90",
+    "piper-tts==1.2.0",
+    # Audio / Video
+    "pydub==0.25.1",
+    "moviepy==1.0.3",
+    "ffmpeg-python==0.2.0",
+    "librosa==0.10.1",
+    "soundfile==0.12.1",
+    # Image / Vision
+    "Pillow==10.2.0",
+    "opencv-python==4.9.0.80",
+    "mediapipe==0.10.11",
+    # ML / AI
+    "faster-whisper==1.0.0",
+    "torch==2.2.1",
+    "sentence-transformers==2.5.1",
+    "scikit-learn==1.4.1.post1",
+    # Numerics
+    "numpy==1.26.4",
+    "scipy==1.12.0",
+    # Web / API
+    "flask==3.0.2",
+    "requests==2.31.0",
+    "google-api-python-client==2.118.0",
+    "google-auth-httplib2==0.2.0",
+    "google-auth-oauthlib==1.2.0",
+    # Browser automation
+    "selenium==4.18.1",
+    "webdriver-manager==4.0.1",
+    # Downloader
+    "yt-dlp==2024.3.10",
+    # Utilities
+    "tqdm==4.66.2",
+    "rich==13.7.0",
+    "python-dateutil==2.9.0.post0",
+    "python-dotenv==1.0.1",
+    "psutil==5.9.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov>=4",
+    "ruff>=0.4",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+supershorts = "main:main"
+supershorts-dashboard = "dashboard:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "venv/*"]

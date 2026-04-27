@@ -1,0 +1,6 @@
+{"ts":"2026-04-27T20:39:26.420Z","event":"session_started","host":"gemini","source":"startup","sessionId":"2026-04-27T20-39-26-417Z-gemini-79xbhe"}
+{"ts":"2026-04-27T20:39:26.421Z","event":"session_injected","host":"gemini","source":"startup","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o","details":{"bootstrapFile":"bootstrap.md","activatedProject":true}}
+{"ts":"2026-04-27T20:41:15.975Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
+{"ts":"2026-04-27T20:43:06.473Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
+{"ts":"2026-04-27T20:48:02.006Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
+{"ts":"2026-04-27T20:49:28.323Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}

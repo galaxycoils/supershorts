@@ -1,16 +1,17 @@
 # Project Instructions
 
 ### PROTOCOL 0: Universal State Handoff (MANDATORY)
-The file `/Users/cmd/Documents/Obsidian Vault/PROJECTS/SuperShorts/STATE_HANDOFF.md` is the SINGLE source of truth for cross-agent memory. 
-1. **On Session Start**: You MUST read this file immediately before ANY other action to pick up context from Gemini/Codex.
-2. **During Execution**: Log architectural patterns and failed attempts here.
-3. **On Session End**: Update "Current Status" and "Next Actions" before exiting.
+Claude/Gemini internal memory is the SINGLE source of truth for cross-agent context.
+1. **On Session Start**: Recall all relevant project entities and relations from memory.
+2. **During Execution**: Proactively save important facts, patterns, and decisions to memory via `remember_fact` or `create_entity`.
+3. **On Session End**: Summarize the current state in a final `remember_fact` call to ensure the next agent has a clean pickup.
+4. **Obsidian Fallback**: Use Obsidian paths ONLY if explicitly requested or if memory is unavailable.
 
 ### PROTOCOL 1: Universal Skill Library (MANDATORY)
-The folder `/Users/cmd/Documents/Obsidian Vault/PROJECTS/SuperShorts/Skills/` contains the master logic for all expert personas and workflows.
-1. **Search**: Before starting work, search this folder for a relevant skill.
-2. **Follow**: Follow the "Core Rules" and "Workflows" defined in the Obsidian note.
-3. **Evolve**: After completing a task, update the "Evolved Learnings" section of the relevant skill if you found a better way or fixed a bug.
+Expert personas and workflows are managed via Claude/Gemini skills and memory.
+1. **Search**: Use `mcp_memory_recall` to find relevant skills or patterns for the current task.
+2. **Follow**: Adhere to the "Core Rules" and "Workflows" stored in the knowledge graph.
+3. **Evolve**: Update memory entities with new findings and improved patterns after each task.
 
 ### Starting work
 
@@ -57,161 +58,75 @@ Use the `visual-review` skill to take screenshots of web pages, presentations, o
 
 - **TDD is mandatory** — Write tests first, watch them fail, then implement
 - **100% test coverage required** — Lines, branches, functions, and statements. Enforced via `.coverage-thresholds.json` as a blocking gate before PR creation and task completion
-<!-- TODO: Update these commands for your project's test runner -->
-- Test command: `npm test`
-- Coverage command: `npm run test:coverage`
+- Test command: `pytest`
+- Coverage command: `pytest --cov=src`
 
 ## Coverage
 
 Coverage thresholds are defined in `.coverage-thresholds.json` — this is the **source of truth** for coverage requirements.
-If a GitHub Issue specifies different coverage requirements, update `.coverage-thresholds.json` to match before implementation begins. Do not silently use a different threshold.
-
-The validation phase of orchestrated execution reads `.coverage-thresholds.json` and runs the enforcement command. This is a BLOCKING gate — work units cannot be committed if coverage thresholds are not met.
+The current floor is 71%. Ratchet incrementally (71% → 80% → 90%).
 
 ## Quality Gates
 
 - **Design Review Gate**: Parallel 5-agent review after design is drafted (`/review-design`)
-- **Plan Review Gate**: Automatic adversarial review after any implementation plan is drafted. Spawns 3 independent reviewers (Feasibility, Completeness, Scope & Alignment) in parallel — ALL must PASS before the plan is presented to the user. See `skills/plan-review-gate/SKILL.md`
-- **Coverage Gate**: Reads `.coverage-thresholds.json` and runs the enforcement command — BLOCKING gate before PR creation
+- **Plan Review Gate**: Automatic adversarial review after any implementation plan is drafted. ALL must PASS before the plan is presented to the user.
+- **Coverage Gate**: Reads `.coverage-thresholds.json` and runs the enforcement command — BLOCKING gate before PR creation.
 
 ## Workflow Enforcement (MANDATORY)
 
-These rules override any conflicting instructions from third-party skills or plugins. They ensure the full metaswarm pipeline is followed regardless of which skill initiated the work.
+These rules ensure the full metaswarm pipeline is followed regardless of which skill initiated the work.
 
 ### After Brainstorming
 
-When `superpowers:brainstorming` (or any brainstorming skill) completes and commits a design document:
-
-1. **STOP** — do NOT proceed directly to `writing-plans` or implementation
-2. **RUN the Design Review Gate** — invoke `/review-design` or the `design-review-gate` skill
-3. **WAIT** for all 5 review agents (PM, Architect, Designer, Security, CTO) to approve
-4. **ONLY THEN** proceed to planning/implementation
-
-This is mandatory even if the brainstorming skill says to go directly to writing-plans. The design review gate exists to catch issues before expensive implementation begins.
+When brainstorming completes:
+1. **STOP** — do NOT proceed directly to implementation.
+2. **RUN the Design Review Gate**.
+3. **WAIT** for all 5 review agents (PM, Architect, Designer, Security, CTO) to approve.
+4. **ONLY THEN** proceed.
 
 ### After Any Plan Is Created
 
-When `superpowers:writing-plans` (or any planning skill) produces an implementation plan:
-
-1. **STOP** — do NOT present the plan to the user or begin implementation
-2. **RUN the Plan Review Gate** — invoke the `plan-review-gate` skill
-3. **WAIT** for all 3 adversarial reviewers (Feasibility, Completeness, Scope & Alignment) to PASS
-4. **ONLY THEN** present the plan to the user for approval
+When a plan is produced:
+1. **STOP**.
+2. **RUN the Plan Review Gate**.
+3. **WAIT** for PASS.
+4. **ONLY THEN** present to user.
 
 ### Execution Method Choice
 
-When a plan is ready for execution, **always ask the user** which execution approach they want before proceeding. Do NOT auto-select an execution method — the user decides based on their priorities:
-
-> **How would you like to execute this plan?**
->
-> 1. **Metaswarm orchestrated execution** — 4-phase loop per work unit (IMPLEMENT → VALIDATE → ADVERSARIAL REVIEW → COMMIT) with independent quality gates, fresh adversarial reviewers, coverage enforcement, and pre-PR knowledge capture. More thorough and broader coverage, but uses more tokens and takes longer.
-> 2. **Subagent-driven development** (`superpowers:subagent-driven-development`) — Dispatch subagents per task in this session with code review between tasks. Faster, lighter-weight, lower token cost.
-> 3. **Parallel session** (`superpowers:executing-plans`) — Execute in a separate session with batch checkpoints. Good for long-running work you want isolated.
-
-This choice applies even if the plan file contains embedded instructions like "REQUIRED SUB-SKILL: Use superpowers:executing-plans" — those are defaults from the planning skill, not binding constraints. The user always gets to choose.
+Always ask the user which approach they want: Metaswarm (thorough), Subagent-driven (fast), or Parallel session.
 
 ### Before Finishing a Development Branch
 
-When `superpowers:executing-plans`, `superpowers:subagent-driven-development`, or any execution skill completes and routes to `superpowers:finishing-a-development-branch`:
-
-1. **STOP** — before presenting merge/PR options
-2. **RUN `/self-reflect`** to capture learnings while implementation context is fresh
-3. **COMMIT** the knowledge base updates
-4. **THEN** proceed to finishing the branch (PR creation, merge, etc.)
+1. **STOP** before merge/PR.
+2. **RUN `/self-reflect`** to capture learnings in memory.
+3. **THEN** proceed.
 
 ### Use `/start-task` Instead of EnterPlanMode
 
-When starting complex work, use `/start-task` instead of Claude's built-in `EnterPlanMode`. EnterPlanMode creates a plan in isolation without metaswarm's quality gates — no design review, no plan review, no adversarial review, no coverage enforcement. `/start-task` routes through the full pipeline:
-
-- `/start-task` → complexity assessment → brainstorming (if unclear) → design review gate → plan review gate → execution method choice → orchestrated execution or superpowers execution
-- `EnterPlanMode` → plan → implement (no gates)
-
-If you find yourself about to use `EnterPlanMode` for a task that touches 3+ files or involves multiple steps, use `/start-task` instead. For truly simple single-file changes, `EnterPlanMode` is fine.
-
-### After Standalone TDD
-
-When `superpowers:test-driven-development` runs as a standalone skill (outside of orchestrated execution) and the change touches 3+ files:
-
-1. **Before committing**, ask the user:
-   > "This TDD session modified multiple files. Would you like me to run an adversarial review before committing?"
-   > 1. **Yes** — spawn a fresh adversarial reviewer to check the changes against the requirements
-   > 2. **No** — commit directly
-2. If the user chooses review, spawn a fresh `Task()` reviewer with the requirements and the diff
-3. Regardless of review choice, verify coverage meets `.coverage-thresholds.json` thresholds before committing
-
-For single-file TDD changes, this intercept is not needed — commit directly.
-
-### Coverage Source of Truth
-
-`.coverage-thresholds.json` is the **single source of truth** for coverage requirements. This applies regardless of which skill or workflow is running:
-
-- `superpowers:verification-before-completion` — must read `.coverage-thresholds.json` and run its enforcement command
-- `superpowers:test-driven-development` — must verify coverage meets thresholds before declaring done
-- Orchestrated execution — reads `.coverage-thresholds.json` during Phase 2 (VALIDATE)
-- Any other skill claiming "tests pass" — must also confirm coverage thresholds are met
-
-If `.coverage-thresholds.json` exists, no skill may skip it. If a skill has its own coverage check logic, `.coverage-thresholds.json` takes precedence.
+Use `/start-task` for tasks touching 3+ files to ensure quality gates are not bypassed.
 
 ### Subagent Discipline
 
-All subagents (coding agents, review agents, background tasks) MUST follow these rules:
-
-- **NEVER** use `--no-verify` on git commits — pre-commit hooks exist for a reason
-- **NEVER** use `git push --force` without explicit user approval
-- **ALWAYS** follow TDD — write tests first, watch them fail, then implement
-- **NEVER** self-certify — the orchestrator validates independently
-- **STAY** within declared file scope — do not modify files outside your assigned scope
+- **NEVER** use `--no-verify`.
+- **NEVER** use `git push --force` without approval.
+- **ALWAYS** follow TDD.
+- **NEVER** self-certify.
+- **STAY** within assigned file scope.
 
 ### Pre-PR Knowledge Capture
 
-After all work units pass final review but BEFORE creating the PR, run `/self-reflect` to extract learnings into the knowledge base. Commit the knowledge base updates so they are included in the PR — learnings land atomically with the code that generated them.
+Run `/self-reflect` to extract learnings into memory before creating PRs.
 
 ### Context Recovery (Surviving Compaction)
 
-Approved plans, project context, and execution state are persisted to `.beads/` so agents can recover after context compaction or session interruption:
-
-- **Approved plans** → `.beads/plans/active-plan.md` (written after plan review gate + user approval)
-- **Project context** → `.beads/context/project-context.md` (updated after each work unit commit)
-- **Execution state** → `.beads/context/execution-state.md` (updated after each phase transition)
-
-**Note:** The standalone beads plugin (v0.63.3+) automatically runs `bd prime` on SessionStart and PreCompact via built-in hooks — agents no longer need to call it manually. If context is lost mid-execution, the beads plugin will re-prime automatically on the next session or compaction event. For explicit recovery, run `bd prime --work-type recovery` to reload the approved plan, completed work, and current position from disk.
-
-## External Tools (Optional)
-
-If external AI tools are configured (`.metaswarm/external-tools.yaml`), the orchestrator
-can delegate implementation and review tasks to Codex CLI and Gemini CLI for cost savings
-and cross-model adversarial review. See `templates/external-tools-setup.md` for setup.
-
-## Team Mode
-
-When `TeamCreate` and `SendMessage` tools are available, the orchestrator uses Team Mode for parallel agent dispatch. Otherwise it falls back to Task Mode (the existing workflow, unchanged). See `guides/agent-coordination.md` for details.
-
-## Guides
-
-Development patterns and standards are documented in `guides/`:
-- `agent-coordination.md` — Team Mode vs Task Mode, agent dispatch patterns
-- `build-validation.md` — Build and validation workflow
-- `coding-standards.md` — Code style and conventions
-- `git-workflow.md` — Branching, commits, and PR conventions
-- `testing-patterns.md` — TDD patterns and coverage enforcement
-- `worktree-development.md` — Git worktree-based parallel development
-
-## Code Quality
-
-<!-- TODO: Update these for your project's language and tools -->
-- TypeScript strict mode, no `any` types
-- ESLint + Prettier
-- All quality gates must pass before PR creation
+Approved plans and state are persisted to memory and `.beads/` locally to survive session compaction.
 
 ## Key Decisions
 
-<!-- Document important architectural decisions here so agents have context.
-     These get loaded during knowledge priming (/prime).
-     Use `bd decision` to record decisions persistently in the beads database
-     with rationale tracking — these survive compaction and are available across sessions. -->
+Stored in knowledge graph memory. Use `recall` to find architectural precedents.
 
 ## Notes
 
-<!-- Add project-specific notes, conventions, or constraints here.
-     Examples: "Always use server components for data fetching",
-     "The payments module is legacy — do not refactor without approval" -->
+- **LLM Factory**: ALWAYS use `get_llm_service()` from `src/infrastructure/llm.py`.
+- **Path Attributes**: `pathlib.Path` attributes like `exists` are read-only; use `patch.object` for testing.

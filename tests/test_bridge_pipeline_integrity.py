@@ -28,36 +28,31 @@ class TestBridgePipelineIntegrity:
             }
         }
 
-    @patch('src.infrastructure.llm.ollama.chat')
     @patch('src.infrastructure.video_engine_impl.get_relevant_pexels_video')
     @patch('src.infrastructure.tts.subprocess.run')
-    def test_mode_to_infra_pipeline(self, mock_subproc, mock_pexels, mock_ollama, mock_env):
+    def test_mode_to_infra_pipeline(self, mock_subproc, mock_pexels, mock_env):
         """
         Verifies the full pipeline from Mode logic (via Bridge) to Infrastructure.
-        
+
         Mode calls Bridge -> Bridge calls Engine/Infrastructure -> Infrastructure calls Tools.
         """
         # --- ARRANGE ---
-        # Mock LLM to return valid JSON content
-        mock_ollama.return_value = {
-            'message': {
-                'content': json.dumps(mock_env["content"])
-            }
-        }
-        
+        # Mock LLM service
+        mock_llm_service = MagicMock()
+        mock_llm_service.generate.return_value = mock_env["content"]
+
         # Mock Pexels to return a dummy mp4 path
         dummy_video = mock_env["output_dir"] / "dummy_video.mp4"
         dummy_video.touch()
         mock_pexels.return_value = str(dummy_video)
-        
+
         # Mock subprocess for TTS (avoiding real ffmpeg/say calls)
         mock_subproc.return_value = MagicMock(returncode=0)
 
         # --- ACT ---
         # 1. Trigger Content Generation (via Bridge)
-        content = generate_lesson_content(mock_env["lesson_title"])
-        assert content["short_form_highlight"] == mock_env["content"]["short_form_highlight"]
-        
+        content = generate_lesson_content(mock_env["lesson_title"], llm_service=mock_llm_service)
+        assert content["short_form_highlight"] == mock_env["content"]["short_form_highlight"]        
         # 2. Trigger TTS (via Bridge)
         audio_file_base = mock_env["output_dir"] / "test_audio"
         # We need to fake the output of text_to_speech
@@ -124,6 +119,6 @@ class TestBridgePipelineIntegrity:
 
         # --- FINAL ASSERT ---
         # Verify bridge correctly routed to infrastructure/engine
-        assert mock_ollama.called
+        assert mock_llm_service.generate.called
         assert mock_pexels.called
         assert "final_video.mp4" in str(video_output)

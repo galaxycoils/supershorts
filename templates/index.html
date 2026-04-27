@@ -141,20 +141,89 @@
                     <h2>Global Settings <small>persistence</small></h2>
                 </div>
                 <div class="settings-grid">
+
+                    <!-- LLM Configuration -->
                     <div class="settings-card">
+                        <div class="settings-card-title">
+                            <span>LLM Configuration</span>
+                            <button class="btn-icon-sm" onclick="refreshLLMState()" title="Refresh providers + models">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                            </button>
+                        </div>
+
+                        <!-- Provider Dropdown -->
+                        <div class="field">
+                            <label>Provider</label>
+                            <div class="dropdown" id="provider-dropdown" data-open="false">
+                                <button class="dropdown-trigger" type="button" onclick="toggleDropdown('provider-dropdown', event)">
+                                    <div class="led off" id="trigger-led"></div>
+                                    <div class="dropdown-trigger-text">
+                                        <span class="dropdown-trigger-name" id="trigger-name">LM Studio</span>
+                                        <span class="dropdown-trigger-detail" id="trigger-detail">checking…</span>
+                                    </div>
+                                    <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                                <div class="dropdown-menu">
+                                    <div class="dropdown-item" data-provider="lmstudio" onclick="selectProvider('lmstudio'); closeDropdowns()">
+                                        <div class="led off" id="led-lmstudio"></div>
+                                        <div class="dropdown-item-body">
+                                            <span class="dropdown-item-name">LM Studio</span>
+                                            <span class="dropdown-item-detail" id="lmstudio-detail">checking…</span>
+                                        </div>
+                                        <span class="badge-source lmstudio">MLX</span>
+                                    </div>
+                                    <div class="dropdown-item" data-provider="ollama" onclick="selectProvider('ollama'); closeDropdowns()">
+                                        <div class="led off" id="led-ollama"></div>
+                                        <div class="dropdown-item-body">
+                                            <span class="dropdown-item-name">Ollama</span>
+                                            <span class="dropdown-item-detail" id="ollama-detail">checking…</span>
+                                        </div>
+                                        <span class="badge-source ollama">GGUF</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LM Studio URL -->
+                        <div class="field" id="lmstudio-url-field">
+                            <label>LM Studio Endpoint</label>
+                            <div class="input-row">
+                                <input type="text" id="lmstudio-url" placeholder="http://127.0.0.1:1234/v1" onchange="saveGlobalSettings()">
+                                <button class="btn-sm" onclick="testLMStudioConnection()">Test</button>
+                            </div>
+                        </div>
+
+                        <!-- Model Dropdown -->
+                        <div class="field">
+                            <div class="field-header">
+                                <label>Active Model <span class="field-meta" id="model-count">0 loaded</span></label>
+                            </div>
+                            <div class="dropdown" id="model-dropdown" data-open="false">
+                                <button class="dropdown-trigger" type="button" onclick="toggleDropdown('model-dropdown', event)">
+                                    <div class="model-trigger-icon">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                                    </div>
+                                    <div class="dropdown-trigger-text">
+                                        <span class="dropdown-trigger-name" id="model-trigger-name">No model selected</span>
+                                        <span class="dropdown-trigger-detail" id="model-trigger-detail">click to select</span>
+                                    </div>
+                                    <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                                <div class="dropdown-menu" id="model-menu">
+                                    <div class="dropdown-empty">Loading models…</div>
+                                </div>
+                            </div>
+                            <select id="global-model" style="display:none"></select>
+                        </div>
+                    </div>
+
+                    <!-- General Settings -->
+                    <div class="settings-card">
+                        <div class="settings-card-title">General</div>
                         <div class="field">
                             <label>Author Identity</label>
                             <input type="text" id="global-author" value="SuperShorts" onchange="saveGlobalSettings()">
                         </div>
-                        <div class="field">
-                            <label>Default Ollama Model</label>
-                            <select id="global-model" onchange="saveGlobalSettings()">
-                                <option value="llama3">llama3</option>
-                                <option value="mistral">mistral</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="settings-card">
                         <div class="toggle-row">
                             <div class="toggle-info">
                                 <div class="toggle-title">Advanced View Mode</div>
@@ -166,6 +235,7 @@
                             </label>
                         </div>
                     </div>
+
                 </div>
             </section>
         </div>

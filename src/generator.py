@@ -16,7 +16,7 @@ from src.core.config import (
 )
 
 # --- Infrastructure Re-exports ---
-from src.infrastructure.llm import ollama_generate, safe_json_parse, OllamaLLMService
+from src.infrastructure.llm import ollama_generate, safe_json_parse, get_llm_service
 from src.infrastructure.video import (
     get_local_background, get_local_gameplay, 
     get_local_viral_gameplay, get_relevant_pexels_video
@@ -56,14 +56,14 @@ from src.core.learning import start_learning_mode
 # Legacy Wrappers for testing
 def generate_brainrot_topics(count: int = 10, previous_topics: Optional[List[str]] = None, llm_service: Optional[ILLMService] = None) -> List[dict]:
     """Bridge for backward compatibility."""
-    llm = llm_service or OllamaLLMService()
+    llm = llm_service or get_llm_service()
     prompt = f"Generate {count} topic ideas for viral AI shorts."
     result = llm.generate(prompt, json_mode=True)
     return result.get("topics", [])
 
 def generate_brainrot_script(topic: Dict[str, Any], llm_service: Optional[ILLMService] = None) -> Dict[str, Any]:
     from src.modes.brainrot import BrainrotMode
-    mode = BrainrotMode(llm_service or OllamaLLMService(), None, None, None)
+    mode = BrainrotMode(llm_service or get_llm_service(), None, None, None)
     return mode.generate_script(topic)
 
 def render_brainrot_slide(output_dir: Path, text: str, index: int, total: int, video_engine: Optional[IVideoEngine] = None) -> str:
@@ -80,12 +80,12 @@ def create_brainrot_video(image_paths: List[str], audio_paths: List[str], output
 
 def generate_tutorial_content(topic, llm_service=None):
     from src.modes.tutorial import TutorialMode
-    mode = TutorialMode(llm_service or OllamaLLMService(), None, None, None)
+    mode = TutorialMode(llm_service or get_llm_service(), None, None, None)
     return mode.generate_script({"title": topic})
 
 def generate_ideas(count=5, llm_service=None):
     from src.modes.studio_ideas import generate_studio_ideas
-    return generate_studio_ideas(count, llm_service=llm_service or OllamaLLMService())
+    return generate_studio_ideas(count, llm_service=llm_service or get_llm_service())
 
 # --- Core Logic Re-exports ---
 from src.core.learning import log_upload, suggest_improvements
@@ -94,7 +94,7 @@ from src.core.learning import log_upload, suggest_improvements
 
 def generate_lesson_content(lesson_title, series_name=None, style_description=None, llm_service: Optional[ILLMService] = None):
     """Bridge to LLM service with default style logic."""
-    llm = llm_service or OllamaLLMService()
+    llm = llm_service or get_llm_service()
     
     if not series_name:
         series_name = f"AI for Developers by {YOUR_NAME}"
@@ -158,7 +158,7 @@ Generate JSON: long_form_slides (7-8 objs with title/content), short_form_highli
 
 def generate_curriculum(focus: str = "AI for Developers", extra: str = "", llm_service: Optional[ILLMService] = None) -> dict:
     """Legacy bridge for curriculum generation."""
-    llm = llm_service or OllamaLLMService()
+    llm = llm_service or get_llm_service()
     prompt = f"Create a 10-lesson curriculum about {focus}. Extra info: {extra}"
     result = llm.generate(prompt, json_mode=True)
     if result and result.get("lessons"):

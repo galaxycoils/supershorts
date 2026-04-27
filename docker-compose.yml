@@ -1,0 +1,31 @@
+services:
+  supershorts:
+    build: .
+    container_name: supershorts
+    ports:
+      - "${PORT:-5050}:5050"
+    volumes:
+      - ./output:/app/output
+      - ${FIREFOX_PROFILE:-~/.mozilla/firefox/youtube_uploader}:/root/.mozilla/firefox/youtube_uploader:rw
+      - ${PIPER_VOICES:-~/.local/share/piper-tts}:/root/.local/share/piper-tts:ro
+    env_file:
+      - .env
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:3b}
+      - OLLAMA_URL=http://ollama:11434
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_models:

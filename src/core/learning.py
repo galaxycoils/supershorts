@@ -1,7 +1,6 @@
 # src/learning.py - Passive Learning (runs AFTER upload, zero impact on generation time)
 import json
 from pathlib import Path
-import ollama
 import datetime
 
 from rich.console import Console
@@ -10,6 +9,7 @@ from rich.prompt import Prompt
 console = Console()
 
 from src.core.config import PROJECT_ROOT, OLLAMA_MODEL, OLLAMA_TIMEOUT
+from src.infrastructure.llm import get_llm_service
 import concurrent.futures
 
 LOG_FILE = PROJECT_ROOT / "performance_log.json"
@@ -56,21 +56,19 @@ def suggest_improvements():
         f"Suggest 3 concrete improvements for future videos (titles, backgrounds, hooks, length). Be very brief."
     )
     try:
-        with console.status("[cyan]Analyzing upload history via Ollama…[/cyan]"):
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                future = ex.submit(
-                    lambda: ollama.chat(model=OLLAMA_MODEL, messages=[{"role": "user", "content": prompt}])
-                )
-                response = future.result(timeout=OLLAMA_TIMEOUT)
-        suggestion = response['message']['content']
+        with console.status("[cyan]Analyzing upload history via AI…[/cyan]"):
+            llm = get_llm_service()
+            # Use raw string generation (not JSON mode) for suggestions
+            suggestion = llm.generate(prompt, json_mode=False)
+            if isinstance(suggestion, dict):
+                # Fallback if provider returns object instead of string in non-json mode
+                suggestion = json.dumps(suggestion)
+                
         console.print("[bold cyan]🧠 Learning Suggestion:[/bold cyan]")
         console.print(suggestion)
         SUGGESTIONS_FILE.parent.mkdir(exist_ok=True, parents=True)
         SUGGESTIONS_FILE.write_text(suggestion)
         return suggestion
-    except concurrent.futures.TimeoutError:
-        console.print(f"[red]⚠  Learning error: Ollama timed out after {OLLAMA_TIMEOUT}s[/red]")
-        return f"Ollama timed out after {OLLAMA_TIMEOUT}s"
     except Exception as e:
         console.print(f"[red]⚠  Learning error: {type(e).__name__}: {e}[/red]")
         return str(e)

@@ -1,0 +1,14 @@
+venv/
+.git/
+tests/
+.helloagents/
+.beads/
+output/
+dry_*.wav
+*.bak
+Notes/
+*.pyc
+__pycache__/
+.env
+.coverage
+.claude/

@@ -1,0 +1,16 @@
+{"ts":"2026-04-27T17:35:51.322Z","event":"session_started","host":"gemini","source":"startup","sessionId":"2026-04-27T17-35-51-319Z-gemini-ydvspf"}
+{"ts":"2026-04-27T17:35:51.324Z","event":"session_injected","host":"gemini","source":"startup","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1","details":{"bootstrapFile":"bootstrap.md","activatedProject":true}}
+{"ts":"2026-04-27T17:36:18.455Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:38:44.095Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:39:50.860Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:40:18.260Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:40:34.035Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:40:52.105Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:41:57.004Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:42:16.770Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:43:14.731Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:44:23.885Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:45:21.162Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:46:01.756Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}
+{"ts":"2026-04-27T17:46:19.182Z","event":"guard_blocked","host":"gemini","source":"command","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1","reason":"Recursive delete of critical path","details":{"command":"killall CleanMyMac_5_HealthMonitor CleanMyMac_5 2>/dev/null; rm -rf /Applications/CleanMyMac_5.app; find ~/Library/LaunchAgents /Library/LaunchAgents ~/Library/LaunchDaemons /Library/LaunchDaemons -na","guardType":"dangerous-command"}}
+{"ts":"2026-04-27T17:47:06.107Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T17-35-51-322Z-gemini-8cgzl1"}

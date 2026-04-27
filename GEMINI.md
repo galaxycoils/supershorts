@@ -6,10 +6,11 @@ Read `/Users/cmd/Documents/Obsidian Vault/SuperShorts/STATE_HANDOFF.md` IMMEDIAT
 2. **Log**: Record successes and "gotchas" during execution.
 3. **Handoff**: Update current status before finishing.
 
----
-
-## Project
-AI video factory. Topic → YouTube Short. Fully local (Ollama LLM + Piper TTS + MoviePy).
+### PROTOCOL 1: Universal Skill Library
+Specialized logic is mastered in `/Users/cmd/Documents/Obsidian Vault/SuperShorts/Skills/`.
+1. **Discover**: Find the right skill in Obsidian for the current task.
+2. **Apply**: Use the workflows and rules defined in the note.
+3. **Evolve**: Improve skills autonomously by logging new findings to the "Evolved Learnings" section.
 - **Metaswarm Workflow**: Use `/start-task` (or equivalent) for complex work. Follow Phase Execution Loop: Plan → Work → Verify → Commit.
 - **TDD Enforcement**: Tests first, 100% coverage required (see `.coverage-thresholds.json`).
 

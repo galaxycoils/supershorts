@@ -81,14 +81,14 @@ def test_api_models(client):
         response = client.get('/api/models')
         assert response.status_code == 200
         data = response.get_json()
-        assert data["models"] == ["model1", "model2"]
+        assert set(data["models"]) == {"model1", "model2"}
 
 def test_api_models_fallback(client):
     with patch('requests.get', side_effect=Exception("Ollama down")):
         response = client.get('/api/models')
         assert response.status_code == 200
         data = response.get_json()
-        assert data["models"] == ["llama3", "mistral"]
+        assert set(data["models"]) == {"llama3", "mistral"}
 
 def test_api_disk(client):
     with patch('dashboard._dir_mb', return_value=123.4):

@@ -40,12 +40,12 @@ BRAINROT_PALETTES = [
 # Rotgen Constants
 CHARACTERS_PATH    = ASSETS_PATH / "characters"
 CANVAS_W, CANVAS_H = 400, 500      # character drawing canvas
-PANEL_W,  PANEL_H  = 1080, 768     # character panel (top of frame)
-GAMEPLAY_H         = 992            # 1920 - 768 - 160
-SUBTITLE_H         = 160
-VIDEO_W,  VIDEO_H  = 1080, 1920
-FPS                = 24
-ANIMATION_FRAMES   = 48             # 2-second loop
+VIDEO_W,  VIDEO_H  = SHORT_VIDEO_SIZE
+PANEL_W,  PANEL_H  = VIDEO_W, int(VIDEO_H * 0.4)     # character panel (top of frame)
+SUBTITLE_H         = int(VIDEO_H * 0.0833)
+GAMEPLAY_H         = VIDEO_H - PANEL_H - SUBTITLE_H
+FPS                = VIDEO_FPS
+ANIMATION_FRAMES   = FPS * 2             # 2-second loop
 
 CHAR_PASTE_X = (PANEL_W - CANVAS_W) // 2   # 340
 CHAR_PASTE_Y = (PANEL_H - CANVAS_H) // 2   # 134
@@ -74,7 +74,7 @@ def auto_scale_text(draw: ImageDraw.ImageDraw, text: str, font_path: str, start_
     
     while size >= min_size:
         try: f = ImageFont.truetype(font_path, size)
-        except Exception: f = ImageFont.load_default()
+        except Exception as e: f = ImageFont.load_default()
         
         # simple word wrap
         words = text.split()
@@ -146,7 +146,7 @@ class StandardVideoEngine(IVideoEngine):
             title_font = ImageFont.truetype(str(FONT_FILE), 60 if video_type == 'long' else 70)
             content_font = ImageFont.truetype(str(FONT_FILE), 38 if video_type == 'long' else 44)
             footer_font = ImageFont.truetype(str(FONT_FILE), 24)
-        except Exception:
+        except Exception as e:
             title_font = content_font = footer_font = ImageFont.load_default()
 
         if not is_thumbnail:
@@ -201,7 +201,7 @@ class StandardVideoEngine(IVideoEngine):
         try:
             font_main = ImageFont.truetype(str(FONT_FILE), 120)
             font_sub  = ImageFont.truetype(str(FONT_FILE), 60)
-        except Exception:
+        except Exception as e:
             font_main = font_sub = ImageFont.load_default()
 
         # Progress bar at top
@@ -244,9 +244,9 @@ class StandardVideoEngine(IVideoEngine):
             bg_source = options.custom_bg if (options.custom_bg and Path(options.custom_bg).exists()) else get_local_viral_gameplay()
             
             if bg_source and Path(bg_source).exists():
-                bg_clip = VideoFileClip(str(bg_source)).subclip(0, total_duration).resize(height=1920)
-                if bg_clip.w > 1080:
-                    bg_clip = bg_clip.crop(x_center=bg_clip.w/2, width=1080)
+                bg_clip = VideoFileClip(str(bg_source)).subclip(0, total_duration).resize(height=SHORT_VIDEO_SIZE[1])
+                if bg_clip.w > SHORT_VIDEO_SIZE[0]:
+                    bg_clip = bg_clip.crop(x_center=bg_clip.w/2, width=SHORT_VIDEO_SIZE[0])
                 final = CompositeVideoClip([bg_clip.volumex(0), final.set_position("center").set_opacity(0.85)])
             
             # Background Music
@@ -274,7 +274,7 @@ class StandardVideoEngine(IVideoEngine):
             safe_close(audio_clips_to_close, final, bg_clip, bg_music)
             try:
                 Path(temp_audio).unlink(missing_ok=True)
-            except Exception:
+            except Exception as e:
                 pass
         return str(output_path)
 
@@ -345,7 +345,7 @@ class StandardVideoEngine(IVideoEngine):
             safe_close(composite, final_composite, bg_music, game_pos, char_pos, audio_clip)
             try:
                 Path(temp_audio).unlink(missing_ok=True)
-            except Exception:
+            except Exception as e:
                 pass
         return str(output_path)
 
@@ -356,11 +356,11 @@ class StandardVideoEngine(IVideoEngine):
         try:
             clip = VideoFileClip(str(input_path))
             actual_duration = min(duration, max(1, int(clip.duration)))
-            final = clip.subclip(0, actual_duration).resize(height=1920)
-            if final.w > 1080:
-                final = final.crop(x_center=final.w / 2, width=1080)
+            final = clip.subclip(0, actual_duration).resize(height=SHORT_VIDEO_SIZE[1])
+            if final.w > SHORT_VIDEO_SIZE[0]:
+                final = final.crop(x_center=final.w / 2, width=SHORT_VIDEO_SIZE[0])
             else:
-                final = final.resize(width=1080)
+                final = final.resize(width=SHORT_VIDEO_SIZE[0])
             
             final.write_videofile(
                 str(output_path),
@@ -446,7 +446,7 @@ class StandardVideoEngine(IVideoEngine):
         d.polygon([(230, y(325)), (200, y(380)), (270, y(340))], fill=(240, 240, 255))
         d.rectangle([(155, y(395)), (245, y(430))], fill="white", outline=(180, 180, 200))
         try: badge_font = ImageFont.truetype(str(FONT_FILE), 22)
-        except Exception: badge_font = ImageFont.load_default()
+        except Exception as e: badge_font = ImageFont.load_default()
         d.text((200, y(412)), "AI", fill=BLUE, font=badge_font, anchor="mm")
 
     def _build_rotgen_char_clip(self, speaking: bool, duration: float, panel_bg: np.ndarray, custom_img: Image.Image | None = None) -> ImageSequenceClip:
@@ -484,19 +484,19 @@ class StandardVideoEngine(IVideoEngine):
                 raw = VideoFileClip(bg_path)
                 src_w, src_h = raw.size
                 if src_w > src_h:
-                    crop_x = (src_w - src_h * 1080 // 992) // 2
-                    cropped = raw.crop(x1=max(0, crop_x), y1=0, x2=min(src_w, crop_x + src_h * 1080 // 992), y2=src_h)
+                    crop_x = (src_w - src_h * VIDEO_W // GAMEPLAY_H) // 2
+                    cropped = raw.crop(x1=max(0, crop_x), y1=0, x2=min(src_w, crop_x + src_h * VIDEO_W // GAMEPLAY_H), y2=src_h)
                     try: raw.reader.close()
                     except Exception: pass
                     raw = cropped
-                clip = raw.resize((1080, GAMEPLAY_H))
+                clip = raw.resize((VIDEO_W, GAMEPLAY_H))
                 if clip.duration < duration: clip = clip.fx(vfx.loop, duration=duration)
                 else: clip = clip.subclip(0, duration)
                 clip = clip.fx(vfx.colorx, 0.55)
                 return clip
             except Exception as e:
                 logger.warning("Failed to load gameplay clip from %s: %s", bg_path, e)
-        return ColorClip(size=(1080, GAMEPLAY_H), color=(10, 10, 30)).set_duration(duration)
+        return ColorClip(size=(VIDEO_W, GAMEPLAY_H), color=(10, 10, 30)).set_duration(duration)
 
     def compose_video(self, slide_paths: List[Union[str, Path]], audio_paths: List[Union[str, Path]], output_path: Union[str, Path], 
                       options: VideoOptions) -> str:

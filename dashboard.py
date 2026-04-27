@@ -21,9 +21,10 @@ import io
 import requests as _req
 from pathlib import Path
 from flask import Flask, Response, jsonify, request, stream_with_context, render_template, send_from_directory
+from src.core.config import LMSTUDIO_BASE_URL
 
 # Clean Architecture Imports
-from src.infrastructure.llm import OllamaLLMService
+from src.infrastructure.llm import get_llm_service
 from src.infrastructure.tts import StandardTTSService
 from src.infrastructure.browser_uploader import YouTubeBrowserUploader
 from src.infrastructure.video_engine_impl import StandardVideoEngine
@@ -38,7 +39,12 @@ from src.modes.studio_ideas import start_idea_generator
 from src.modes.viral import start_viral_gameplay_mode, generate_youtube_content_package
 from src.modes.clipper import run_video_clipper
 from src.core.learning import start_learning_mode, suggest_improvements
+from src.core.logging import setup_logging, get_logger
 from main import main_flow
+
+# Initialize logging
+setup_logging()
+logger = get_logger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -120,11 +126,25 @@ def api_health():
     import psutil
     ollama_ok = False
     try:
-        r = _req.get("http://localhost:11434/api/tags", timeout=1)
+        r = _req.get("http://127.0.0.1:11434/api/tags", timeout=1)
         ollama_ok = r.status_code == 200
     except: pass
-    ram_gb = psutil.virtual_memory().available >> 30
-    return jsonify({"ollama": ollama_ok, "uptime_s": int(time.time() - START), "ram_gb": ram_gb})
+    
+    lms_ok = False
+    try:
+        r = _req.get(f"{LMSTUDIO_BASE_URL.rstrip('/')}/models", timeout=2)
+        lms_ok = r.status_code == 200
+    except: pass
+    
+    v = psutil.virtual_memory()
+    return jsonify({
+        "ollama": ollama_ok, 
+        "lmstudio": lms_ok,
+        "uptime_s": int(time.time() - START), 
+        "ram_gb": v.available >> 30,
+        "ram_total_gb": v.total >> 30,
+        "ram_pct": v.percent
+    })
 
 @app.route("/api/ram")
 def api_ram():
@@ -134,20 +154,43 @@ def api_ram():
 
 @app.route("/api/models")
 def api_models():
+    lms_models = []
+    ollama_models = []
+    recommendations = {
+        "scripting": "qwen2.5-coder:3b",
+        "reasoning": "llama3.2:3b",
+        "creative": "mistral"
+    }
+
     try:
-        r = _req.get("http://localhost:11434/api/tags", timeout=2)
+        r = _req.get(f"{LMSTUDIO_BASE_URL.rstrip('/')}/models", timeout=2)
         if r.status_code == 200:
-            models = [m["name"] for m in r.json().get("models", [])]
-            return jsonify({
-                "models": models,
-                "recommendations": {
-                    "scripting": "qwen2.5-coder:3b",
-                    "reasoning": "llama3.2:3b",
-                    "creative": "mistral"
-                }
-            })
-    except: pass
-    return jsonify({"models": ["llama3", "mistral"], "recommendations": {}})
+            lms_models = [m["id"] for m in r.json().get("data", [])]
+    except Exception:
+        pass
+
+    try:
+        r = _req.get("http://127.0.0.1:11434/api/tags", timeout=1)
+        if r.status_code == 200:
+            ollama_models = [m["name"] for m in r.json().get("models", [])]
+    except Exception:
+        pass
+
+    if not lms_models and not ollama_models:
+        ollama_models = ["llama3", "mistral"]
+
+    model_info = (
+        [{"name": m, "label": m, "source": "lmstudio"} for m in lms_models] +
+        [{"name": m, "label": m, "source": "ollama"} for m in ollama_models]
+    )
+    all_models = list(dict.fromkeys(lms_models + ollama_models))
+
+    return jsonify({
+        "models": all_models,
+        "model_info": model_info,
+        "recommendations": recommendations,
+        "lmstudio_url": LMSTUDIO_BASE_URL
+    })
 
 @app.route("/api/assets")
 def api_assets():
@@ -181,13 +224,16 @@ def api_run(mode):
         os.environ["LLM_TEMPERATURE"] = str(data.get("temperature", "0.7"))
         os.environ["LLM_TONE"] = data.get("tone", "educational")
         
+        provider = data.get("llm_provider")
+        model = data.get("llm_model")
+
         if data.get("hd_mode") == "y": os.environ["RENDER_HD"] = "1"
         if data.get("background"): os.environ["CUSTOM_BG"] = str(PROJECT_ROOT / "assets" / "backgrounds" / data.get("background"))
         if data.get("character"): os.environ["CUSTOM_CHAR"] = str(PROJECT_ROOT / "assets" / "characters" / data.get("character"))
         if data.get("music"): os.environ["CUSTOM_MUSIC"] = str(PROJECT_ROOT / "assets" / "music" / data.get("music"))
 
         # Instantiate services
-        llm = OllamaLLMService()
+        llm = get_llm_service(provider=provider, model=model)
         tts = StandardTTSService()
         uploader = YouTubeBrowserUploader()
         broll_selector = AIBRollSelector(llm)
@@ -279,6 +325,20 @@ def serve_output(filename):
     return send_from_directory(PROJECT_ROOT / "output", filename)
 
 if __name__ == "__main__":
+    from src.core.config import LLM_PROVIDER, LMSTUDIO_BASE_URL, OLLAMA_MODEL
+    if LLM_PROVIDER == "lmstudio":
+        try:
+            logger.info(f"🔍 Validating LM Studio model: {OLLAMA_MODEL}")
+            r = _req.get(f"{LMSTUDIO_BASE_URL.rstrip('/')}/models", timeout=2)
+            models = [m['id'] for m in r.json().get('data', [])]
+            if OLLAMA_MODEL not in models:
+                logger.warning(f"⚠️  WARNING: Model '{OLLAMA_MODEL}' not found in LM Studio!")
+                logger.warning(f"   Available: {', '.join(models)}")
+            else:
+                logger.info(f"✅ Model '{OLLAMA_MODEL}' verified.")
+        except Exception as e:
+            logger.error(f"❌ Could not connect to LM Studio at {LMSTUDIO_BASE_URL}: {e}")
+
     port = int(os.environ.get("PORT", 5050))
-    print(f"🎬  SuperShorts Dashboard v3.0  →  http://localhost:{port}")
+    logger.info(f"🎬  SuperShorts Dashboard v3.1  →  http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, threaded=True)

@@ -17,22 +17,22 @@ def test_generate_tcm_curriculum_mock():
     assert len(result['lessons']) == 1
     assert result['lessons'][0]['title'] == "Lesson 1"
 
+from unittest.mock import MagicMock, patch
 from src.generator import generate_lesson_content, compose_video
 
-@patch('src.infrastructure.llm.ollama_generate')
-def test_generate_lesson_content_params(mock_ollama):
-    mock_ollama.return_value = {
+def test_generate_lesson_content_params():
+    mock_llm = MagicMock()
+    mock_llm.generate.return_value = {
         "long_form_slides": [],
         "short_form_highlight": "Test highlight",
         "hashtags": "#test"
     }
     # Test with custom series and style
-    generate_lesson_content("TCM Topic", series_name="TCM Series", style_description="Custom Style")
+    generate_lesson_content("TCM Topic", series_name="TCM Series", style_description="Custom Style", llm_service=mock_llm)
     
-    # Check if the prompt sent to ollama contains our custom strings
-    # We need to access the first argument of the first call
-    assert mock_ollama.called
-    args, kwargs = mock_ollama.call_args
+    # Check if the prompt sent to llm contains our custom strings
+    assert mock_llm.generate.called
+    args, kwargs = mock_llm.generate.call_args
     prompt = args[0]
     assert "TCM Series" in prompt
     assert "Custom Style" in prompt
