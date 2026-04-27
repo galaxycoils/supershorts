@@ -340,5 +340,6 @@ if __name__ == "__main__":
             logger.error(f"❌ Could not connect to LM Studio at {LMSTUDIO_BASE_URL}: {e}")
 
     port = int(os.environ.get("PORT", 5050))
-    logger.info(f"🎬  SuperShorts Dashboard v3.1  →  http://localhost:{port}")
-    app.run(host="0.0.0.0", port=port, threaded=True)
+    debug_mode = os.environ.get("FLASK_ENV") == "development"
+    logger.info(f"🎬  SuperShorts Dashboard v3.1  →  http://localhost:{port} (debug={debug_mode})")
+    app.run(host="0.0.0.0", port=port, threaded=True, debug=debug_mode)

@@ -25,6 +25,7 @@ assets/pexels/
 # Runtime / generated state
 dry_*.wav
 config.json
+mcp_output.json
 brainrot_plan.json
 rotgen_plan.json
 youtube_studio_ideas.json

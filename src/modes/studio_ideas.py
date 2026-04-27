@@ -48,7 +48,13 @@ def get_trending_context():
 
 
 def get_yt_api_key() -> str | None:
-    """Read YouTube Data API key from config.json; prompt + save if missing."""
+    """Read YouTube Data API key from environment or config.json; prompt + save if missing."""
+    # 1. Check environment variable
+    env_key = os.environ.get("YOUTUBE_API_KEY")
+    if env_key:
+        return env_key
+
+    # 2. Check config.json
     try:
         cfg = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
         if cfg.get("youtube_api_key"):

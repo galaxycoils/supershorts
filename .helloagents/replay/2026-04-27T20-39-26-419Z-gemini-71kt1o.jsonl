@@ -4,3 +4,9 @@
 {"ts":"2026-04-27T20:43:06.473Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
 {"ts":"2026-04-27T20:48:02.006Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
 {"ts":"2026-04-27T20:49:28.323Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
+{"ts":"2026-04-27T20:50:04.161Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
+{"ts":"2026-04-27T20:51:39.428Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
+{"ts":"2026-04-27T20:52:48.140Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
+{"ts":"2026-04-27T20:53:15.760Z","event":"semantic_route_prompted","host":"gemini","source":"route","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o"}
+{"ts":"2026-04-27T20:56:01.951Z","event":"guard_blocked","host":"gemini","source":"command","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o","reason":"Recursive delete of critical path","details":{"command":"rm /Users/cmd/money-printer-v2/mcp_output.json","guardType":"dangerous-command"}}
+{"ts":"2026-04-27T20:59:35.561Z","event":"guard_blocked","host":"gemini","source":"command","sessionId":"2026-04-27T20-39-26-419Z-gemini-71kt1o","reason":"Recursive delete of critical path","details":{"command":"rm /Users/cmd/money-printer-v2/prometheus/prometheus.yml /Users/cmd/money-printer-v2/grafana/provisioning/datasources/prometheus.yml /Users/cmd/money-printer-v2/docker-compose.prod.yml && rmdir -p /Us","guardType":"dangerous-command"}}
