@@ -1,10 +1,41 @@
-# SuperShorts Production Suite v3.6.0
+<div align="center">
 
-![SuperShorts Dashboard Preview](https://raw.githubusercontent.com/galaxycoils/supershorts/main/uiexample/IMG_1469.JPG)
+# 🌙 SuperShorts
 
-> **The ultimate "RotGen" clone for automated short-form content creation.**
+### *AI-powered short-form video engine — generate, render, and upload on autopilot.*
+
+[![CI Pipeline](https://github.com/galaxycoils/supershorts/actions/workflows/ci.yml/badge.svg)](https://github.com/galaxycoils/supershorts/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-8B5CF6.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-4C7DFF.svg)](https://www.python.org/downloads/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-1E1E2E.svg)](https://github.com/astral-sh/ruff)
+[![Last commit](https://img.shields.io/github/last-commit/galaxycoils/supershorts?color=8B5CF6)](https://github.com/galaxycoils/supershorts/commits/main)
+
+<img src="https://raw.githubusercontent.com/galaxycoils/supershorts/main/uiexample/IMG_1469.JPG" alt="SuperShorts dashboard" width="820" />
+
+</div>
+
+---
+
+## 📚 Table of Contents
+
+- [Why SuperShorts](#-why-supershorts)
+- [Core Architecture](#-core-architecture)
+- [Key Features](#-key-features)
+- [Screenshots](#-screenshots)
+- [Installation & Setup](#-installation--setup)
+- [Running the Dashboard](#-running-the-dashboard)
+- [Project Structure](#-project-structure)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## 🎯 Why SuperShorts
 
 SuperShorts is a production-grade, AI-powered video engine designed to generate, render, and upload viral content (YouTube Shorts, TikToks, Reels) on total autopilot. Leveraging local LLMs via Ollama and high-fidelity TTS via Piper, it provides a cost-free, high-performance pipeline for modern content creators.
+
+> **The ultimate "RotGen" clone for automated short-form content creation.**
 
 ---
 
@@ -13,7 +44,7 @@ SuperShorts is a production-grade, AI-powered video engine designed to generate,
 ### Frontend: The Command Center
 Built for performance and responsiveness, the UI has been refactored into a componentized architecture:
 - **Vanilla JS Engine**: Optimized state management for real-time subprocess monitoring and job tracking.
-- **Modern Aesthetic**: A "RotGen V2" theme featuring deep-space black surfaces (`#050505`), glassmorphism, and neon purple-to-blue gradients.
+- **Tranquil Eclipse Aesthetic**: Deep-indigo surfaces, soft lunar glow, and a refined purple-to-blue gradient — calmer than neon, sharper than flat.
 - **Mobile-First**: Fully responsive collapsible sidebar and multi-step production modals using CSS Grid and Flexbox.
 - **Real-time Monitoring**: Streaming output via Server-Sent Events (SSE) for zero-latency feedback during renders.
 
@@ -30,7 +61,7 @@ A robust Python-based microservice architecture:
 ## 🌟 Key Features
 
 - **Character-Based Production**: Choose from a roster of AI characters (Adam, Antoni, Arnold, etc.) with automated avatar overlays.
-- **3-Step Production Modal**: 
+- **3-Step Production Modal**:
     1. **Identity**: Select voices and character styles.
     2. **Concept**: Input topics or generate them using "Topic & Tone" presets.
     3. **Precision**: Fine-tune LLM temperature and rendering quality (720p vs 1080p HD).
@@ -40,6 +71,27 @@ A robust Python-based microservice architecture:
     - **RotGen**: Dynamic split-screen AI character stories.
     - **Clipper**: Transform long-form videos into vertical short-form hits.
 - **Asset Manager**: Dynamic visual selector for local backgrounds, characters, and music.
+
+---
+
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/galaxycoils/supershorts/main/uiexample/IMG_1469.JPG" alt="Command Center" /><br/>
+      <sub><b>Command Center</b><br/>KPIs &amp; live job telemetry</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/galaxycoils/supershorts/main/uiexample/IMG_1471.JPG" alt="Production Modal" /><br/>
+      <sub><b>Production Modal</b><br/>3-step identity → concept → precision</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/galaxycoils/supershorts/main/uiexample/IMG_1473.JPG" alt="Gallery" /><br/>
+      <sub><b>Gallery</b><br/>Browse rendered shorts</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -103,11 +155,14 @@ Access the UI at: **`http://localhost:5050`**
 ---
 
 ## 📈 Roadmap
-- [x] v3.5.0: Componentized UI & RotGen Aesthetic
-- [x] v3.6.0: Multi-LLM Provider Support (LM Studio)
-- [ ] v3.7.0: Multi-platform uploading (TikTok, Instagram)
-- [ ] v3.8.0: Cloud-synced asset library
-- [ ] v3.9.0: Advanced AI-driven B-Roll selection
+
+| Version | Milestone                                  | Status |
+|--------:|--------------------------------------------|:------:|
+| v3.5.0  | Componentized UI & RotGen Aesthetic        | ✅ |
+| v3.6.0  | Multi-LLM Provider Support (LM Studio)     | ✅ |
+| v3.7.0  | Multi-platform uploading (TikTok, Instagram) | 🚧 |
+| v3.8.0  | Cloud-synced asset library                 | 🔭 |
+| v3.9.0  | Advanced AI-driven B-Roll selection        | 🔭 |
 
 ---
 
@@ -123,6 +178,8 @@ Contributions are what make the open-source community such an amazing place to l
 ---
 
 ## 📄 License
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
 
-**Developed by {YOUR_NAME} for SuperShorts / AI for Developers.**
+<div align="center">
+<sub>Built with ☕ by the SuperShorts team — <i>AI for Developers</i>.</sub>
+</div>

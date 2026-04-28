@@ -1,13 +1,15 @@
-/* style.css — RotGen V2 Aesthetic Dashboard */
+/* style.css — Tranquil Eclipse Aesthetic Dashboard */
 :root {
-  --primary-bg: #050505;
-  --surface-bg: #121212;
-  --surface-hover: #1E1E1E;
-  --accent-gradient: linear-gradient(135deg, #8B5CF6, #3B82F6);
-  --accent-glow: rgba(139, 92, 246, 0.4);
+  --primary-bg: #070512;
+  --bg-sidebar: #0B0918;
+  --surface-bg: #121022;
+  --surface-hover: #1B1830;
+  --accent-gradient: linear-gradient(135deg, #7C5CFF 0%, #4C7DFF 100%);
+  --accent-glow: rgba(124, 92, 255, 0.28);
+  --moon-glow: radial-gradient(circle at 80% 10%, rgba(180, 170, 255, 0.08), transparent 55%);
   --text-main: #FFFFFF;
   --text-dim: #A1A1AA;
-  --border-color: #27272A;
+  --border-color: #27243A;
   --success: #10B981;
   --error: #EF4444;
   --sidebar-w: 260px;
@@ -17,7 +19,7 @@
   --z-modal: 1000;
   --space-unit: 8px;
   --elevation-2: 0 4px 6px -1px rgba(0,0,0,0.5);
-  --elevation-3: 0 20px 40px -10px rgba(0,0,0,0.8);
+  --elevation-3: 0 18px 36px -12px rgba(0,0,0,0.7);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -25,7 +27,9 @@ html, body { height: 100%; -webkit-font-smoothing: antialiased; scroll-behavior:
 
 body {
   background: var(--primary-bg);
-  background-image: radial-gradient(circle at 50% -20%, rgba(139, 92, 246, 0.05) 0%, var(--primary-bg) 80%);
+  background-image:
+    var(--moon-glow),
+    radial-gradient(circle at 50% -20%, rgba(124, 92, 255, 0.06) 0%, transparent 80%);
   color: var(--text-main);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 13px;
