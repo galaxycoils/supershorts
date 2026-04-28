@@ -1,0 +1,50 @@
+name: Daily Strategy
+
+on:
+  schedule:
+    # 09:00 UTC = 5am ET (EDT) / 4am ET (EST) / 2am PT (PDT).
+    # GitHub Actions cron is always UTC; it does not respect local DST.
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-strategy
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Anthropic SDK
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'anthropic>=0.40,<1'
+
+      - name: Generate today's plan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/daily_strategy.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name  'supershorts-strategy-bot'
+          git config user.email 'strategy-bot@users.noreply.github.com'
+          git add strategy/latest.md strategy/daily/
+          if git diff --cached --quiet; then
+            echo "No strategy changes to commit."
+            exit 0
+          fi
+          today=$(date -u +%Y-%m-%d)
+          git commit -m "chore(strategy): daily plan for ${today}"
+          git push
