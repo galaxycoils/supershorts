@@ -22,7 +22,13 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavdevice-dev libavfilter-dev libswresample-dev pkg-config espeak libespeak-dev
+        sudo apt-get install -y \
+          ffmpeg \
+          libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
+          libavdevice-dev libavfilter-dev libswresample-dev \
+          pkg-config \
+          espeak libespeak-dev \
+          libgl1 libglib2.0-0
 
     - name: Install dependencies
       run: |
