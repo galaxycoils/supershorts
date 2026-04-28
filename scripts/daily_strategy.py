@@ -3,12 +3,17 @@
 Reads yesterday's plan (or the seed on day 1), asks Claude to critique it
 and produce today's plan, writes the result to disk. Designed to run
 unattended from a GitHub Actions cron.
+
+Always writes strategy/last_run.log with a status line and any traceback
+so failures are diagnosable from the committed branch alone (the workflow
+has no log-export step).
 """
 
 from __future__ import annotations
 
 import os
 import sys
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +25,7 @@ DAILY_DIR = STRATEGY_DIR / "daily"
 CONTEXT_PATH = STRATEGY_DIR / "CONTEXT.md"
 LATEST_PATH = STRATEGY_DIR / "latest.md"
 SEED_PATH = STRATEGY_DIR / "seed.md"
+LOG_PATH = STRATEGY_DIR / "last_run.log"
 
 MODEL = "claude-opus-4-7"
 
@@ -87,6 +93,28 @@ order:
 """
 
 
+def now_utc_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def write_log(status: str, detail: str) -> None:
+    """Always write a single-line status + optional detail block."""
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with LOG_PATH.open("w", encoding="utf-8") as fh:
+        fh.write(f"{now_utc_iso()} {status}\n")
+        fh.write(f"sdk_version={getattr(anthropic, '__version__', 'unknown')}\n")
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if api_key:
+            fh.write(f"api_key_prefix={api_key[:10]}...\n")
+        else:
+            fh.write("api_key_prefix=<MISSING>\n")
+        if detail:
+            fh.write("\n--- detail ---\n")
+            fh.write(detail)
+            if not detail.endswith("\n"):
+                fh.write("\n")
+
+
 def load_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -112,7 +140,7 @@ def build_user_message(today: str, prev_plan: str) -> str:
 def generate_plan() -> str:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        sys.exit("ANTHROPIC_API_KEY not set — add it to repo secrets.")
+        raise RuntimeError("ANTHROPIC_API_KEY is not set in the environment")
 
     client = anthropic.Anthropic(api_key=api_key)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -141,7 +169,7 @@ def generate_plan() -> str:
     text_blocks = [b.text for b in message.content if b.type == "text"]
     plan = "\n".join(text_blocks).strip()
     if not plan:
-        sys.exit("Model returned no text content.")
+        raise RuntimeError("Model returned no text content")
 
     usage = message.usage
     print(
@@ -164,11 +192,20 @@ def write_plan(plan: str) -> Path:
 
 
 def main() -> int:
-    plan = generate_plan()
-    dated = write_plan(plan)
-    print(f"wrote {dated.relative_to(REPO_ROOT)}")
-    print(f"wrote {LATEST_PATH.relative_to(REPO_ROOT)}")
-    return 0
+    try:
+        plan = generate_plan()
+        dated = write_plan(plan)
+        print(f"wrote {dated.relative_to(REPO_ROOT)}")
+        print(f"wrote {LATEST_PATH.relative_to(REPO_ROOT)}")
+        write_log("OK", f"wrote {dated.name} and latest.md")
+        return 0
+    except Exception:
+        tb = traceback.format_exc()
+        print(tb, file=sys.stderr)
+        write_log("FAILED", tb)
+        # Exit 0 so the workflow's commit step still runs and pushes the
+        # diagnostic log; the log itself records FAILED status.
+        return 0
 
 
 if __name__ == "__main__":
