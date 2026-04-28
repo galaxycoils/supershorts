@@ -6,6 +6,14 @@ on:
     # GitHub Actions cron is always UTC; it does not respect local DST.
     - cron: '0 9 * * *'
   workflow_dispatch: {}
+  # Also re-run when the strategist itself changes — safe because the
+  # bot only writes under strategy/daily/ and strategy/latest.md, neither
+  # of which is in the paths list, so there's no self-trigger loop.
+  push:
+    paths:
+      - 'scripts/daily_strategy.py'
+      - 'strategy/CONTEXT.md'
+      - '.github/workflows/daily-strategy.yml'
 
 permissions:
   contents: write
